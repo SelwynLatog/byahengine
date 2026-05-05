@@ -140,9 +140,9 @@ static void draw_box_lit(
     glm::mat4 m = glm::translate(glm::mat4(1.0f), center_bottom);
     glm::mat3 nm = glm::mat3(glm::transpose(glm::inverse(m)));
 
-    set_mat4(shader, "u_model",      m);
+    set_mat4(shader, "u_model", m);
     set_mat3(shader, "u_normal_mat", nm);
-    set_vec3(shader, "u_kd",         color);
+    set_vec3(shader, "u_kd", color);
 
     std::vector<float> verts;
     push_box_lit(verts, glm::vec3(0.0f), full_size, color);
@@ -255,8 +255,8 @@ void scene_draw(
     glm::vec3 sc = scene.model_center * scene.model_scale;
     glm::mat4 tm =
         glm::translate(glm::mat4(1.0f), render_pos)
-        * glm::rotate(glm::mat4(1.0f), trike.heading,    glm::vec3(0,1,0))
-        * glm::rotate(glm::mat4(1.0f), trike.roll_angle, glm::vec3(0,0,1))
+        * glm::rotate(glm::mat4(1.0f), -trike.heading, glm::vec3(0,1,0))
+        * glm::rotate(glm::mat4(1.0f), trike.roll_angle, glm::vec3(1,0,0))
         * glm::rotate(glm::mat4(1.0f), glm::radians(Const::TRIKE_MODEL_YAW_OFFSET), glm::vec3(0,1,0))
         * glm::translate(glm::mat4(1.0f), -sc)
         * glm::scale(glm::mat4(1.0f), glm::vec3(scene.model_scale));
@@ -264,7 +264,7 @@ void scene_draw(
     glm::mat3 tnm = glm::mat3(glm::transpose(glm::inverse(tm)));
 
     shader_bind(scene.shader);
-    set_mat4(scene.shader, "u_model",      tm);
+    set_mat4(scene.shader, "u_model", tm);
     set_mat3(scene.shader, "u_normal_mat", tnm);
 
     if constexpr (Const::USE_PROC_MESH){
@@ -281,7 +281,7 @@ void scene_draw(
         shader_bind(scene.shader);
     } else {
         for (int i = 0; i < (int)scene.trike_mesh.data.groups.size(); ++i){
-            const ObjGroup&    grp = scene.trike_mesh.data.groups[i];
+            const ObjGroup& grp = scene.trike_mesh.data.groups[i];
             const ObjMaterial* mat = obj_find_material(scene.trike_mesh.data, grp.mat_name);
             set_vec3(scene.shader, "u_kd", mat ? mat->kd : glm::vec3(0.8f));
             obj_mesh_draw_group(scene.trike_mesh, i);
@@ -299,7 +299,7 @@ void scene_draw(
     for (const auto& obs : obstacles){
         float flash = glm::clamp(obs.hit_timer / 0.35f, 0.0f, 1.0f);
         glm::vec3 base = {0.45f, 0.43f, 0.40f};
-        glm::vec3 hit = {0.9f,  0.15f, 0.10f};
+        glm::vec3 hit = {0.9f, 0.15f, 0.10f};
         glm::vec3 color = glm::mix(base, hit, flash);
 
         glm::vec3 cb = glm::vec3(
