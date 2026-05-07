@@ -21,7 +21,7 @@ namespace Const{
     inline constexpr float TRIKE_MASS = 180.0f; // kg + rider
     inline constexpr float TRIKE_MAX_SPEED = 12.0f; // m/s (43 km/h)
     inline constexpr float TRIKE_ENGINE_FORCE = 300.0f; // N
-    inline constexpr float TRIKE_BRAKE_FORCE= 400.0f; // N
+    inline constexpr float TRIKE_BRAKE_FORCE= 600.0f; // N
     inline constexpr float TRIKE_FRICTION = 8.5f; // rolling resistance coefficient
     inline constexpr float TRIKE_MAX_STEER_ANGLE = 20.0f; // degrees
     inline constexpr float TRIKE_STEER_SPEED = 90.0f; //degrees /sec

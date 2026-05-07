@@ -93,6 +93,8 @@ void app_run(App& app){
         // collision detection + response
         for (auto& obs : app.obstacles){
             if (obs.hit_timer > 0.0f) obs.hit_timer -= dt;
+            glm::vec3 to_obs = obs.position - app.trike.position;
+            if (glm::dot(to_obs, to_obs) > 25.0f) continue;
             if (!aabb_overlap(app.trike.aabb, obs.aabb)) continue;
 
             // min translation vec
@@ -117,9 +119,9 @@ void app_run(App& app){
             if (spd_along < 0.0f) closing += std::abs(spd_along);
             if (lat_along < 0.0f) closing += std::abs(lat_along);
 
-            if (closing > 0.1f){
+            if (closing > 0.8f){
                 app.trike.last_impact_force = closing;
-                app.trike.impact_timer = 0.35f;
+                app.trike.impact_timer = (closing > 2.0f) ? 0.35f : 0.0f;
                 obs.hit_timer = 0.35f;
 
                 if (spd_along < 0.0f)

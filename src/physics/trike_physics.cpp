@@ -45,7 +45,7 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, float dt){
     // brake always opposes current motion
     float brake_force = brake * (state.speed > 0.0f ? -1.0f : (state.speed < 0.0f ? 1.0f : 0.0f));
     // rolling friction : proportional to speed, always opposes motion
-    float friction = -state.speed * Const::TRIKE_FRICTION;
+    float friction = (input.brake == 0.0f) ? -state.speed * Const::TRIKE_FRICTION : 0.0f;
 
     float net_force = engine + brake_force + friction;
     float acceleration = net_force / Const::TRIKE_MASS;
@@ -86,10 +86,10 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, float dt){
         state.heading = std::remainder(state.heading, 2.0f * glm::pi<float>());
 
         // blend velocity heading toward body heading
-        //creates organic lag on cornering
-        float slip_angle = state.heading - state.velocity_heading;
+        // creates organic lag on cornering
+        float slip_angle = std::remainder(state.heading - state.velocity_heading, 2.0f * glm::pi<float>());
         state.velocity_heading += slip_angle * std::min(1.0f, 8.0f * dt);
-
+        
         //integrate position
         glm::vec3 forward = {
             std::cos(state.velocity_heading),
@@ -117,12 +117,10 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, float dt){
         // feeds actual slip into the system
         // trike roll won't physically drift outward during hard turns without this
         float slip_input = (state.speed * std::tan(state.steer_angle)) * 0.35f;
-        state.lateral_speed += slip_input * dt;
-
+        if (std::abs(state.speed) > 0.1f) state.lateral_speed += slip_input * dt;
 
         // dead stop lateral creep
-        if (std::abs(state.lateral_speed) < 0.01f) state.lateral_speed = 0.0f;
-
+        if (std::abs(state.lateral_speed) < 0.05f) state.lateral_speed = 0.0f;
         // integrate lateral pos
         state.position += right * state.lateral_speed * dt;
 
@@ -130,9 +128,9 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, float dt){
         // lateral acceleration is what tips the trike
         // a = v^2 / R, R = wheelbase / tan(steer_angle)
         float lateral_accel_g= 0.0f;
-        if (std::abs(state.steer_angle) > 0.001f && std::abs(state.speed) >= 3.0f){
+        if (std::abs(state.steer_angle) > 0.001f && std::abs(state.speed) >= 5.5f){
             float turn_radius= Const::TRIKE_WHEELBASE / std::tan(std::abs(state.steer_angle));
-            lateral_accel_g= (state.speed * state.speed) / turn_radius;
+            lateral_accel_g= (state.speed * state.speed) / turn_radius/ Const::GRAVITY;
 
             // sign
             // right turn= positive roll tips right

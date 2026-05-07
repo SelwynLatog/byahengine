@@ -18,9 +18,9 @@ struct Aabb {
 // half-extents of the trike in its LOCAL frame (metres)
 // these are fixed geometry constants — tune to match the model visually
 // x= half-length (front to back), z = half-width (side to side), y = half-height
-static constexpr float TRIKE_HEXT_X= 1.1f;  // ~2.2m bumper to bumper
+static constexpr float TRIKE_HEXT_X= 0.85f;  // ~2.2m bumper to bumper
 static constexpr float TRIKE_HEXT_Y= 0.75f; // ~1.5m tall with canopy
-static constexpr float TRIKE_HEXT_Z= 0.65f; // ~1.3m wide including sidecar
+static constexpr float TRIKE_HEXT_Z= 0.50f; // ~1.3m wide including sidecar
 
 // recomputes the world-space AABB from the trike's current position and heading
 // called once per frame after physics update, before any collision checks
