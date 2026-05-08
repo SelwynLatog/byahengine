@@ -256,7 +256,7 @@ void scene_draw(
     glm::mat4 tm =
         glm::translate(glm::mat4(1.0f), render_pos)
         * glm::rotate(glm::mat4(1.0f), -trike.heading, glm::vec3(0,1,0))
-        * glm::rotate(glm::mat4(1.0f), trike.roll_angle, glm::vec3(1,0,0))
+        * glm::rotate(glm::mat4(1.0f), -trike.roll_angle, glm::vec3(1,0,0))
         * glm::rotate(glm::mat4(1.0f), glm::radians(Const::TRIKE_MODEL_YAW_OFFSET), glm::vec3(0,1,0))
         * glm::translate(glm::mat4(1.0f), -sc)
         * glm::scale(glm::mat4(1.0f), glm::vec3(scene.model_scale));

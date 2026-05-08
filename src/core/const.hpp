@@ -57,7 +57,7 @@ namespace Const{
     // cam
     inline constexpr float CAM_YAW_DEFAULT= 0.0f;
     inline constexpr float CAM_PITCH_DEFAULT= 25.0f;
-    inline constexpr float CAM_DIST_DEFAULT= 6.0f;
+    inline constexpr float CAM_DIST_DEFAULT= 5.0f;
     inline constexpr float CAM_PITCH_MIN= 5.0f;
     inline constexpr float CAM_PITCH_MAX= 85.0f;
     inline constexpr float CAM_YAW_SPEED= 60.0f;  // degrees/sec
