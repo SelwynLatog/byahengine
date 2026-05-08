@@ -17,7 +17,9 @@ credits to @wawa for the trike model, you can find and download it for free on:
 https://sketchfab.com/3d-models/lowpoly-traysikeltricycle-08cb15a0c57748f793e0ead5e5095722
 
 <img width="1873" height="1090" alt="image" src="https://github.com/user-attachments/assets/93b8092b-7db8-4828-a6fa-e32f7ea9fbdf" />
-<img width="1863" height="1068" alt="image" src="https://github.com/user-attachments/assets/6c689712-7ab5-46aa-9798-b746f29fdc77" />
+
+<img width="1864" height="1104" alt="image" src="https://github.com/user-attachments/assets/bd850430-7be0-4d09-a5b8-9c2ac00f3aa0" />
+
 
 # V2 Goal:
 - in-game map editor
