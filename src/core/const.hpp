@@ -69,6 +69,9 @@ namespace Const{
     inline constexpr float CAM_LERP_SPEED= 5.0f; // how fast cam catches to trike
     inline constexpr float CAM_LOOKAHEAD= 1.5f; //metres ahead of trike at max speed
 
+    // editor
+    inline constexpr float EDITOR_CAM_SPEED = 12.0f; //metres/sec freecam movement
+    inline constexpr float EDITOR_LOOK_SENSITIVITY = 0.003f; // radians per pixel drag
 
     // lighting
     inline constexpr float LIGHT_DIR_X= 1.0f;
