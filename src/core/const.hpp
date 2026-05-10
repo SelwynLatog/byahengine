@@ -72,6 +72,10 @@ namespace Const{
     // editor
     inline constexpr float EDITOR_CAM_SPEED = 12.0f; //metres/sec freecam movement
     inline constexpr float EDITOR_LOOK_SENSITIVITY = 0.003f; // radians per pixel drag
+    inline constexpr float EDITOR_GRID_SNAP = 0.5f; // metres, placement snaps to this grid
+    inline constexpr float EDITOR_ROTATE_SPEED = 1.5f; // radians/sec
+    inline constexpr float EDITOR_SCALE_SPEED = 0.5f; // units/sec
+    inline constexpr const char* MAP_SAVE_PATH = "../assets/map.txt";
 
     // lighting
     inline constexpr float LIGHT_DIR_X= 1.0f;
