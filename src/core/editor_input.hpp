@@ -17,3 +17,8 @@ void editor_input_update(EditorState & editor, WorldMap& map, GLFWwindow* window
 // returns false if ray is parallel to ground
 bool editor_raycast_ground( double mx, double my, const glm::mat4& view, const glm::mat4& proj,
     int screen_w, int screen_h, glm::vec3& out_pos);
+
+// check if ray hits any placed object's AABB
+// returns id of the closest hit oject -1 if none
+int editor_raycast_objects( double mx, double my, const glm::mat4& view, const glm::mat4& proj,
+    int screen_w, int screen_h, const WorldMap& map);
