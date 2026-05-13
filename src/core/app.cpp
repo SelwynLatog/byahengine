@@ -1,5 +1,7 @@
 #include "app.hpp"
 #include "const.hpp"
+#include "editor_cam.hpp"
+#include "editor_input.hpp"
 #include "../physics/trike_aabb.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -23,6 +25,10 @@ static glm::vec3 s_cam_pos = glm::vec3(-6.0f, 3.0f, 0.0f);
 static bool s_free_cam = false;
 static bool s_f_pressed_last = false;
 
+// map editor toggle
+// edge trigger so a single tab press flips mode once
+static bool s_tab_pressed_last = false;
+
 void app_init(App& app){
     window_init(app.window,
         Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, Const::WINDOW_TITLE);
@@ -30,6 +36,10 @@ void app_init(App& app){
     glEnable(GL_DEPTH_TEST);
 
     scene_init(app.scene);
+    editor_renderer_init(app.editor_renderer);
+
+    // try to load existing map
+    world_map_load(app.map, Const::MAP_SAVE_PATH);   
 
     // spawn static obstacles
     // position=center-bottom 
@@ -56,7 +66,54 @@ void app_run(App& app){
         app.last_time = now;
         if (dt > Const::MAX_DELTA) dt = Const::MAX_DELTA;
 
-        // driving input
+        // tab toggle
+        // switch from editor/ drive mode
+        bool tab_down = glfwGetKey(app.window.handle, GLFW_KEY_TAB) == GLFW_PRESS;
+        if (tab_down && !s_tab_pressed_last){
+            app.editor.active = !app.editor.active;
+            if (app.editor.active){
+                // entering editor
+                // park cam above trike & reset mouse
+                app.editor.cam_pos = app.trike.position + glm::vec3(0.0f, 12.0f, 0.0f);
+                editor_cam_init(app.window.handle);
+            }
+        }
+        s_tab_pressed_last = tab_down;
+
+        // EDITOR MODE
+        if (app.editor.active){
+            editor_cam_update(app.editor, app.window.handle, dt);
+
+            glm::mat4 view = editor_cam_get_view(app.editor);
+            glm::mat4 proj = glm::perspective ( glm::radians(Const::CAM_FOV), (float)Const::WINDOW_WIDTH/ (float)Const::WINDOW_HEIGHT,
+            Const::CAM_NEAR, Const::CAM_FAR);
+
+            editor_input_update(app.editor, app.map, app.window.handle, view, proj, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, dt);
+
+            // render
+            glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            // draw world scene:
+            // ground, gizmo
+            // trike parked where it stopped last
+            scene_draw(app.scene, app.trike, app.obstacles, view, proj);
+
+            // draw editor overlays:
+            // grid, ghost, selection highlight
+            editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj);
+
+            // temp editor control hud
+            font_draw(app.editor_renderer.font,"[TAB] drive  [L CLICK] place/select  [DEL] delete  [T]translate [R]rotate [Y]scale  [Ctrl+S] save",
+                      10, Const::WINDOW_HEIGHT - 24, 1, 0.7f, 0.7f, 0.7f);
+            
+            window_swap_buffers(app.window);
+            window_poll_events();
+            continue;
+        }
+
+
+        // DRIVING MODE
         TrikeInput input;
         input.throttle = (glfwGetKey(app.window.handle, GLFW_KEY_W) == GLFW_PRESS) ? 1.0f : 0.0f;
         input.brake = (glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS) ? 1.0f : 0.0f;
@@ -208,5 +265,7 @@ void app_shutdown(App& app){
     hud_destroy(app.hud);
     scene_destroy(app.scene);
     window_destroy(app.window);
+    world_map_save(app.map, Const::MAP_SAVE_PATH);
+    editor_renderer_destroy(app.editor_renderer);
     app.running = false;
 }

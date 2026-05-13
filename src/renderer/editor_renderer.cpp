@@ -85,6 +85,7 @@ static void draw_wire_box(
 
 void editor_renderer_init(EditorRenderer& er){
     shader_init(er.shader, ER_VERT, ER_FRAG);
+    font_init(er.font, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
 
     // buid the snap grid as a static mesh
     // two sets parallel one along x, one along z
@@ -157,4 +158,5 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
 void editor_renderer_destroy(EditorRenderer& er){
     shader_destroy(er.shader);
     mesh_destroy(er.grid);
+    font_destroy(er.font);
 }

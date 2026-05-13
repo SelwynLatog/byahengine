@@ -8,18 +8,22 @@ add_executable(tricycle-sim
     src/main.cpp
     src/core/app.cpp
     src/core/window.cpp
+    src/core/editor_cam.cpp
+    src/core/editor_input.cpp
     src/renderer/shader.cpp
     src/renderer/mesh.cpp
     src/renderer/mesh_builder.cpp
     src/renderer/obj_loader.cpp
     src/renderer/obj_mesh.cpp
+    src/renderer/editor_renderer.cpp
+    src/renderer/font.cpp
+    src/renderer/hud.cpp
+    src/renderer/scene.cpp
     src/tricycle/tricycle_mesh.cpp
     src/tricycle/tricycle_model.cpp
     src/physics/trike_physics.cpp
     src/physics/trike_aabb.cpp
-    src/renderer/font.cpp
-    src/renderer/hud.cpp
-    src/renderer/scene.cpp
+    src/world/world_map.cpp
     vendor/glad/src/glad.c
 )
 

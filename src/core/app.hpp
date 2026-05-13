@@ -1,10 +1,13 @@
 #pragma once
 #include "window.hpp"
+#include "editor_state.hpp"
 #include "../physics/trike_state.hpp"
 #include "../physics/trike_physics.hpp"
 #include "../physics/obstacle.hpp"
 #include "../renderer/hud.hpp"
 #include "../renderer/scene.hpp"
+#include "../renderer/editor_renderer.hpp"
+#include "../world/world_map.hpp"
 #include <vector>
 
 struct App {
@@ -17,6 +20,10 @@ struct App {
     bool running = false;
 
     std::vector<Obstacle> obstacles;
+
+    EditorState editor;
+    WorldMap map;
+    EditorRenderer editor_renderer;
 };
 
 void app_init(App& app);

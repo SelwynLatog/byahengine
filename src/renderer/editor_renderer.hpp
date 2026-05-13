@@ -1,6 +1,7 @@
 #pragma once
 #include "shader.hpp"
 #include "mesh.hpp"
+#include "font.hpp"
 #include "../core/editor_state.hpp"
 #include "../world/world_map.hpp"
 #include <glm/glm.hpp>
@@ -10,6 +11,7 @@
 struct EditorRenderer{
     Shader shader; // flat color pos + rgb
     Mesh grid; // snap grid built once at init
+    Font font; // editor control hud
 };
 
 // builds the static grid mesh and compiles the flat shader

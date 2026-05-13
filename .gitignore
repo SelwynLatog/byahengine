@@ -4,5 +4,6 @@ vendor/
 *.exe
 *.obj
 *.o
+*.ps1
 .cache/
 .vscode/
