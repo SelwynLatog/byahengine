@@ -1,5 +1,6 @@
 #include "editor_input.hpp"
 #include "const.hpp"
+#include "../renderer/editor_renderer.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <filesystem>
@@ -16,6 +17,8 @@ static bool s_arr_left_last = false;
 static bool s_arr_right_last = false;
 static bool s_arr_up_last = false;
 static bool s_arr_down_last = false;
+static bool s_pgup_last = false;
+static bool s_pgdn_last = false;
 
 void editor_scan_props(EditorState& editor, const char* assets_dir){
     editor.prop_list.clear();
@@ -119,8 +122,9 @@ int editor_raycast_objects (double mx, double my, const glm::mat4& view, const g
 }
 
 
-void editor_input_update(EditorState & editor, WorldMap& map, GLFWwindow* window, 
-    const glm::mat4& view, const glm::mat4& proj, int screen_w, int screen_h, float dt){
+void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
+    GLFWwindow* window, const glm::mat4& view, const glm::mat4& proj,
+    int screen_w, int screen_h, float dt){
 
     double mx, my;
     glfwGetCursorPos(window, &mx, &my);
@@ -176,6 +180,9 @@ void editor_input_update(EditorState & editor, WorldMap& map, GLFWwindow* window
     }
 
     // tool switching
+    // tool key + <- -> to control
+    // eg. R + <- -> to rotate mesh
+    // probably should have added this to make it more clear
     if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) editor.tool = TOOL_TRANSLATE;
     if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) editor.tool = TOOL_ROTATE;
     if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS) editor.tool = TOOL_SCALE;
@@ -190,16 +197,25 @@ void editor_input_update(EditorState & editor, WorldMap& map, GLFWwindow* window
                 bool ar = glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS;
                 bool au = glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS;
                 bool ad = glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS;
+                bool pgup = glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS;
+                bool pgdn = glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS;
 
+                // xz movement
                 if (al && !s_arr_left_last) o.position.x -= Const::EDITOR_GRID_SNAP;
                 if (ar && !s_arr_right_last) o.position.x += Const::EDITOR_GRID_SNAP;
                 if (au && !s_arr_up_last) o.position.z -= Const::EDITOR_GRID_SNAP;
                 if (ad && !s_arr_down_last) o.position.z += Const::EDITOR_GRID_SNAP;
 
+                // y nudge for vert pos adjustment
+                if (pgup && !s_pgup_last) o.position.y += Const::EDITOR_GRID_SNAP;
+                if (pgdn && !s_pgdn_last) o.position.y -= Const::EDITOR_GRID_SNAP;
+
                 s_arr_left_last = al;
                 s_arr_right_last = ar;
                 s_arr_up_last = au;
                 s_arr_down_last = ad;
+                s_pgup_last = pgup;
+                s_pgdn_last = pgdn;
             }
 
             if (editor.tool == TOOL_ROTATE){
@@ -234,6 +250,7 @@ void editor_input_update(EditorState & editor, WorldMap& map, GLFWwindow* window
             o.position = editor.ghost_pos;
             o.model_path = editor.selected_model;
             o.behavior = STATIC;
+            o.y_floor_offset = editor_get_y_floor_offset(er, editor.selected_model);
             WorldObject& placed = world_map_place(map, o);
             editor.selected_id = placed.id;
             std::cout << " editor placed " << o.model_path << " id = " << placed.id

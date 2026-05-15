@@ -91,7 +91,7 @@ void app_run(App& app){
             glm::mat4 proj = glm::perspective ( glm::radians(Const::CAM_FOV), (float)Const::WINDOW_WIDTH/ (float)Const::WINDOW_HEIGHT,
             Const::CAM_NEAR, Const::CAM_FAR);
 
-            editor_input_update(app.editor, app.map, app.window.handle, view, proj, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, dt);
+            editor_input_update(app.editor, app.map, app.editor_renderer, app.window.handle, view, proj, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, dt);
 
             // render
             glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);
@@ -107,7 +107,7 @@ void app_run(App& app){
             editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj);
 
             // temp editor control hud
-            font_draw(app.editor_renderer.font,"[TAB] drive  [L CLICK] place/select  [DEL] delete  [T]translate [R]rotate [Y]scale  [Ctrl+S] save",
+            font_draw(app.editor_renderer.font,"[TAB] drive  [L CLICK] place/select  [DEL] delete  [T]translate [R]rotate [Y]scale  [Ctrl+S] save [PgUp/PgDn] Y nudge",
                       10, Const::WINDOW_HEIGHT - 30, 2, 0.7f, 0.7f, 0.7f);
             
             window_swap_buffers(app.window);

@@ -29,4 +29,6 @@ struct WorldObject{
     std::string model_path = "";
     ObjectBehavior behavior = STATIC;
     int id = -1; // unique id will be assigned on placement
+
+    float y_floor_offset = 0.0f;
 };

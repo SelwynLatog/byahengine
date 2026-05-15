@@ -1,6 +1,7 @@
 #pragma once
 #include "editor_state.hpp"
 #include "../world/world_map.hpp"
+#include "../renderer/editor_renderer.hpp"
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
@@ -12,8 +13,9 @@ void editor_scan_props(EditorState& editor, const char* assets_dir);
 // deletion
 // tool switching
 // save/load
-void editor_input_update(EditorState & editor, WorldMap& map, GLFWwindow* window, 
-    const glm::mat4& view, const glm::mat4& proj, int screen_w, int screen_h, float dt);
+void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
+    GLFWwindow* window, const glm::mat4& view, const glm::mat4& proj,
+    int screen_w, int screen_h, float dt);
 
 // casts a ray from screen pixel (mx, my) into the world
 // returns the XZ ground plane hit pos y=0

@@ -164,12 +164,28 @@ static ObjMesh& get_prop_mesh(EditorRenderer& er, const std::string& filename){
         return er.prop_cache[filename];
     }
 
+    // compute y min from vertex buffer before uploading
+    // layout is px py pz nx ny nz so Y is at every index 1, 7, 13...
+    float y_min = 1e9f;
+    for (int i = 1; i < (int)data.vertices.size(); i += 6) y_min = std::min(y_min, data.vertices[i]);
+    
+    // store offset so model matrix can push mesh up to y = 0
+    er.prop_y_offset[filename] = (y_min < 1e9f) ? -y_min : 0.0f;
+
     ObjMesh mesh{};
     obj_mesh_init(mesh, std::move(data));
     er.prop_cache[filename] = std::move(mesh);
     return er.prop_cache[filename];
 }
 
+// returns the y floor offset for a given prop filename
+float editor_get_y_floor_offset(EditorRenderer& er, const std::string& filename){
+    get_prop_mesh(er, filename); // ensure cached
+    auto it = er.prop_y_offset.find(filename);
+    return (it != er.prop_y_offset.end()) ? it->second : 0.0f;
+}
+
+// maps out a color based on obj behavior
 // maps out a color based on obj behavior
 // makes it easier to read at first glance
 static glm::vec3 behavior_color(ObjectBehavior b){
@@ -234,9 +250,11 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
 
         // build model matrix: translate, rotate Y, scale
         // same convention as trike: center-bottom origin
+        // also added y-offset lifts so mesh lowest vertex sits at y ground level
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::translate(model, o.position);
         model = glm::rotate(model, o.rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::translate(model, glm::vec3(0.0f, o.y_floor_offset, 0.0f));
         model = glm::scale(model, o.scale);
 
         glm::mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));

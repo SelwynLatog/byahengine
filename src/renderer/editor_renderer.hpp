@@ -17,8 +17,13 @@ struct EditorRenderer{
     Mesh grid; // snap grid built once at init
     Font font; // editor control hud
 
-    // load prop meshes keyed by filename
+    // load prop meshes keyed by filename eg. "balay.obj"
     std::map<std::string, ObjMesh> prop_cache;
+
+    // y offset per prop
+    // this sets mesh lowest point to 0 so no spawning below ground level
+    std::map<std::string, float> prop_y_offset;
+
 };
 
 // builds the static grid mesh and compiles the flat shader
@@ -35,3 +40,5 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
     const glm::mat4& view, const glm::mat4& proj);
 
 void editor_renderer_destroy(EditorRenderer& er);
+
+float editor_get_y_floor_offset(EditorRenderer& er, const std::string& filename);
