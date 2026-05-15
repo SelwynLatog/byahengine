@@ -249,16 +249,12 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
                 ? er.prop_y_offset[o.model_path] : 0.0f;
             glm::vec3 lmin = bit->second.local_min;
             glm::vec3 lmax = bit->second.local_max;
-            glm::vec3 wmin = o.position + glm::vec3(
-                lmin.x * o.scale.x,
-                (lmin.y + yoff) * o.scale.y,
-                lmin.z * o.scale.z);
-            glm::vec3 wmax = o.position + glm::vec3(
-                lmax.x * o.scale.x,
-                (lmax.y + yoff) * o.scale.y,
-                lmax.z * o.scale.z);
+            glm::vec3 wmin = o.position + glm::vec3(lmin.x * o.scale.x, lmin.y * o.scale.y + yoff, lmin.z * o.scale.z);
+            glm::vec3 wmax = o.position + glm::vec3(lmax.x * o.scale.x, lmax.y * o.scale.y + yoff, lmax.z * o.scale.z);
+
             draw_wire_box(er.shader, wmin, wmax, view, proj, behavior_color(o.behavior));
-        } else {
+        } 
+        else {
             // fallback to a unit cube until mesh is cached
             glm::vec3 half = o.scale * 0.5f;
             draw_wire_box(er.shader,
@@ -335,16 +331,11 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
                     ? er.prop_y_offset[o.model_path] : 0.0f;
                 glm::vec3 lmin = bit->second.local_min;
                 glm::vec3 lmax = bit->second.local_max;
-                glm::vec3 wmin = o.position + glm::vec3(
-                    lmin.x * o.scale.x,
-                    (lmin.y + yoff) * o.scale.y,
-                    lmin.z * o.scale.z);
-                glm::vec3 wmax = o.position + glm::vec3(
-                    lmax.x * o.scale.x,
-                    (lmax.y + yoff) * o.scale.y,
-                    lmax.z * o.scale.z);
+                glm::vec3 wmin = o.position + glm::vec3( lmin.x * o.scale.x, lmin.y * o.scale.y + yoff, lmin.z * o.scale.z);
+                glm::vec3 wmax = o.position + glm::vec3( lmax.x * o.scale.x, lmax.y * o.scale.y + yoff, lmax.z * o.scale.z);
                 draw_wire_box(er.shader, wmin, wmax, view, proj, {1.0f, 0.55f, 0.0f});
-            } else {
+            } 
+            else {
                 glm::vec3 half = o.scale * 0.5f;
                 draw_wire_box(er.shader,
                     o.position + glm::vec3(-half.x, 0.0f, -half.z),
