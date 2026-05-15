@@ -13,7 +13,7 @@ void trike_model_init(TrikeModel& t) {
 }
 
 void trike_model_draw(const TrikeModel& t, const Shader& shader) {
-    for (int i = 0; i < (int)t.mesh.data.groups.size(); ++i) {
+    for (int i = 0; i < (int)t.mesh.data.groups.size(); i++) {
         const ObjGroup& grp = t.mesh.data.groups[i];
         const ObjMaterial* mat = obj_find_material(t.mesh.data, grp.mat_name);
         glm::vec3 kd = mat ? mat->kd : glm::vec3(0.8f);

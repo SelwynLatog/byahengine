@@ -1,4 +1,6 @@
 #include "editor_renderer.hpp"
+#include "obj_loader.hpp"
+#include "obj_mesh.hpp"
 #include "../core/const.hpp"
 #include "../world/world_object.hpp"
 #include <glad/glad.h>
@@ -9,6 +11,41 @@
 #include <vector>
 #include <cmath>
 #include <cstdio>
+
+// lit shader - pos + normal layout
+// mirrors scene.cpp VERT_SRC/ FRAG_SRC
+static const char* ER_LIT_VERT = R"(
+#version 330 core
+layout(location = 0) in vec3 a_pos;
+layout(location = 1) in vec3 a_normal;
+uniform mat4 u_model;
+uniform mat4 u_view;
+uniform mat4 u_proj;
+uniform mat3 u_normal_mat;
+out vec3 v_world_normal;
+out vec3 v_world_pos;
+void main(){
+    vec4 world = u_model * vec4(a_pos, 1.0);
+    gl_Position = u_proj * u_view * world;
+    v_world_normal = normalize(u_normal_mat * a_normal);
+    v_world_pos = world.xyz;
+}
+)";
+
+static const char* ER_LIT_FRAG = R"(
+#version 330 core
+in vec3 v_world_normal;
+in vec3 v_world_pos;
+out vec4 frag_color;
+uniform vec3 u_kd;
+uniform vec3 u_light_dir;
+void main(){
+    float diff = max(dot(normalize(v_world_normal), u_light_dir), 0.0);
+    float ambient = 0.55;
+    vec3 lit = u_kd * (ambient + diff * 0.85);
+    frag_color = vec4(lit, 1.0);
+}
+)";
 
 // mirrors gizmo shader already in scene.cpp
 // pos + rgb layout
@@ -65,7 +102,7 @@ static void draw_wire_box(
 
     // expand into flat pos+rgb buffer for mesh_init
     std::vector<float> verts;
-    for (int i = 0; i < 24; ++i){
+    for (int i = 0; i < 24; i++){
         glm::vec3 p = c[e[i]];
         verts.insert(verts.end(), {
             p.x, p.y, p.z,
@@ -88,7 +125,8 @@ static void draw_wire_box(
 }
 
 void editor_renderer_init(EditorRenderer& er){
-    shader_init(er.shader, ER_VERT, ER_FRAG);
+    shader_init(er.shader,     ER_VERT,     ER_FRAG);
+    shader_init(er.obj_shader, ER_LIT_VERT, ER_LIT_FRAG);
     font_init(er.font, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
 
     // buid the snap grid as a static mesh
@@ -111,6 +149,27 @@ void editor_renderer_init(EditorRenderer& er){
 
     mesh_init(er.grid, lines);
 }
+// returns a ref to the cached ObjMesh for this filename
+// loads from assets/ on first call then returns cached entry after
+// asset_dir is relative path eg "../assets"
+
+static ObjMesh& get_prop_mesh(EditorRenderer& er, const std::string& filename){
+    auto it = er.prop_cache.find(filename);
+    if (it != er.prop_cache.end()) return it->second;
+
+    std::string full_path = std::string("../assets/") + filename;
+    ObjData data;
+    if (!obj_load(full_path, data)){
+        er.prop_cache[filename] = ObjMesh{};
+        return er.prop_cache[filename];
+    }
+
+    ObjMesh mesh{};
+    obj_mesh_init(mesh, std::move(data));
+    er.prop_cache[filename] = std::move(mesh);
+    return er.prop_cache[filename];
+}
+
 // maps out a color based on obj behavior
 // makes it easier to read at first glance
 static glm::vec3 behavior_color(ObjectBehavior b){
@@ -125,6 +184,10 @@ static glm::vec3 behavior_color(ObjectBehavior b){
 
 void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj){
+
+    // light dir which matches scene.cpp
+    static const glm::vec3 LIGHT_DIR = glm::normalize(
+        glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
 
     // bind shader and set shared uniforms once
     // model is identity for grid
@@ -152,6 +215,45 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
             o.position + glm::vec3(-half.x, 0.0f, -half.z),
             o.position + glm::vec3( half.x, o.scale.y, half.z),
             view, proj, behavior_color(o.behavior));
+    }
+    // draw placed object meshes
+    // bind lit shader once, then loop all placed objects
+    // build model matrix from pos/rot/scale per object
+    // draw each material group with its kd color
+    shader_bind(er.obj_shader);
+    set_mat4(er.obj_shader, "u_view", view);
+    set_mat4(er.obj_shader, "u_proj", proj);
+    glUniform3f(glGetUniformLocation(er.obj_shader.id, "u_light_dir"),
+        LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
+
+    for (auto& o : map.objects){
+        if (o.model_path.empty()) continue;
+
+        ObjMesh& mesh = get_prop_mesh(er, o.model_path);
+        if (mesh.data.vertices.empty()) continue; // load failed andd skip
+
+        // build model matrix: translate, rotate Y, scale
+        // same convention as trike: center-bottom origin
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, o.position);
+        model = glm::rotate(model, o.rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::scale(model, o.scale);
+
+        glm::mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
+
+        set_mat4(er.obj_shader, "u_model", model);
+        glUniformMatrix3fv(glGetUniformLocation(er.obj_shader.id, "u_normal_mat"),
+            1, GL_FALSE, glm::value_ptr(normal_mat));
+
+        // draw each material group with its kd color
+        for (int i = 0; i < (int)mesh.data.groups.size(); i++){
+            const ObjGroup& grp = mesh.data.groups[i];
+            const ObjMaterial* mat = obj_find_material(mesh.data, grp.mat_name);
+            glm::vec3 kd = mat ? mat->kd : glm::vec3(0.8f);
+            glUniform3f(glGetUniformLocation(er.obj_shader.id, "u_kd"),
+                kd.r, kd.g, kd.b);
+            obj_mesh_draw_group(mesh, i);
+        }
     }
 
     // 3. ghost box
@@ -280,6 +382,10 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
 
 void editor_renderer_destroy(EditorRenderer& er){
     shader_destroy(er.shader);
+    shader_destroy(er.obj_shader);
     mesh_destroy(er.grid);
     font_destroy(er.font);
+    for (auto& [name, mesh] : er.prop_cache)
+    obj_mesh_destroy(mesh);
+    er.prop_cache.clear();
 }

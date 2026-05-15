@@ -170,9 +170,9 @@ bool obj_load(const std::string& obj_path, ObjData& out){
                 grp.vertex_count++;
             };
 
-            for (size_t i = 1; i + 1 < face_verts.size(); ++i) {
-                emit_vert(face_verts[0].first,   face_verts[0].second);
-                emit_vert(face_verts[i].first,   face_verts[i].second);
+            for (size_t i = 1; i + 1 < face_verts.size(); i++) {
+                emit_vert(face_verts[0].first, face_verts[0].second);
+                emit_vert(face_verts[i].first, face_verts[i].second);
                 emit_vert(face_verts[i+1].first, face_verts[i+1].second);
             }
         }

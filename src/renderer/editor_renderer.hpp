@@ -2,16 +2,23 @@
 #include "shader.hpp"
 #include "mesh.hpp"
 #include "font.hpp"
+#include "obj_mesh.hpp"
 #include "../core/editor_state.hpp"
 #include "../world/world_map.hpp"
 #include <glm/glm.hpp>
+#include <map>
+#include <string>
 
 // all visual feedback for editor:
 // uses same gizmo shader pattern as scene.cpp
 struct EditorRenderer{
     Shader shader; // flat color pos + rgb
+    Shader obj_shader; // lit pos + normal
     Mesh grid; // snap grid built once at init
     Font font; // editor control hud
+
+    // load prop meshes keyed by filename
+    std::map<std::string, ObjMesh> prop_cache;
 };
 
 // builds the static grid mesh and compiles the flat shader

@@ -280,7 +280,7 @@ void scene_draw(
         glBindVertexArray(0);
         shader_bind(scene.shader);
     } else {
-        for (int i = 0; i < (int)scene.trike_mesh.data.groups.size(); ++i){
+        for (int i = 0; i < (int)scene.trike_mesh.data.groups.size(); i++){
             const ObjGroup& grp = scene.trike_mesh.data.groups[i];
             const ObjMaterial* mat = obj_find_material(scene.trike_mesh.data, grp.mat_name);
             set_vec3(scene.shader, "u_kd", mat ? mat->kd : glm::vec3(0.8f));
