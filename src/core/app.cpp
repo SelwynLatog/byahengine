@@ -38,6 +38,9 @@ void app_init(App& app){
     scene_init(app.scene);
     editor_renderer_init(app.editor_renderer);
 
+    // scan assets/ for placeable props
+    editor_scan_props(app.editor, "../assets");
+
     // try to load existing map
     world_map_load(app.map, Const::MAP_SAVE_PATH);   
 
@@ -105,7 +108,7 @@ void app_run(App& app){
 
             // temp editor control hud
             font_draw(app.editor_renderer.font,"[TAB] drive  [L CLICK] place/select  [DEL] delete  [T]translate [R]rotate [Y]scale  [Ctrl+S] save",
-                      10, Const::WINDOW_HEIGHT - 24, 1, 0.7f, 0.7f, 0.7f);
+                      10, Const::WINDOW_HEIGHT - 30, 2, 0.7f, 0.7f, 0.7f);
             
             window_swap_buffers(app.window);
             window_poll_events();

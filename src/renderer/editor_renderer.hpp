@@ -17,11 +17,14 @@ struct EditorRenderer{
 // builds the static grid mesh and compiles the flat shader
 void editor_renderer_init(EditorRenderer& er);
 
-// draws three things every editor frame
+// draws:
 // 1. snap grid on xz plane
-// 2. ghost box at cursor showing where next obj will land
-// 3. highlight box around the currently selected object
-void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const WorldMap& map,
+// 2. placed WorldMap objects as colored boxes (color by behavior)
+// 3. ghost box at cursor showing where next obj will land
+// 4. highlight box around the currently selected object
+// 5. prop palette panel (left side)
+// 6. status HUD (bottom left)
+void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj);
 
 void editor_renderer_destroy(EditorRenderer& er);
