@@ -33,7 +33,7 @@ void editor_cam_update(EditorState& editor, GLFWwindow* window, float dt){
         float dx = (float)(mx- s_last_mouse_x);
         float dy = (float)(my- s_last_mouse_y);
 
-        editor.cam_yaw += dx *  Const::EDITOR_LOOK_SENSITIVITY;
+        editor.cam_yaw -= dx * Const::EDITOR_LOOK_SENSITIVITY;
         editor.cam_pitch -= dy * Const::EDITOR_LOOK_SENSITIVITY;
 
         // clamp pitch so cam never flips over goofy
@@ -68,6 +68,20 @@ void editor_cam_update(EditorState& editor, GLFWwindow* window, float dt){
     // vertical up/down
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) editor.cam_pos += world_up * speed;
     if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) editor.cam_pos -= world_up * speed;
+
+    // arrow key look
+    // note that it only fires when no object is selected
+    if (editor.selected_id == -1){
+        float look = Const::EDITOR_LOOK_SENSITIVITY * 600.0f * dt;
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) editor.cam_yaw += look;
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) editor.cam_yaw -= look;
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) editor.cam_pitch += look;
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) editor.cam_pitch -= look;
+
+        editor.cam_pitch = std::clamp(editor.cam_pitch,
+            -glm::half_pi<float>() + 0.05f,
+             glm::half_pi<float>() - 0.05f);
+    }
 }
 
 glm::mat4 editor_cam_get_view(const EditorState& editor){

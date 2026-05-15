@@ -77,6 +77,7 @@ namespace Const{
     inline constexpr float EDITOR_SCALE_SPEED = 0.5f; // units/sec
     inline constexpr const char* MAP_SAVE_PATH = "../assets/map.txt";
     inline constexpr int EDITOR_GRID_RADIUS = 50;  // grid lines extend 50m from origin
+    inline constexpr int EDITOR_PAGE_SIZE = 9; // num of prop selection
 
     // lighting
     inline constexpr float LIGHT_DIR_X= 1.0f;

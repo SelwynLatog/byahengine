@@ -1,6 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
 #include <string>
+#include <vector>
 
 // which transform operation currently in use
 enum EditorTool{
@@ -26,4 +27,10 @@ struct EditorState{
 
     // active tool
     EditorTool tool = TOOL_TRANSLATE;
+
+    // prop palette
+    // scan OBJ files from assets/
+    // allows selector to scan which page of lets say for now 0-9 we are on
+    std::vector<std::string> prop_list;
+    int prop_page = 0;
 };

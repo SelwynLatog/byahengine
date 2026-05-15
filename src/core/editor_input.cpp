@@ -2,12 +2,38 @@
 #include "const.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <filesystem>
+#include <algorithm>
 #include <iostream>
 
 // key state tracking to prevent held key repeat
 static bool s_tab_last = false;
 static bool s_del_last = false;
 static bool s_lmb_last = false;
+
+// translate tool arrow key edge triggers
+static bool s_arr_left_last = false;
+static bool s_arr_right_last = false;
+static bool s_arr_up_last = false;
+static bool s_arr_down_last = false;
+
+void editor_scan_props(EditorState& editor, const char* assets_dir){
+    editor.prop_list.clear();
+
+    // scan through assets/ and collect every .obj filename
+    // store filename but reconstruct fullpath at placement time
+    for (const auto& entry : std::filesystem::directory_iterator(assets_dir)){
+        if (!entry.is_regular_file()) continue;
+        if (entry.path().extension() != ".obj") continue;
+        editor.prop_list.push_back(entry.path().filename().string());
+    }
+
+    // sort alphabetically so the palette is stable across runs
+    std::sort(editor.prop_list.begin(), editor.prop_list.end());
+
+    std::cout << "[editor] found " << editor.prop_list.size() << " props in"<< assets_dir<< "\n";
+    for(const auto& p : editor.prop_list) std::cout<< " "<< p << "\n";
+}
 
 bool editor_raycast_ground( double mx, double my,
     const glm::mat4& view, const glm::mat4& proj,
@@ -110,6 +136,45 @@ void editor_input_update(EditorState & editor, WorldMap& map, GLFWwindow* window
         editor.ghost_pos.y = 0.0f;
     }
 
+    // prop palette
+    // num keys 1-9 select from curr page of prop_list
+    // page flips with [ and ] so we scroll past 9 props
+    {
+        int total = (int)editor.prop_list.size();
+
+        // page scroll
+        // using bracket keys: [ = prev page, ] = next page
+        static bool s_pgup_last = false;
+        static bool s_pgdn_last = false;
+        bool pgup = glfwGetKey(window, GLFW_KEY_LEFT_BRACKET)  == GLFW_PRESS;
+        bool pgdn = glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS;
+        if (pgup && !s_pgup_last && editor.prop_page > 0) editor.prop_page--;
+        if (pgdn && !s_pgdn_last){
+            int max_page = (total - 1) / Const::EDITOR_PAGE_SIZE;
+            if (editor.prop_page < max_page) editor.prop_page++;
+        }
+        s_pgup_last = pgup;
+        s_pgdn_last = pgdn;
+
+        // 1-9 select prop on curr page
+         static const int num_keys[9] = {
+            GLFW_KEY_1, GLFW_KEY_2, GLFW_KEY_3,
+            GLFW_KEY_4, GLFW_KEY_5, GLFW_KEY_6,
+            GLFW_KEY_7, GLFW_KEY_8, GLFW_KEY_9
+        };
+
+        for (int i =0; i<Const::EDITOR_PAGE_SIZE; i++){
+            if (glfwGetKey(window, num_keys[i]) == GLFW_PRESS){
+                int idx = editor.prop_page * Const::EDITOR_PAGE_SIZE + i;
+                if (idx < total){
+                    editor.selected_model = editor.prop_list[idx];
+                    editor.selected_id = -1; // deselect placed object when picking a new prop
+                    std::cout << "[editor] selected prop: " << editor.selected_model << "\n";
+                }
+            }
+        }
+    }
+
     // tool switching
     if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) editor.tool = TOOL_TRANSLATE;
     if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) editor.tool = TOOL_ROTATE;
@@ -119,6 +184,23 @@ void editor_input_update(EditorState & editor, WorldMap& map, GLFWwindow* window
     if (editor.selected_id != -1){
         for(auto& o : map.objects){
             if (o.id != editor.selected_id) continue;
+
+            if (editor.tool == TOOL_TRANSLATE){
+                bool al = glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS;
+                bool ar = glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS;
+                bool au = glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS;
+                bool ad = glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS;
+
+                if (al && !s_arr_left_last) o.position.x -= Const::EDITOR_GRID_SNAP;
+                if (ar && !s_arr_right_last) o.position.x += Const::EDITOR_GRID_SNAP;
+                if (au && !s_arr_up_last) o.position.z -= Const::EDITOR_GRID_SNAP;
+                if (ad && !s_arr_down_last) o.position.z += Const::EDITOR_GRID_SNAP;
+
+                s_arr_left_last = al;
+                s_arr_right_last = ar;
+                s_arr_up_last = au;
+                s_arr_down_last = ad;
+            }
 
             if (editor.tool == TOOL_ROTATE){
                 if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) o.rotation.y -= Const::EDITOR_ROTATE_SPEED * dt;

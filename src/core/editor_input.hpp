@@ -4,6 +4,9 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
+// scans assets/ for *.obj files and fills editor.prop_list
+void editor_scan_props(EditorState& editor, const char* assets_dir);
+
 // handles:
 // placement
 // deletion
