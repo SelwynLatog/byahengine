@@ -165,12 +165,26 @@ static ObjMesh& get_prop_mesh(EditorRenderer& er, const std::string& filename){
     }
 
     // compute y min from vertex buffer before uploading
-    // layout is px py pz nx ny nz so Y is at every index 1, 7, 13...
-    float y_min = 1e9f;
-    for (int i = 1; i < (int)data.vertices.size(); i += 6) y_min = std::min(y_min, data.vertices[i]);
-    
+    // layout is px py pz nx ny nz so Y is at every 6 floats
+    float x_min= 1e9f, x_max=-1e9f;
+    float y_min= 1e9f, y_max=-1e9f;
+    float z_min= 1e9f, z_max=-1e9f;
+    for (int i = 0; i < (int)data.vertices.size(); i += 6){
+        float x = data.vertices[i];
+        float y = data.vertices[i+1];
+        float z = data.vertices[i+2];
+        x_min=std::min(x_min,x); x_max=std::max(x_max,x);
+        y_min=std::min(y_min,y); y_max=std::max(y_max,y);
+        z_min=std::min(z_min,z); z_max=std::max(z_max,z);
+    }
+
     // store offset so model matrix can push mesh up to y = 0
     er.prop_y_offset[filename] = (y_min < 1e9f) ? -y_min : 0.0f;
+
+    EditorRenderer::PropBounds bounds;
+    bounds.local_min = glm::vec3(x_min, y_min, z_min);
+    bounds.local_max = glm::vec3(x_max, y_max, z_max);
+    er.prop_bounds[filename] = bounds;
 
     ObjMesh mesh{};
     obj_mesh_init(mesh, std::move(data));
@@ -223,14 +237,35 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
     // gives visual feedback for every placed object even before OBJ meshes load
     for (const auto& o : map.objects){
 
-        // skip selected 
+        // skip selected
         // it has its own highlight color below
         if (o.id == editor.selected_id) continue;
-        glm::vec3 half = o.scale * 0.5f;
-        draw_wire_box(er.shader,
-            o.position + glm::vec3(-half.x, 0.0f, -half.z),
-            o.position + glm::vec3( half.x, o.scale.y, half.z),
-            view, proj, behavior_color(o.behavior));
+
+        auto bit = er.prop_bounds.find(o.model_path);
+        if (bit != er.prop_bounds.end()){
+            // scale local min/max by object scale and offset by position
+            // y is also shifted by y_floor_offset to match the model matrix
+            float yoff = er.prop_y_offset.count(o.model_path)
+                ? er.prop_y_offset[o.model_path] : 0.0f;
+            glm::vec3 lmin = bit->second.local_min;
+            glm::vec3 lmax = bit->second.local_max;
+            glm::vec3 wmin = o.position + glm::vec3(
+                lmin.x * o.scale.x,
+                (lmin.y + yoff) * o.scale.y,
+                lmin.z * o.scale.z);
+            glm::vec3 wmax = o.position + glm::vec3(
+                lmax.x * o.scale.x,
+                (lmax.y + yoff) * o.scale.y,
+                lmax.z * o.scale.z);
+            draw_wire_box(er.shader, wmin, wmax, view, proj, behavior_color(o.behavior));
+        } else {
+            // fallback to a unit cube until mesh is cached
+            glm::vec3 half = o.scale * 0.5f;
+            draw_wire_box(er.shader,
+                o.position + glm::vec3(-half.x, 0.0f, -half.z),
+                o.position + glm::vec3( half.x, o.scale.y, half.z),
+                view, proj, behavior_color(o.behavior));
+        }
     }
     // draw placed object meshes
     // bind lit shader once, then loop all placed objects
@@ -292,13 +327,30 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
     // wraps curr selected placed obj
     // walks the object list to find the selected id
     if (editor.selected_id != -1){
-        for (const auto & o : map.objects){
+        for (const auto& o : map.objects){
             if (o.id != editor.selected_id) continue;
-            glm::vec3 half = o.scale * 0.5f;
-            draw_wire_box(er.shader,
-                o.position + glm::vec3(-half.x, 0.0f, -half.z),
-                o.position + glm::vec3( half.x, o.scale.y, half.z),
-                view, proj, {1.0f, 0.55f, 0.0f});
+            auto bit = er.prop_bounds.find(o.model_path);
+            if (bit != er.prop_bounds.end()){
+                float yoff = er.prop_y_offset.count(o.model_path)
+                    ? er.prop_y_offset[o.model_path] : 0.0f;
+                glm::vec3 lmin = bit->second.local_min;
+                glm::vec3 lmax = bit->second.local_max;
+                glm::vec3 wmin = o.position + glm::vec3(
+                    lmin.x * o.scale.x,
+                    (lmin.y + yoff) * o.scale.y,
+                    lmin.z * o.scale.z);
+                glm::vec3 wmax = o.position + glm::vec3(
+                    lmax.x * o.scale.x,
+                    (lmax.y + yoff) * o.scale.y,
+                    lmax.z * o.scale.z);
+                draw_wire_box(er.shader, wmin, wmax, view, proj, {1.0f, 0.55f, 0.0f});
+            } else {
+                glm::vec3 half = o.scale * 0.5f;
+                draw_wire_box(er.shader,
+                    o.position + glm::vec3(-half.x, 0.0f, -half.z),
+                    o.position + glm::vec3( half.x, o.scale.y, half.z),
+                    view, proj, {1.0f, 0.55f, 0.0f});
+            }
             break;
         }
     }
@@ -353,7 +405,7 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
     // selected object transform
     {
         int x = 16;
-        int bottom = Const::WINDOW_HEIGHT -180;
+        int bottom = Const::WINDOW_HEIGHT -220;
         int y = bottom;
 
         // tool name
@@ -392,6 +444,19 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
                 snprintf(buf, sizeof(buf), "SCALE X:%.2f  Y:%.2f  Z:%.2f",
                     o.scale.x, o.scale.y, o.scale.z);
                 font_draw(er.font, buf, x, y, 2, 0.6f, 1.0f, 0.6f);
+                y += 20;
+
+                // behavior label matches wireframe color
+                const char* bname = "STATIC";
+                float br = 0.55f, bg = 0.55f, bb = 0.55f;
+                switch(o.behavior){
+                    case STATIC: bname="STATIC"; br=0.55f; bg=0.55f; bb=0.55f; break;
+                    case DYNAMIC: bname="DYNAMIC"; br=0.20f; bg=0.50f; bb=1.00f; break;
+                    case DECORATION: bname="DECORATION"; br=0.95f; bg=0.80f; bb=0.10f; break;
+                    case PEDESTRIAN: bname="PEDESTRIAN"; br=0.20f; bg=0.85f; bb=0.30f; break;
+                }
+                snprintf(buf, sizeof(buf), "BEHAVIOR: %s  [B] cycle", bname);
+                font_draw(er.font, buf, x, y, 2, br, bg, bb);
                 break;
             }
         }

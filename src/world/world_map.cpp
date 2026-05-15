@@ -32,7 +32,7 @@ void world_map_save(const WorldMap& map, const std::string& path){
           << o.position.x << " " << o.position.y << " " << o.position.z << " "
           << o.rotation.x << " " << o.rotation.y << " " << o.rotation.z << " "
           << o.scale.x << " " << o.scale.y << " " << o.scale.z << " "
-          << o.model_path << "\n";
+          << o.model_path << o.y_floor_offset<<"\n";
     }
     std::cout << "world_map saved " << map.objects.size() << " objects to " << path << "\n";
 }

@@ -107,8 +107,10 @@ void app_run(App& app){
             editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj);
 
             // temp editor control hud
-            font_draw(app.editor_renderer.font,"[TAB] drive  [L CLICK] place/select  [DEL] delete  [T]translate [R]rotate [Y]scale  [Ctrl+S] save [PgUp/PgDn] Y nudge",
-                      10, Const::WINDOW_HEIGHT - 30, 2, 0.7f, 0.7f, 0.7f);
+            font_draw(app.editor_renderer.font,"[TAB] drive  [L CLICK] place/select  [DEL] delete  [B] behavior  [Ctrl+S] save",
+                      10, Const::WINDOW_HEIGHT - 40, 2, 0.7f, 0.7f, 0.7f);
+            font_draw(app.editor_renderer.font,"[T] translate  [R] rotate  [Y] scale  [PgUp/PgDn] Y nudge  [1-9] prop  [/] page",
+                      10, Const::WINDOW_HEIGHT - 20, 2, 0.7f, 0.7f, 0.7f);
             
             window_swap_buffers(app.window);
             window_poll_events();

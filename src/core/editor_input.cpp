@@ -11,6 +11,7 @@
 static bool s_tab_last = false;
 static bool s_del_last = false;
 static bool s_lmb_last = false;
+static bool s_b_last = false;
 
 // translate tool arrow key edge triggers
 static bool s_arr_left_last = false;
@@ -71,7 +72,7 @@ bool editor_raycast_ground( double mx, double my,
 }
 
 int editor_raycast_objects (double mx, double my, const glm::mat4& view, const glm::mat4& proj,
-    int screen_w, int screen_h, const WorldMap& map){
+    int screen_w, int screen_h, const WorldMap& map, const EditorRenderer& er){
 
     float ndc_x = (2.0f * (float)mx / screen_w) - 1.0f;
     float ndc_y = 1.0f - (2.0f * (float)my / screen_h);
@@ -91,9 +92,28 @@ int editor_raycast_objects (double mx, double my, const glm::mat4& view, const g
     for (const auto& o : map.objects){
         // we build a simple AABB from pos + scale for picking
         // assume center bottom convention as it is pretty much used for all trike and obstacles
-        glm::vec3 half = o.scale * 0.5f;
-        glm::vec3 aabb_min = o.position + glm::vec3( -half.x, 0.0f, -half.z);
-        glm::vec3 aabb_max = o.position + glm::vec3( half.x, o.scale.y, half.z);
+        // updated to use real mesh bounds when cached
+        glm::vec3 aabb_min, aabb_max;
+        auto bit = er.prop_bounds.find(o.model_path);
+        if (bit != er.prop_bounds.end()){
+            float yoff = er.prop_y_offset.count(o.model_path)
+                ? er.prop_y_offset.at(o.model_path) : 0.0f;
+            glm::vec3 lmin = bit->second.local_min;
+            glm::vec3 lmax = bit->second.local_max;
+            aabb_min = o.position + glm::vec3(
+                lmin.x * o.scale.x,
+                (lmin.y + yoff) * o.scale.y,
+                lmin.z * o.scale.z);
+            aabb_max = o.position + glm::vec3(
+                lmax.x * o.scale.x,
+                (lmax.y + yoff) * o.scale.y,
+                lmax.z * o.scale.z);
+        } 
+        else {
+            glm::vec3 half = o.scale * 0.5f;
+            aabb_min = o.position + glm::vec3(-half.x, 0.0f, -half.z);
+            aabb_max = o.position + glm::vec3( half.x, o.scale.y,  half.z);
+        }
 
         // ray vs AABB slab test
         float tmin = 0.0f, tmax = 1e9f;
@@ -237,7 +257,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     if (lmb && !s_lmb_last){
 
         // check first if we cliked an existing object
-        int hit = editor_raycast_objects (mx, my, view, proj, screen_w, screen_h, map);
+        int hit = editor_raycast_objects(mx, my, view, proj, screen_w, screen_h, map, er);
         if (hit != -1){
             // select it but dont place
             editor.selected_id = hit;
@@ -268,7 +288,23 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             editor.selected_id = -1;
         }
     }
-    s_del_last = del;
+    
+    // B cycle behavior on selected object
+    bool b_down = glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS;
+    if (b_down && !s_b_last && editor.selected_id != -1){
+        for (auto& o : map.objects){
+            if (o.id != editor.selected_id) continue;
+            switch (o.behavior){
+                case STATIC:o.behavior = DYNAMIC; break;
+                case DYNAMIC:o.behavior = DECORATION; break;
+                case DECORATION:o.behavior = PEDESTRIAN; break;
+                case PEDESTRIAN:o.behavior = STATIC; break;
+            }
+            std::cout << "[editor] id=" << o.id << " behavior -> " << o.behavior << "\n";
+            break;
+        }
+    }
+    s_b_last = b_down;
 
     // save map
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS &&

@@ -24,6 +24,14 @@ struct EditorRenderer{
     // this sets mesh lowest point to 0 so no spawning below ground level
     std::map<std::string, float> prop_y_offset;
 
+    // world space using half-extents derived from min/max at load time
+    // this is used for wireframe boxes and raycast AABB so they match actual mesh
+     struct PropBounds {
+        glm::vec3 local_min = glm::vec3(0.0f);
+        glm::vec3 local_max = glm::vec3(1.0f);
+    };
+    std::map<std::string, PropBounds> prop_bounds;
+
 };
 
 // builds the static grid mesh and compiles the flat shader
