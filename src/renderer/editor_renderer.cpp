@@ -411,6 +411,15 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
                 }
                 snprintf(buf, sizeof(buf), "BEHAVIOR: %s  [B] cycle", bname);
                 font_draw(er.font, buf, x, y, 2, br, bg, bb);
+                y += 20;
+
+                if (o.behavior == DYNAMIC){
+                    // for now hud is ass because there no preset named stored for objs
+                    // will add in the future. Testing values for now before I scale furthe
+                    snprintf(buf, sizeof(buf), "MASS:%.1f  REST:%.2f  FRIC:%.2f  [N] preset",
+                        o.mass, o.restitution, o.friction);
+                    font_draw(er.font, buf, x, y, 2, 0.4f, 0.8f, 1.0f);
+                }
                 break;
             }
         }

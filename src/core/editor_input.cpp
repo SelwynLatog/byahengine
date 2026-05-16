@@ -12,6 +12,29 @@ static bool s_tab_last = false;
 static bool s_del_last = false;
 static bool s_lmb_last = false;
 static bool s_b_last = false;
+static bool s_n_last = false;
+
+// dynamic physics preset table
+// adding a new type = one new row here + a const in const.hpp
+// N key cycles through this when selected object is DYNAMIC
+// much easier for me to scale than slopping down on else statements
+struct DynPreset {
+    const char* name;
+    float mass;
+    float restitution;
+    float friction;
+};
+
+static const DynPreset DYN_PRESETS[] = {
+    { "CONE",       Const::DYN_CONE_MASS,          Const::DYN_CONE_RESTITUTION,         Const::DYN_CONE_FRICTION         },
+    { "BIN",        Const::DYN_BIN_MASS,           Const::DYN_BIN_RESTITUTION,          Const::DYN_BIN_FRICTION          },
+    { "BAG",        Const::DYN_BAG_MASS,           Const::DYN_BAG_RESTITUTION,          Const::DYN_BAG_FRICTION          },
+    { "CART",       Const::DYN_CART_MASS,          Const::DYN_CART_RESTITUTION,         Const::DYN_CART_FRICTION         },
+    { "MOTORCYCLE", Const::DYN_MOTORCYCLE_MASS,    Const::DYN_MOTORCYCLE_RESTITUTION,   Const::DYN_MOTORCYCLE_FRICTION   },
+    { "POLE",       Const::DYN_POLE_MASS,          Const::DYN_POLE_RESTITUTION,         Const::DYN_POLE_FRICTION         },
+    { "TRIKE",      Const::DYN_TRIKE_MASS,         Const::DYN_TRIKE_RESTITUTION,        Const::DYN_TRIKE_FRICTION        },
+};
+static const int DYN_PRESET_COUNT = (int)(sizeof(DYN_PRESETS) / sizeof(DYN_PRESETS[0]));
 
 // translate tool arrow key edge triggers
 static bool s_arr_left_last = false;
@@ -295,16 +318,47 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         for (auto& o : map.objects){
             if (o.id != editor.selected_id) continue;
             switch (o.behavior){
-                case STATIC:o.behavior = DYNAMIC; break;
-                case DYNAMIC:o.behavior = DECORATION; break;
-                case DECORATION:o.behavior = PEDESTRIAN; break;
-                case PEDESTRIAN:o.behavior = STATIC; break;
+                case STATIC:     o.behavior = DYNAMIC;     break;
+                case DYNAMIC:    o.behavior = DECORATION;  break;
+                case DECORATION: o.behavior = PEDESTRIAN;  break;
+                case PEDESTRIAN: o.behavior = STATIC;      break;
             }
-            std::cout << "[editor] id=" << o.id << " behavior -> " << o.behavior << "\n";
+            // on becoming DYNAMIC apply current preset immediately
+            if (o.behavior == DYNAMIC){
+                const DynPreset& p = DYN_PRESETS[editor.dyn_preset_index];
+                o.mass        = p.mass;
+                o.restitution = p.restitution;
+                o.friction    = p.friction;
+                std::cout << "[editor] id=" << o.id << " DYNAMIC preset=" << p.name
+                          << " mass=" << p.mass << "\n";
+            } else {
+                o.mass        = 999.0f;
+                o.restitution = 0.10f;
+                o.friction    = 0.99f;
+                std::cout << "[editor] id=" << o.id << " behavior -> " << o.behavior << "\n";
+            }
             break;
         }
     }
     s_b_last = b_down;
+
+    // N cycle dynamic preset on selected DYNAMIC object
+    bool n_down = glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS;
+    if (n_down && !s_n_last && editor.selected_id != -1){
+        for (auto& o : map.objects){
+            if (o.id != editor.selected_id) continue;
+            if (o.behavior != DYNAMIC) break; // N only works on DYNAMIC objects
+            editor.dyn_preset_index = (editor.dyn_preset_index + 1) % DYN_PRESET_COUNT;
+            const DynPreset& p = DYN_PRESETS[editor.dyn_preset_index];
+            o.mass        = p.mass;
+            o.restitution = p.restitution;
+            o.friction    = p.friction;
+            std::cout << "[editor] id=" << o.id << " preset -> " << p.name
+                      << " mass=" << p.mass << "\n";
+            break;
+        }
+    }
+    s_n_last = n_down;
 
     // save map
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS &&

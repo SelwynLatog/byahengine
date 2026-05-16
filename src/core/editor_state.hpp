@@ -33,4 +33,8 @@ struct EditorState{
     // allows selector to scan which page of lets say for now 0-9 we are on
     std::vector<std::string> prop_list;
     int prop_page = 0;
+
+    // dynamic behavior selector
+    // when DYNAMIC, select obj type N key cycles through DYN_PRESETS
+    int dyn_preset_index = 0;   
 };

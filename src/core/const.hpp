@@ -106,4 +106,53 @@ namespace Const{
     // 0.18 fairly dead collision
     // feels heavy not pinball
     inline constexpr float RESTITUTION= 0.18f;
+
+    // DYNAMIC PROPS
+
+    // traffic cones
+    inline constexpr float DYN_CONE_MASS = 3.0f;
+    inline constexpr float DYN_CONE_RESTITUTION = 0.60f;
+    inline constexpr float DYN_CONE_FRICTION = 0.70f;
+
+    // garbage bins
+    inline constexpr float DYN_BIN_MASS = 12.0f;
+    inline constexpr float DYN_BIN_RESTITUTION = 0.45f;
+    inline constexpr float DYN_BIN_FRICTION = 0.70f;
+
+    // garbage bags
+    inline constexpr float DYN_BAG_MASS = 1.5f;
+    inline constexpr float DYN_BAG_RESTITUTION = 0.20f;
+    inline constexpr float DYN_BAG_FRICTION = 0.95f;
+
+    // parked motorcycles
+    inline constexpr float DYN_MOTORCYCLE_MASS = 120.0f;
+    inline constexpr float DYN_MOTORCYCLE_RESTITUTION = 0.20f;
+    inline constexpr float DYN_MOTORCYCLE_FRICTION = 0.85f;
+
+    // parked trikes
+    inline constexpr float DYN_TRIKE_MASS = 180.0f;
+    inline constexpr float DYN_TRIKE_RESTITUTION = 0.15f;
+    inline constexpr float DYN_TRIKE_FRICTION = 0.90f;
+
+    // food carts
+    // ice cream, isawan, fishballan, etc
+    inline constexpr float DYN_CART_MASS = 35.0f;
+    inline constexpr float DYN_CART_RESTITUTION = 0.30f;
+    inline constexpr float DYN_CART_FRICTION = 0.60f; 
+
+    // poles and posts
+    // street lamps, sign posts
+    inline constexpr float DYN_POLE_MASS = 18.0f;
+    inline constexpr float DYN_POLE_RESTITUTION = 0.25f;
+    inline constexpr float DYN_POLE_FRICTION = 0.90f;
+
+    // food stalls
+    // fruit stands, palengke stalls
+    // To be added
+
+    // fallback
+    inline constexpr float DYN_DEFAULT_MASS = 8.0f;
+    inline constexpr float DYN_DEFAULT_RESTITUTION = 0.55f;
+    inline constexpr float DYN_DEFAULT_FRICTION = 0.75f;
+
 }

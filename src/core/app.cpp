@@ -462,10 +462,24 @@ void app_run(App& app){
             sim.pitch_vel *= ang_drag;
             sim.roll_vel  *= ang_drag;
 
-            // clamp pitch/roll to flat once fully tipped ( around past 90 degrees)
-            // stop angular motion when object is lying on the ground
-            if (std::abs(sim.pitch) > glm::half_pi<float>()) sim.pitch_vel = 0.0f;
-            if (std::abs(sim.roll)  > glm::half_pi<float>()) sim.roll_vel  = 0.0f;
+            // gravity pulls the tip down while falling
+            // only apply while not yet flat (under 90 degrees)
+            float gravity_torque = Const::GRAVITY * 0.4f;
+            if (std::abs(sim.pitch) > 0.05f && std::abs(sim.pitch) < glm::half_pi<float>())
+                sim.pitch_vel += std::copysign(gravity_torque, sim.pitch) * dt;
+            if (std::abs(sim.roll) > 0.05f && std::abs(sim.roll) < glm::half_pi<float>())
+                sim.roll_vel  += std::copysign(gravity_torque, sim.roll)  * dt;
+
+            // once past 90 degrees the object is on the ground
+            // snap flat and kill angular
+            if (std::abs(sim.pitch) >= glm::half_pi<float>()){
+                sim.pitch = std::copysign(glm::half_pi<float>(), sim.pitch);
+                sim.pitch_vel = 0.0f;
+            }
+            if (std::abs(sim.roll) >= glm::half_pi<float>()){
+                sim.roll = std::copysign(glm::half_pi<float>(), sim.roll);
+                sim.roll_vel  = 0.0f;
+            }
 
             // sleep when everything is nearly still
             float lin_spd = glm::length(sim.velocity);
