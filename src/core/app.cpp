@@ -227,6 +227,10 @@ void app_run(App& app){
         // tick impact timer
         if (app.trike.impact_timer > 0.0f) app.trike.impact_timer -= dt;
 
+        // snapshot pre-collision speed so we can clamp after all responses
+        float pre_collision_speed = app.trike.speed;
+        bool any_collision = false;
+
         // collision detection + response
         for (auto& obs : app.obstacles){
             if (obs.hit_timer > 0.0f) obs.hit_timer -= dt;
@@ -311,18 +315,29 @@ void app_run(App& app){
             }
             app.trike.lateral_speed *= 0.55f;
 
-            // cap exit velocity to what we had coming in — restitution can never add energy
+            // cap exit velocity
             float max_exit = speed_before * (1.0f + Const::RESTITUTION);
             if (std::abs(app.trike.speed) > max_exit)
                 app.trike.speed = std::copysign(max_exit, app.trike.speed);
             if (std::abs(app.trike.lateral_speed) > lat_before * (1.0f + Const::RESTITUTION))
                 app.trike.lateral_speed = std::copysign(lat_before, app.trike.lateral_speed);
 
-            // kill any residual ghost velocity
-            if (std::abs(app.trike.speed) < 0.15f) app.trike.speed = 0.0f;
-            if (std::abs(app.trike.lateral_speed) < 0.15f) app.trike.lateral_speed = 0.0f;
+            // kill residual ghost velocity after every wall contact
+            app.trike.lateral_speed = 0.0f;
+            if (std::abs(app.trike.speed) < 0.5f) app.trike.speed = 0.0f;
+            any_collision = true;
             aabb_update(app.trike.aabb, app.trike.position, app.trike.heading);
         }
+
+        // clamp speed to pre-collision value after all responses
+        // physics rebuilds speed inside the fixed timestep loop before we get here
+        // so without this clamp, throttle held during wall contact gives free acceleration
+        if (any_collision){
+            float max_spd = std::abs(pre_collision_speed);
+            if (std::abs(app.trike.speed) > max_spd + 0.5f) app.trike.speed = std::copysign(max_spd, app.trike.speed);
+            app.trike.lateral_speed = 0.0f;
+        }
+            
 
         // camera
         float yaw_r = glm::radians(s_cam_yaw);
