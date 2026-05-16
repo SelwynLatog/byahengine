@@ -9,6 +9,9 @@
 #include "../renderer/editor_renderer.hpp"
 #include "../world/world_map.hpp"
 #include <vector>
+#include <unordered_map>
+#include "../physics/dynamic_sim.hpp"
+
 
 struct App {
     Window window;
@@ -24,6 +27,8 @@ struct App {
     EditorState editor;
     WorldMap map;
     EditorRenderer editor_renderer;
+
+    std::unordered_map<int, DynamicSim> dynamic_sims;
 };
 
 void app_init(App& app);

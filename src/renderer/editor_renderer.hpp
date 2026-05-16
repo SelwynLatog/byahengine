@@ -8,6 +8,8 @@
 #include <glm/glm.hpp>
 #include <map>
 #include <string>
+#include <unordered_map>
+#include "../physics/dynamic_sim.hpp"
 
 // all visual feedback for editor:
 // uses same gizmo shader pattern as scene.cpp
@@ -48,11 +50,13 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
     const glm::mat4& view, const glm::mat4& proj);
 
 // draws only placed obj meshes
-// then called both in editor and drive
+// called both in editor and drive mode
 // flash_map: world_object_id -> hit_timer value (0 = no flash)
+// dynamic_sims: when present, DYNAMIC objects render from sim position/angles instead of placed transform
 void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj,
-    const std::map<int,float>& flash_map = {});
+    const std::map<int,float>& flash_map = {},
+    const std::unordered_map<int, DynamicSim>& dynamic_sims = {});
 
 void editor_renderer_destroy(EditorRenderer& er);
 

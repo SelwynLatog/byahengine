@@ -31,4 +31,11 @@ struct WorldObject{
     int id = -1; // unique id will be assigned on placement
 
     float y_floor_offset = 0.0f;
+
+    // RIGID BODY DEFS - DYNAMIC 
+    // TEMP: hardcoded at placement
+    // tunable in the future
+    float mass = 10.0f; //kg. cone, poles, barell, etc
+    float restitution = 0.50f; // bounciness on 
+    float friction = 0.80f; // ground drag, higher stops faster
 };

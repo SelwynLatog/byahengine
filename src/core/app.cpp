@@ -50,7 +50,7 @@ void world_map_to_obstacles(App& app){
             glm::vec3 lmin = bit->second.local_min;
             glm::vec3 lmax = bit->second.local_max;
 
-            world_min =  o.position + glm::vec3( 
+            world_min = o.position + glm::vec3( 
                 lmin.x * o.scale.x, lmin.y * o.scale.y + yoff, lmin.z * o.scale.z);
 
             world_max = o.position + glm::vec3( 
@@ -82,6 +82,37 @@ void world_map_to_obstacles(App& app){
         << " obstacles from world map\n";
 }
 
+// rigid body dynamic sim init
+// called and loaded when returning from editor
+void init_dynamic_sims(App& app){
+    for (const auto& o : app.map.objects){
+        if (o.behavior !=DYNAMIC) continue;
+
+        if (app.dynamic_sims.count(o.id)) continue;
+
+        DynamicSim sim;
+        sim.position = o.position;
+        sim.yaw = o.rotation.y;
+
+        // builds initial AABB from prop bounds
+        auto bit = app.editor_renderer.prop_bounds.find(o.model_path);
+        if (bit != app.editor_renderer.prop_bounds.end()){
+            float yoff = app.editor_renderer.prop_y_offset.count(o.model_path)
+                ? app.editor_renderer.prop_y_offset.at(o.model_path) : 0.0f;
+            glm::vec3 lmin = bit->second.local_min;
+            glm::vec3 lmax = bit->second.local_max;
+            glm::vec3 wmin = sim.position + glm::vec3(lmin.x*o.scale.x, lmin.y*o.scale.y+yoff, lmin.z*o.scale.z);
+            glm::vec3 wmax = sim.position + glm::vec3(lmax.x*o.scale.x, lmax.y*o.scale.y+yoff, lmax.z*o.scale.z);
+            sim.aabb = { wmin, wmax };
+        }
+        else{
+            glm::vec3 half = o.scale * 0.5f;
+            sim.aabb = { sim.position - half, sim.position + half };
+        }
+        app.dynamic_sims[o.id] = sim;
+    }
+}
+
 void app_init(App& app){
     window_init(app.window,
         Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, Const::WINDOW_TITLE);
@@ -104,6 +135,7 @@ void app_init(App& app){
             editor_get_y_floor_offset(app.editor_renderer, o.model_path);
     }
     world_map_to_obstacles(app);
+    init_dynamic_sims(app);
 
     // pre editor hardcoded static objs
     // kept for now in case I fuck up my world_map_to_obstacles
@@ -149,6 +181,7 @@ void app_run(App& app){
                 // returning to drive mode
                 // rebuild collision obstacles from current map state
                 world_map_to_obstacles(app);
+                init_dynamic_sims(app);
             }
         }
         s_tab_pressed_last = tab_down;
@@ -339,6 +372,152 @@ void app_run(App& app){
         }
             
 
+        // DYNAMIC object integration + collision
+        for (auto& [id, sim] : app.dynamic_sims){
+            // find the world object for mass/restitution/friction
+            const WorldObject* wo = nullptr;
+            for (const auto& o : app.map.objects)
+                if (o.id == id) { wo = &o; break; }
+            if (!wo) continue;
+
+            // rebuild AABB from current sim position
+            // only awake objects need this every frame
+            if (!sim.sleeping){
+                auto bit = app.editor_renderer.prop_bounds.find(wo->model_path);
+                if (bit != app.editor_renderer.prop_bounds.end()){
+                    float yoff = app.editor_renderer.prop_y_offset.count(wo->model_path)
+                        ? app.editor_renderer.prop_y_offset.at(wo->model_path) : 0.0f;
+                    glm::vec3 lmin = bit->second.local_min;
+                    glm::vec3 lmax = bit->second.local_max;
+                    sim.aabb.min = sim.position + glm::vec3(lmin.x*wo->scale.x, lmin.y*wo->scale.y+yoff, lmin.z*wo->scale.z);
+                    sim.aabb.max = sim.position + glm::vec3(lmax.x*wo->scale.x, lmax.y*wo->scale.y+yoff, lmax.z*wo->scale.z);
+                }
+            }
+
+            // trike vs dynamic collision
+            if (aabb_overlap(app.trike.aabb, sim.aabb)){
+                sim.sleeping = false;
+                glm::vec3 mtv = aabb_mtv(app.trike.aabb, sim.aabb);
+                glm::vec3 hit_normal = glm::length(mtv) > 0.0f ? glm::normalize(mtv) : glm::vec3(0,0,1);
+
+                // mass ratio determines how much each party moves
+                float total_mass = wo->mass + Const::TRIKE_MASS;
+                float obj_share = Const::TRIKE_MASS / total_mass;
+                float trike_share = wo->mass / total_mass;
+
+                // separate: trike gets pushed back, object gets pushed forward
+                app.trike.position -= mtv * trike_share;
+                sim.position += mtv * obj_share;
+
+                // closing speed along hit normal
+                glm::vec3 trike_fwd = { std::cos(app.trike.heading), 0.0f, std::sin(app.trike.heading) };
+                float closing = std::abs(app.trike.speed) * std::abs(glm::dot(trike_fwd, -hit_normal));
+
+                // impulse to object
+                // linear push in hit direction
+                float impulse = closing * (1.0f + wo->restitution) * (Const::TRIKE_MASS / total_mass);
+                sim.velocity += -hit_normal * impulse;
+
+                // torque 
+                // pitch and roll from hit direction and object height
+                float height = (sim.aabb.max.y - sim.aabb.min.y);
+                float inertia = wo->mass * height * height * 0.3f; // approx rod inertia
+                float torque_mag = impulse * height * 0.5f / (inertia + 0.001f);
+
+                // hit from front/back -> pitch
+                sim.pitch_vel += torque_mag * glm::dot(-hit_normal, trike_fwd);
+                // hit from side → roll
+                glm::vec3 trike_rgt = { std::cos(app.trike.heading + glm::half_pi<float>()), 0.0f,
+                                        std::sin(app.trike.heading + glm::half_pi<float>()) };
+                sim.roll_vel  += torque_mag * glm::dot(-hit_normal, trike_rgt);
+
+                // spin on Y
+                // glancing cause yaw spin
+                sim.yaw_vel   += torque_mag * 0.4f * (glm::dot(-hit_normal, trike_rgt));
+
+                // trike loses speed proportional to object mass
+                app.trike.speed *= (1.0f - glm::clamp(wo->mass / total_mass * 0.6f, 0.0f, 0.6f));
+
+                aabb_update(app.trike.aabb, app.trike.position, app.trike.heading);
+            }
+
+            if (sim.sleeping) continue;
+
+            // integrate position
+            sim.position += sim.velocity * dt;
+
+            // ground friction bleeds linear velocity
+            float drag = 1.0f - wo->friction * dt;
+            sim.velocity *= glm::clamp(drag, 0.0f, 1.0f);
+
+            // integrate angular
+            sim.yaw += sim.yaw_vel * dt;
+            sim.pitch += sim.pitch_vel * dt;
+            sim.roll += sim.roll_vel  * dt;
+
+            // angular drag
+            float ang_drag = 1.0f - wo->friction * 1.5f * dt;
+            ang_drag = glm::clamp(ang_drag, 0.0f, 1.0f);
+            sim.yaw_vel   *= ang_drag;
+            sim.pitch_vel *= ang_drag;
+            sim.roll_vel  *= ang_drag;
+
+            // clamp pitch/roll to flat once fully tipped ( around past 90 degrees)
+            // stop angular motion when object is lying on the ground
+            if (std::abs(sim.pitch) > glm::half_pi<float>()) sim.pitch_vel = 0.0f;
+            if (std::abs(sim.roll)  > glm::half_pi<float>()) sim.roll_vel  = 0.0f;
+
+            // sleep when everything is nearly still
+            float lin_spd = glm::length(sim.velocity);
+            float ang_spd = std::abs(sim.yaw_vel) + std::abs(sim.pitch_vel) + std::abs(sim.roll_vel);
+            if (lin_spd < 0.05f && ang_spd < 0.02f){
+                sim.velocity  = glm::vec3(0.0f);
+                sim.yaw_vel   = sim.pitch_vel = sim.roll_vel = 0.0f;
+                sim.sleeping  = true;
+            }
+        }
+
+        // dynamic vs dynamic collision
+        // O(n^2) fine for small barangay object counts
+        for (auto& [id_a, sim_a] : app.dynamic_sims){
+            if (sim_a.sleeping) continue;
+            for (auto& [id_b, sim_b] : app.dynamic_sims){
+                if (id_a >= id_b) continue; // skip self and already-checked pairs
+                if (!aabb_overlap(sim_a.aabb, sim_b.aabb)) continue;
+
+                const WorldObject* wo_a = nullptr;
+                const WorldObject* wo_b = nullptr;
+                for (const auto& o : app.map.objects){
+                    if (o.id == id_a) wo_a = &o;
+                    if (o.id == id_b) wo_b = &o;
+                }
+                if (!wo_a || !wo_b) continue;
+
+                sim_b.sleeping = false;
+
+                glm::vec3 mtv = aabb_mtv(sim_a.aabb, sim_b.aabb);
+                glm::vec3 hit_normal = glm::length(mtv) > 0.0f ? glm::normalize(mtv) : glm::vec3(0,0,1);
+
+                float total_mass = wo_a->mass + wo_b->mass;
+                sim_a.position -= mtv * (wo_b->mass / total_mass);
+                sim_b.position += mtv * (wo_a->mass / total_mass);
+
+                // exchange velocity scaled by mass — simple elastic collision
+                float restitution = (wo_a->restitution + wo_b->restitution) * 0.5f;
+                float rel_vel = glm::dot(sim_a.velocity - sim_b.velocity, hit_normal);
+                if (rel_vel > 0.0f){
+                    float impulse = rel_vel * (1.0f + restitution) / (1.0f/wo_a->mass + 1.0f/wo_b->mass);
+                    sim_a.velocity -= hit_normal * (impulse / wo_a->mass);
+                    sim_b.velocity += hit_normal * (impulse / wo_b->mass);
+
+                    // transfer some angular from linear impulse
+                    float torque = impulse * 0.3f;
+                    sim_a.roll_vel -= torque / (wo_a->mass + 0.001f);
+                    sim_b.roll_vel += torque / (wo_b->mass + 0.001f);
+                }
+            }
+        }
+
         // camera
         float yaw_r = glm::radians(s_cam_yaw);
         float pitch_r = glm::radians(s_cam_pitch);
@@ -398,7 +577,7 @@ void app_run(App& app){
             if (obs.world_id != -1 && obs.hit_timer > 0.0f)
                 flash_map[obs.world_id] = obs.hit_timer;
 
-        editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map);
+        editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims);
         hud_draw(app.hud, app.trike);
 
         window_swap_buffers(app.window);

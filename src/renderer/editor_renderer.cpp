@@ -419,7 +419,8 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
 
 void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj,
-    const std::map<int,float>& flash_map){
+    const std::map<int,float>& flash_map,
+    const std::unordered_map<int, DynamicSim>& dynamic_sims){
 
     static const glm::vec3 LIGHT_DIR = glm::normalize(
         glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
@@ -437,10 +438,25 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
         if (mesh.data.vertices.empty()) continue;
 
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, o.position);
-        model = glm::rotate(model, o.rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::translate(model, glm::vec3(0.0f, o.y_floor_offset, 0.0f));
-        model = glm::scale(model, o.scale);
+
+        auto dit = dynamic_sims.find(o.id);
+        if (o.behavior == DYNAMIC && dit != dynamic_sims.end()){
+            // render from simulated transform = tipping, sliding, spinning
+            const DynamicSim& sim = dit->second;
+            model = glm::translate(model, sim.position);
+            model = glm::rotate(model, sim.yaw + o.rotation.y, glm::vec3(0,1,0));
+            model = glm::rotate(model, sim.pitch,              glm::vec3(1,0,0));
+            model = glm::rotate(model, sim.roll,               glm::vec3(0,0,1));
+            model = glm::translate(model, glm::vec3(0.0f, o.y_floor_offset, 0.0f));
+            model = glm::scale(model, o.scale);
+        } 
+        else {
+            // static/decoration/pedestrian = placed transform
+            model = glm::translate(model, o.position);
+            model = glm::rotate(model, o.rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+            model = glm::translate(model, glm::vec3(0.0f, o.y_floor_offset, 0.0f));
+            model = glm::scale(model, o.scale);
+        }
 
         glm::mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
 
