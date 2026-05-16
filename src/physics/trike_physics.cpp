@@ -48,11 +48,16 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, float dt){
     // but realistically this is the only way to fix the problem of
     // toggling between "sliding off" a static mesh or
     // getting hard stuck post collision and not being able to get off
-    float brake_force = brake * (state.speed >= 0.0f ? -1.0f : 1.0f);
-    // rolling friction : proportional to speed, always opposes motion
-    float friction = (input.brake == 0.0f) ? -state.speed * Const::TRIKE_FRICTION : 0.0f;
+    
+    // brake only opposes forward motion, doesn't fight reverse
+    float brake_force = (state.speed > 0.0f) ? -input.brake * Const::TRIKE_BRAKE_FORCE : 0.0f;
+    // reverse is a separate gentle push backward (speed clamped to 30% max below)
+    float reverse_force = -input.reverse * Const::TRIKE_ENGINE_FORCE * 0.45f;
+    // rolling friction always opposes motion, reduced during braking/reversing so they aren't fighting it
+    float friction = (input.brake == 0.0f && input.reverse == 0.0f)
+        ? -state.speed * Const::TRIKE_FRICTION : -state.speed * Const::TRIKE_FRICTION * 0.4f;
 
-    float net_force = engine + brake_force + friction;
+    float net_force = engine + brake_force + reverse_force + friction;
     float acceleration = net_force / Const::TRIKE_MASS;
     state.speed += acceleration * dt;
 
@@ -62,7 +67,7 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, float dt){
         Const::TRIKE_MAX_SPEED);
 
         // dead stop : prevent creeping at near-zero speed with no input
-        if (input.throttle == 0.0f && input.brake == 0.0f && std::abs(state.speed)< 0.05f)
+        if (input.throttle == 0.0f && input.brake == 0.0f && input.reverse == 0.0f && std::abs(state.speed) < 0.05f)
             state.speed = 0.0f;
 
         // Bicycle steering model
@@ -71,6 +76,7 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, float dt){
         // heading change per second = speed/ R = speed * tan(steer_engle)/ wheelbase
         if (std::abs(state.steer_angle)> 0.001f){
             float turn_rate = (state.speed * std::tan(state.steer_angle))/ Const::TRIKE_WHEELBASE;
+            if (state.speed < 0.0f) turn_rate = -turn_rate;
 
             // speed sensitivity- prevent trike from spinning like a beyblade at same speeds
             // low speed turn is tight

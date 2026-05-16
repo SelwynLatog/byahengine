@@ -191,7 +191,9 @@ void app_run(App& app){
         // DRIVING MODE
         TrikeInput input;
         input.throttle = (glfwGetKey(app.window.handle, GLFW_KEY_W) == GLFW_PRESS) ? 1.0f : 0.0f;
-        input.brake = (glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS) ? 1.0f : 0.0f;
+        bool s_held   = glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS;
+        input.brake   = (s_held && app.trike.speed >  0.5f) ? 1.0f : 0.0f;
+        input.reverse = (s_held && app.trike.speed <= 0.5f) ? 1.0f : 0.0f;
         input.steer = 0.0f;
         if (glfwGetKey(app.window.handle, GLFW_KEY_A) == GLFW_PRESS) input.steer -= 1.0f;
         if (glfwGetKey(app.window.handle, GLFW_KEY_D) == GLFW_PRESS) input.steer += 1.0f;
@@ -200,11 +202,14 @@ void app_run(App& app){
         s_f_pressed_last = f_down;
 
         // camera orbit input
-        if (glfwGetKey(app.window.handle, GLFW_KEY_LEFT)  == GLFW_PRESS) s_cam_yaw -= Const::CAM_YAW_SPEED   * dt;
-        if (glfwGetKey(app.window.handle, GLFW_KEY_RIGHT) == GLFW_PRESS) s_cam_yaw += Const::CAM_YAW_SPEED   * dt;
+        if (glfwGetKey(app.window.handle, GLFW_KEY_LEFT)  == GLFW_PRESS) s_cam_yaw -= Const::CAM_YAW_SPEED * dt;
+        if (glfwGetKey(app.window.handle, GLFW_KEY_RIGHT) == GLFW_PRESS) s_cam_yaw += Const::CAM_YAW_SPEED * dt;
         if (glfwGetKey(app.window.handle, GLFW_KEY_UP)    == GLFW_PRESS) s_cam_pitch += Const::CAM_PITCH_SPEED * dt;
         if (glfwGetKey(app.window.handle, GLFW_KEY_DOWN)  == GLFW_PRESS) s_cam_pitch -= Const::CAM_PITCH_SPEED * dt;
         s_cam_pitch = glm::clamp(s_cam_pitch, Const::CAM_PITCH_MIN, Const::CAM_PITCH_MAX);
+        // spring yaw offset back toward 0 (behind trike) when trike is moving
+        if (std::abs(app.trike.speed) > 0.3f)
+            s_cam_yaw = glm::mix(s_cam_yaw, 0.0f, 1.0f - std::exp(-3.5f * dt));
 
         // fixed timestep physics
         // physics will run constantly at 120 hz regardless if framerate is ass
@@ -228,6 +233,17 @@ void app_run(App& app){
             glm::vec3 to_obs = obs.position - app.trike.position;
             if (glm::dot(to_obs, to_obs) > 25.0f) continue;
             if (!aabb_overlap(app.trike.aabb, obs.aabb)) continue;
+            // skip full response if we just hit this obstacle recently
+            // MTV still separates, but no force injection until cooldown expires
+            // I thought I fixed the impact collisionl loop
+            // I'll add a per obs cooldown upon hit
+            bool fresh_hit = (obs.hit_timer <= 0.0f);
+
+            // snapshot speed before any response so we can cap the exit velocity
+            // prevents restitution overshoot
+            // aka the trike flying off max speed at angled collision hits
+            float speed_before = std::abs(app.trike.speed);
+            float lat_before = std::abs(app.trike.lateral_speed);
 
             // min translation vec
             // smallest possible push to separate 2 boxes
@@ -251,7 +267,7 @@ void app_run(App& app){
             if (spd_along < 0.0f) closing += std::abs(spd_along);
             if (lat_along < 0.0f) closing += std::abs(lat_along);
 
-            if (closing > 0.8f){
+            if (closing > 0.8f && fresh_hit){
                 app.trike.last_impact_force = closing;
                 app.trike.impact_timer = (closing > 2.0f) ? 0.35f : 0.0f;
                 obs.hit_timer = 0.35f;
@@ -277,6 +293,8 @@ void app_run(App& app){
             glm::vec3 fwd2 = {std::cos(app.trike.heading), 0.0f, std::sin(app.trike.heading)};
             glm::vec3 rgt2 = {std::cos(app.trike.heading + glm::half_pi<float>()), 0.0f,
                              std::sin(app.trike.heading + glm::half_pi<float>())};
+            // project full velocity and cancel the wall-normal component entirely
+            // this prevents the trike re-entering the wall next tick
             glm::vec3 vel = fwd2 * app.trike.speed + rgt2 * app.trike.lateral_speed;
             float vel_into = glm::dot(vel, -mtv_normal);
             if (vel_into > 0.0f){
@@ -284,11 +302,25 @@ void app_run(App& app){
                 app.trike.speed = glm::dot(vel_corrected, fwd2);
                 app.trike.lateral_speed = glm::dot(vel_corrected, rgt2);
             }
-            // bleed off lateral immediately after impact
-            // wall redirect injects lateral velocity that has no natural source
-            // kill it fast so it doesn't feel like freaking ice
+            // hard clamp: if still moving into wall after correction, zero that component
+            float residual = glm::dot(
+                fwd2 * app.trike.speed + rgt2 * app.trike.lateral_speed, -mtv_normal);
+            if (residual > 0.0f){
+                app.trike.speed -= residual * glm::dot(fwd2, -mtv_normal);
+                app.trike.lateral_speed -= residual * glm::dot(rgt2, -mtv_normal);
+            }
             app.trike.lateral_speed *= 0.55f;
 
+            // cap exit velocity to what we had coming in — restitution can never add energy
+            float max_exit = speed_before * (1.0f + Const::RESTITUTION);
+            if (std::abs(app.trike.speed) > max_exit)
+                app.trike.speed = std::copysign(max_exit, app.trike.speed);
+            if (std::abs(app.trike.lateral_speed) > lat_before * (1.0f + Const::RESTITUTION))
+                app.trike.lateral_speed = std::copysign(lat_before, app.trike.lateral_speed);
+
+            // kill any residual ghost velocity
+            if (std::abs(app.trike.speed) < 0.15f) app.trike.speed = 0.0f;
+            if (std::abs(app.trike.lateral_speed) < 0.15f) app.trike.lateral_speed = 0.0f;
             aabb_update(app.trike.aabb, app.trike.position, app.trike.heading);
         }
 

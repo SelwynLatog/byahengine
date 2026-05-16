@@ -9,6 +9,7 @@ struct TrikeInput {
     float throttle = 0.0f; //[0,1] engine force scalar
     float brake = 0.0f; //[0,1] brake force scalar
     float steer = 0.0f; //[-1,1] left= negative, right=positive
+    float reverse  = 0.0f; //[0,1] reverse intent
 };
 
 // advances the trike simulation by dt seconds
