@@ -18,6 +18,8 @@ struct Obstacle{
 
     // count down after impact
     float hit_timer= 0.0f;
+
+    int world_id= -1;
 };
 
 // call once when spawning

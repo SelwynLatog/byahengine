@@ -288,6 +288,10 @@ void scene_draw(
         }
     }
 
+    // cube meshes not drawn
+    // world objects are rendered as OBJ meshes via editor_renderer_draw_props
+    // commented for now instead of removed for further testing
+    /*
     // obstacle solid meshes
     // flashes red on hit
     shader_bind(scene.shader);
@@ -308,7 +312,7 @@ void scene_draw(
             (obs.aabb.min.z + obs.aabb.max.z) * 0.5f);
 
         draw_box_lit(scene.shader, cb, obs.half_extents * 2.0f, color, view, proj);
-    }
+    }*/
 
     // AABB wireframes
     // green=trike, 

@@ -47,6 +47,13 @@ void editor_renderer_init(EditorRenderer& er);
 void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj);
 
+// draws only placed obj meshes
+// then called both in editor and drive
+// flash_map: world_object_id -> hit_timer value (0 = no flash)
+void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
+    const glm::mat4& view, const glm::mat4& proj,
+    const std::map<int,float>& flash_map = {});
+
 void editor_renderer_destroy(EditorRenderer& er);
 
 float editor_get_y_floor_offset(EditorRenderer& er, const std::string& filename);

@@ -29,3 +29,6 @@ struct App {
 void app_init(App& app);
 void app_run(App& app);
 void app_shutdown(App& app);
+
+// rebuild app.obstacles from all Static WorldMap objects
+void world_map_to_obstacles(App& app);

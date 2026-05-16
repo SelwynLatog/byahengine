@@ -10,6 +10,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/constants.hpp>
 #include <cmath>
+#include <iostream>
 
 // this commit ver is much cleaner now. Used to be a horrendous god file
 // basically had shaders, draw calls, mesh uploads, everything
@@ -29,6 +30,58 @@ static bool s_f_pressed_last = false;
 // edge trigger so a single tab press flips mode once
 static bool s_tab_pressed_last = false;
 
+void world_map_to_obstacles(App& app){
+    
+    // tag generated objects by rebuilding from scratch each time
+    // im sure there's definitely a much more efficient way but for now
+    // this is fine :>
+    app.obstacles.clear();
+    
+    for(const auto& o: app.map.objects){
+        if (o.behavior != STATIC) continue;
+
+        // then get real mesh bounds from editor renderer cache
+        glm::vec3 world_min, world_max;
+        auto bit = app.editor_renderer.prop_bounds.find(o.model_path);
+        if (bit != app.editor_renderer.prop_bounds.end()){
+            float yoff = app.editor_renderer.prop_y_offset.count(o.model_path)?
+                app.editor_renderer.prop_y_offset.at(o.model_path) : 0.0f;
+            
+            glm::vec3 lmin = bit->second.local_min;
+            glm::vec3 lmax = bit->second.local_max;
+
+            world_min =  o.position + glm::vec3( 
+                lmin.x * o.scale.x, lmin.y * o.scale.y + yoff, lmin.z * o.scale.z);
+
+            world_max = o.position + glm::vec3( 
+                lmax.x * o.scale.x, lmax.y * o.scale.y + yoff, lmax.z * o.scale.z);
+        }
+        else{
+            // fallback to unit cube scaled by obj scale
+            glm::vec3 half = o.scale * 0.5f;
+            world_min = o.position + glm::vec3(-half.x, 0.0f, -half.z);
+            world_max = o.position + glm::vec3( half.x, o.scale.y, half.z);
+        }
+
+        // build obstacles from world bounds
+        glm::vec3 size = world_max - world_min;
+        glm::vec3 half = size * 0.5f;
+        glm::vec3 center_bottom = glm::vec3(
+            (world_min.x + world_max.x) * 0.5f, world_min.y, (world_min.z + world_max.z) * 0.5f
+        );
+
+        Obstacle obs = make_obstacle(center_bottom, half);
+        obs.world_id = o.id;
+        app.obstacles.push_back(obs);
+
+
+        std::cout << "[collision] STATIC id=" << o.id << " model=" << o.model_path
+            << " half=(" << half.x << "," << half.y << "," << half.z << ")\n";
+    }
+     std::cout << "[collision] rebuilt " << app.obstacles.size()
+        << " obstacles from world map\n";
+}
+
 void app_init(App& app){
     window_init(app.window,
         Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, Const::WINDOW_TITLE);
@@ -43,7 +96,18 @@ void app_init(App& app){
 
     // try to load existing map
     world_map_load(app.map, Const::MAP_SAVE_PATH);   
+    
+    // build collision obstacles from loaded map
+    // call prop bounds first to trigger loads via editor_renderer
+    for (const auto& o : app.map.objects){
+        if (!o.model_path.empty())
+            editor_get_y_floor_offset(app.editor_renderer, o.model_path);
+    }
+    world_map_to_obstacles(app);
 
+    // pre editor hardcoded static objs
+    // kept for now in case I fuck up my world_map_to_obstacles
+    /*
     // spawn static obstacles
     // position=center-bottom 
     // half_extents=half w/h/d
@@ -51,12 +115,13 @@ void app_init(App& app){
     app.obstacles.push_back(make_obstacle({10.0f, 0.0f,  0.0f}, {0.75f, 1.0f, 0.75f}));
     app.obstacles.push_back(make_obstacle({ 0.0f, 0.0f, 10.0f}, {1.0f,  1.5f, 0.5f}));
     app.obstacles.push_back(make_obstacle({15.0f, 0.0f,  8.0f}, {0.5f,  0.8f, 0.5f}));
+    */
 
     hud_init(app.hud, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
 
-    app.last_time   = (float)glfwGetTime();
+    app.last_time = (float)glfwGetTime();
     app.accumulator = 0.0f;
-    app.running     = true;
+    app.running = true;
 }
 
 // main loop app_run
@@ -65,7 +130,7 @@ void app_run(App& app){
     while (!window_should_close(app.window)){
         // delta time
         float now = (float)glfwGetTime();
-        float dt  = now - app.last_time;
+        float dt = now - app.last_time;
         app.last_time = now;
         if (dt > Const::MAX_DELTA) dt = Const::MAX_DELTA;
 
@@ -79,6 +144,11 @@ void app_run(App& app){
                 // park cam above trike & reset mouse
                 app.editor.cam_pos = app.trike.position + glm::vec3(0.0f, 12.0f, 0.0f);
                 editor_cam_init(app.window.handle);
+            } 
+            else {
+                // returning to drive mode
+                // rebuild collision obstacles from current map state
+                world_map_to_obstacles(app);
             }
         }
         s_tab_pressed_last = tab_down;
@@ -259,6 +329,14 @@ void app_run(App& app){
         // entire render pass in one call
         // ground, gizmo, trike, obstacles, wireframes
         scene_draw(app.scene, app.trike, app.obstacles, view, proj);
+
+        // build flash map from current obstacle hit timers
+        std::map<int,float> flash_map;
+        for (const auto& obs : app.obstacles)
+            if (obs.world_id != -1 && obs.hit_timer > 0.0f)
+                flash_map[obs.world_id] = obs.hit_timer;
+
+        editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map);
         hud_draw(app.hud, app.trike);
 
         window_swap_buffers(app.window);

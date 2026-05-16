@@ -11,6 +11,7 @@
 #include <vector>
 #include <cmath>
 #include <cstdio>
+#include <map>
 
 // lit shader - pos + normal layout
 // mirrors scene.cpp VERT_SRC/ FRAG_SRC
@@ -263,47 +264,9 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
                 view, proj, behavior_color(o.behavior));
         }
     }
+    
     // draw placed object meshes
-    // bind lit shader once, then loop all placed objects
-    // build model matrix from pos/rot/scale per object
-    // draw each material group with its kd color
-    shader_bind(er.obj_shader);
-    set_mat4(er.obj_shader, "u_view", view);
-    set_mat4(er.obj_shader, "u_proj", proj);
-    glUniform3f(glGetUniformLocation(er.obj_shader.id, "u_light_dir"),
-        LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
-
-    for (auto& o : map.objects){
-        if (o.model_path.empty()) continue;
-
-        ObjMesh& mesh = get_prop_mesh(er, o.model_path);
-        if (mesh.data.vertices.empty()) continue; // load failed andd skip
-
-        // build model matrix: translate, rotate Y, scale
-        // same convention as trike: center-bottom origin
-        // also added y-offset lifts so mesh lowest vertex sits at y ground level
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, o.position);
-        model = glm::rotate(model, o.rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::translate(model, glm::vec3(0.0f, o.y_floor_offset, 0.0f));
-        model = glm::scale(model, o.scale);
-
-        glm::mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
-
-        set_mat4(er.obj_shader, "u_model", model);
-        glUniformMatrix3fv(glGetUniformLocation(er.obj_shader.id, "u_normal_mat"),
-            1, GL_FALSE, glm::value_ptr(normal_mat));
-
-        // draw each material group with its kd color
-        for (int i = 0; i < (int)mesh.data.groups.size(); i++){
-            const ObjGroup& grp = mesh.data.groups[i];
-            const ObjMaterial* mat = obj_find_material(mesh.data, grp.mat_name);
-            glm::vec3 kd = mat ? mat->kd : glm::vec3(0.8f);
-            glUniform3f(glGetUniformLocation(er.obj_shader.id, "u_kd"),
-                kd.r, kd.g, kd.b);
-            obj_mesh_draw_group(mesh, i);
-        }
-    }
+    editor_renderer_draw_props(er, map, view, proj);
 
     // 3. ghost box
     // only drawn when cursor is over valid ground and a model is selected
@@ -450,6 +413,58 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
                 font_draw(er.font, buf, x, y, 2, br, bg, bb);
                 break;
             }
+        }
+    }
+}
+
+void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
+    const glm::mat4& view, const glm::mat4& proj,
+    const std::map<int,float>& flash_map){
+
+    static const glm::vec3 LIGHT_DIR = glm::normalize(
+        glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
+
+    shader_bind(er.obj_shader);
+    set_mat4(er.obj_shader, "u_view", view);
+    set_mat4(er.obj_shader, "u_proj", proj);
+    glUniform3f(glGetUniformLocation(er.obj_shader.id, "u_light_dir"),
+        LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
+
+    for (auto& o : map.objects){
+        if (o.model_path.empty()) continue;
+
+        ObjMesh& mesh = get_prop_mesh(er, o.model_path);
+        if (mesh.data.vertices.empty()) continue;
+
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, o.position);
+        model = glm::rotate(model, o.rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::translate(model, glm::vec3(0.0f, o.y_floor_offset, 0.0f));
+        model = glm::scale(model, o.scale);
+
+        glm::mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
+
+        set_mat4(er.obj_shader, "u_model", model);
+        glUniformMatrix3fv(glGetUniformLocation(er.obj_shader.id, "u_normal_mat"),
+            1, GL_FALSE, glm::value_ptr(normal_mat));
+
+        // check if this object is flashing from a hit
+        float flash = 0.0f;
+        auto fit = flash_map.find(o.id);
+        if (fit != flash_map.end())
+            flash = glm::clamp(fit->second / 0.35f, 0.0f, 1.0f);
+
+        for (int i = 0; i < (int)mesh.data.groups.size(); i++){
+            const ObjGroup& grp = mesh.data.groups[i];
+            const ObjMaterial* mat = obj_find_material(mesh.data, grp.mat_name);
+            glm::vec3 kd = mat ? mat->kd : glm::vec3(0.8f);
+            // blend toward red on impact
+            // basically same as old boxes
+            glm::vec3 hit_color = {0.9f, 0.15f, 0.10f};
+            kd = glm::mix(kd, hit_color, flash);
+            glUniform3f(glGetUniformLocation(er.obj_shader.id, "u_kd"),
+                kd.r, kd.g, kd.b);
+            obj_mesh_draw_group(mesh, i);
         }
     }
 }
