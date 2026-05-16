@@ -43,7 +43,12 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, float dt){
     float brake = input.brake * Const::TRIKE_BRAKE_FORCE;
 
     // brake always opposes current motion
-    float brake_force = brake * (state.speed > 0.0f ? -1.0f : (state.speed < 0.0f ? 1.0f : 0.0f));
+    // at standstill, brake becomes reverse
+    // for now there is of course no driver model, so it looks goofy
+    // but realistically this is the only way to fix the problem of
+    // toggling between "sliding off" a static mesh or
+    // getting hard stuck post collision and not being able to get off
+    float brake_force = brake * (state.speed >= 0.0f ? -1.0f : 1.0f);
     // rolling friction : proportional to speed, always opposes motion
     float friction = (input.brake == 0.0f) ? -state.speed * Const::TRIKE_FRICTION : 0.0f;
 

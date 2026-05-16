@@ -269,10 +269,25 @@ void app_run(App& app){
                 if (side_factor > 0.3f && closing > 1.5f)
                     app.trike.roll_rate += side_factor * closing * 0.4f
                         * (lat_dot > 0.0f ? 1.0f : -1.0f);
-            } else {
+            } 
+            else {
                 if (spd_along < 0.0f) app.trike.speed -= spd_along;
                 if (lat_along < 0.0f) app.trike.lateral_speed -= lat_along;
             }
+            glm::vec3 fwd2 = {std::cos(app.trike.heading), 0.0f, std::sin(app.trike.heading)};
+            glm::vec3 rgt2 = {std::cos(app.trike.heading + glm::half_pi<float>()), 0.0f,
+                             std::sin(app.trike.heading + glm::half_pi<float>())};
+            glm::vec3 vel = fwd2 * app.trike.speed + rgt2 * app.trike.lateral_speed;
+            float vel_into = glm::dot(vel, -mtv_normal);
+            if (vel_into > 0.0f){
+                glm::vec3 vel_corrected = vel + mtv_normal * vel_into;
+                app.trike.speed = glm::dot(vel_corrected, fwd2);
+                app.trike.lateral_speed = glm::dot(vel_corrected, rgt2);
+            }
+            // bleed off lateral immediately after impact
+            // wall redirect injects lateral velocity that has no natural source
+            // kill it fast so it doesn't feel like freaking ice
+            app.trike.lateral_speed *= 0.55f;
 
             aabb_update(app.trike.aabb, app.trike.position, app.trike.heading);
         }
