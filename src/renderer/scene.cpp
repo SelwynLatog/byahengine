@@ -179,7 +179,7 @@ void scene_init(SceneState& scene){
         obj_mesh_init(scene.trike_mesh, std::move(data));
 
         float minX=1e9f,maxX=-1e9f,minY=1e9f,maxY=-1e9f,minZ=1e9f,maxZ=-1e9f;
-        for (int i = 0; i < (int)scene.trike_mesh.data.vertices.size(); i += 6){
+        for (int i = 0; i < (int)scene.trike_mesh.data.vertices.size(); i += 8){
             float x = scene.trike_mesh.data.vertices[i];
             float y = scene.trike_mesh.data.vertices[i+1];
             float z = scene.trike_mesh.data.vertices[i+2];

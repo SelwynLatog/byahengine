@@ -3,7 +3,7 @@
 
 void obj_mesh_init(ObjMesh& m, ObjData&& data){
     m.data = std::move(data);
-    m.total_vertices = (int)m.data.vertices.size() / 6;
+    m.total_vertices = (int)m.data.vertices.size() / 8;
 
     glGenVertexArrays(1, &m.vao);
     glGenBuffers(1, &m.vbo);
@@ -17,13 +17,18 @@ void obj_mesh_init(ObjMesh& m, ObjData&& data){
 
     // attribute 0: position (xyz)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
-        6 * sizeof(float), (void*)0);
+        8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
     // attribute 1: normal (xyz)
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
-        6 * sizeof(float), (void*)(3 * sizeof(float)));
+        8 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+
+    // attribute 2: uv (xy)
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE,
+        8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
 
     glBindVertexArray(0);
 

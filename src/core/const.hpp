@@ -109,27 +109,27 @@ namespace Const{
 
     // DYNAMIC PROPS
 
-    // traffic cones
+    // traffic cones - check
     inline constexpr float DYN_CONE_MASS = 3.0f;
     inline constexpr float DYN_CONE_RESTITUTION = 0.60f;
     inline constexpr float DYN_CONE_FRICTION = 0.70f;
 
-    // garbage bins
+    // garbage bins - check
     inline constexpr float DYN_BIN_MASS = 12.0f;
     inline constexpr float DYN_BIN_RESTITUTION = 0.45f;
     inline constexpr float DYN_BIN_FRICTION = 0.70f;
 
-    // garbage bags
+    // garbage bags - check
     inline constexpr float DYN_BAG_MASS = 1.5f;
     inline constexpr float DYN_BAG_RESTITUTION = 0.20f;
     inline constexpr float DYN_BAG_FRICTION = 0.95f;
 
-    // parked motorcycles
+    // parked motorcycles - check
     inline constexpr float DYN_MOTORCYCLE_MASS = 120.0f;
     inline constexpr float DYN_MOTORCYCLE_RESTITUTION = 0.20f;
     inline constexpr float DYN_MOTORCYCLE_FRICTION = 0.85f;
 
-    // parked trikes
+    // parked trikes - check
     inline constexpr float DYN_TRIKE_MASS = 180.0f;
     inline constexpr float DYN_TRIKE_RESTITUTION = 0.15f;
     inline constexpr float DYN_TRIKE_FRICTION = 0.90f;
@@ -148,7 +148,33 @@ namespace Const{
 
     // food stalls
     // fruit stands, palengke stalls
-    // To be added
+    inline constexpr float DYN_STALL_MASS = 25.0f;
+    inline constexpr float DYN_STALL_RESTITUTION = 0.15f;
+    inline constexpr float DYN_STALL_FRICTION = 0.70f;
+
+    // barrells
+    inline constexpr float DYN_BARREL_MASS = 20.0f;
+    inline constexpr float DYN_BARREL_RESTITUTION = 0.55f;
+    inline constexpr float DYN_BARREL_FRICTION = 0.65f;
+
+    // railings
+    inline constexpr float DYN_RAILING_MASS = 40.0f;
+    inline constexpr float DYN_RAILING_RESTITUTION = 0.20f;
+    inline constexpr float DYN_RAILING_FRICTION = 0.85f;
+
+    // 4 wheelers. trucks, suvs
+    inline constexpr float DYN_CAR_MASS = 1100.0f;
+    inline constexpr float DYN_CAR_RESTITUTION = 0.12f;
+    inline constexpr float DYN_CAR_FRICTION = 0.90f;
+
+    inline constexpr float DYN_TRUCK_MASS = 8000.0f;
+    inline constexpr float DYN_TRUCK_RESTITUTION = 0.08f;
+    inline constexpr float DYN_TRUCK_FRICTION = 0.95f;
+
+    // individual fruits
+    inline constexpr float DYN_FRUIT_MASS = 0.3f;
+    inline constexpr float DYN_FRUIT_RESTITUTION = 0.70f;
+    inline constexpr float DYN_FRUIT_FRICTION = 0.60f;
 
     // fallback
     inline constexpr float DYN_DEFAULT_MASS = 8.0f;

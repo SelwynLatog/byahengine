@@ -269,7 +269,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             if (editor.tool == TOOL_SCALE){
                 if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) o.scale -= Const::EDITOR_SCALE_SPEED * dt;
                 if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) o.scale += Const::EDITOR_SCALE_SPEED * dt;
-                o.scale = glm::max(o.scale, glm::vec3(0.05f));
+                o.scale = glm::max(o.scale, glm::vec3(0.005f));
             }
             break;
         }

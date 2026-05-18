@@ -6,7 +6,8 @@
 // one material parsed from the .mtl file
 struct ObjMaterial {
     std::string name;
-    glm::vec3   kd = {1.0f, 1.0f, 1.0f};   // diffuse color, all we care about
+    glm::vec3 kd = {1.0f, 1.0f, 1.0f}; // diffuse color, used when no texture
+    std::string tex_path = ""; // absolute path to map_Kd texture
 };
 
 // one contiguous group of triangles that share the same material
@@ -19,7 +20,7 @@ struct ObjGroup {
 
 // the full result of loading one OBJ+MTL pair
 struct ObjData {
-    // flat interleaved buffer: px py pz nx ny nz  (6 floats per vertex)
+    // flat interleaved buffer: px py pz nx ny nz u v  (8 floats per vertex)
     std::vector<float>       vertices;
     std::vector<ObjMaterial> materials;
     std::vector<ObjGroup>    groups;

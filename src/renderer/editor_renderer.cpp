@@ -12,6 +12,9 @@
 #include <cmath>
 #include <cstdio>
 #include <map>
+#define STB_IMAGE_IMPLEMENTATION
+#include "../../vendor/stb/stb_image.h"
+#include <iostream>
 
 // lit shader - pos + normal layout
 // mirrors scene.cpp VERT_SRC/ FRAG_SRC
@@ -19,17 +22,20 @@ static const char* ER_LIT_VERT = R"(
 #version 330 core
 layout(location = 0) in vec3 a_pos;
 layout(location = 1) in vec3 a_normal;
+layout(location = 2) in vec2 a_uv;
 uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_proj;
 uniform mat3 u_normal_mat;
 out vec3 v_world_normal;
 out vec3 v_world_pos;
+out vec2 v_uv;
 void main(){
     vec4 world = u_model * vec4(a_pos, 1.0);
     gl_Position = u_proj * u_view * world;
     v_world_normal = normalize(u_normal_mat * a_normal);
     v_world_pos = world.xyz;
+    v_uv = a_uv;
 }
 )";
 
@@ -37,13 +43,17 @@ static const char* ER_LIT_FRAG = R"(
 #version 330 core
 in vec3 v_world_normal;
 in vec3 v_world_pos;
+in vec2 v_uv;
 out vec4 frag_color;
-uniform vec3 u_kd;
-uniform vec3 u_light_dir;
+uniform vec3      u_kd;
+uniform vec3      u_light_dir;
+uniform sampler2D u_tex;
+uniform int       u_use_texture;
 void main(){
     float diff = max(dot(normalize(v_world_normal), u_light_dir), 0.0);
     float ambient = 0.55;
-    vec3 lit = u_kd * (ambient + diff * 0.85);
+    vec3 base = (u_use_texture == 1) ? texture(u_tex, v_uv).rgb : u_kd;
+    vec3 lit = base * (ambient + diff * 0.85);
     frag_color = vec4(lit, 1.0);
 }
 )";
@@ -77,6 +87,40 @@ void main(){
 // internal helpers
 static void set_mat4(const Shader& s, const char* n, const glm::mat4& m){
     glUniformMatrix4fv(glGetUniformLocation(s.id, n), 1, GL_FALSE, glm::value_ptr(m));
+}
+
+// loads a texture from disk into GL, caches by path
+// returns 0 on failure
+static GLuint load_texture(EditorRenderer& er, const std::string& path){
+    if (path.empty()) return 0;
+    auto it = er.tex_cache.find(path);
+    if (it != er.tex_cache.end()) return it->second;
+
+    stbi_set_flip_vertically_on_load(1); // OpenGL UVs are bottom-up
+    int w, h, ch;
+    unsigned char* px = stbi_load(path.c_str(), &w, &h, &ch, 4);
+    if (!px){
+        std::cerr << "[tex] failed to load: " << path << "\n";
+        er.tex_cache[path] = 0;
+        return 0;
+    }
+
+    GLuint id;
+    glGenTextures(1, &id);
+    glBindTexture(GL_TEXTURE_2D, id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    // nearest filtering = PS1 look
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    stbi_image_free(px);
+    er.tex_cache[path] = id;
+    std::cout << "[tex] loaded " << w << "x" << h << " " << path << "\n";
+    return id;
 }
 
 // draws a wireframe box from world space min/max cornders
@@ -170,7 +214,7 @@ static ObjMesh& get_prop_mesh(EditorRenderer& er, const std::string& filename){
     float x_min= 1e9f, x_max=-1e9f;
     float y_min= 1e9f, y_max=-1e9f;
     float z_min= 1e9f, z_max=-1e9f;
-    for (int i = 0; i < (int)data.vertices.size(); i += 6){
+    for (int i = 0; i < (int)data.vertices.size(); i += 8){
         float x = data.vertices[i];
         float y = data.vertices[i+1];
         float z = data.vertices[i+2];
@@ -514,14 +558,28 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
         for (int i = 0; i < (int)mesh.data.groups.size(); i++){
             const ObjGroup& grp = mesh.data.groups[i];
             const ObjMaterial* mat = obj_find_material(mesh.data, grp.mat_name);
+
             glm::vec3 kd = mat ? mat->kd : glm::vec3(0.8f);
-            // blend toward red on impact
-            // basically same as old boxes
             glm::vec3 hit_color = {0.9f, 0.15f, 0.10f};
             kd = glm::mix(kd, hit_color, flash);
             glUniform3f(glGetUniformLocation(er.obj_shader.id, "u_kd"),
                 kd.r, kd.g, kd.b);
+
+            // bind texture if material has one, else flat color
+            GLuint tex = (mat && !mat->tex_path.empty())
+                         ? load_texture(er, mat->tex_path) : 0;
+            if (tex){
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, tex);
+                glUniform1i(glGetUniformLocation(er.obj_shader.id, "u_tex"), 0);
+                glUniform1i(glGetUniformLocation(er.obj_shader.id, "u_use_texture"), 1);
+            } else {
+                glUniform1i(glGetUniformLocation(er.obj_shader.id, "u_use_texture"), 0);
+            }
+
             obj_mesh_draw_group(mesh, i);
+
+            if (tex) glBindTexture(GL_TEXTURE_2D, 0);
         }
     }
 }
@@ -532,6 +590,9 @@ void editor_renderer_destroy(EditorRenderer& er){
     mesh_destroy(er.grid);
     font_destroy(er.font);
     for (auto& [name, mesh] : er.prop_cache)
-    obj_mesh_destroy(mesh);
+        obj_mesh_destroy(mesh);
     er.prop_cache.clear();
+    for (auto& [path, id] : er.tex_cache)
+        if (id) glDeleteTextures(1, &id);
+    er.tex_cache.clear();
 }

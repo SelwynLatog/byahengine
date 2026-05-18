@@ -22,6 +22,10 @@ struct EditorRenderer{
     // load prop meshes keyed by filename eg. "balay.obj"
     std::map<std::string, ObjMesh> prop_cache;
 
+    // GL texture objects keyed by absolute tex path
+    // 0 = not loaded yet or failed
+    std::map<std::string, GLuint> tex_cache;
+
     // y offset per prop
     // this sets mesh lowest point to 0 so no spawning below ground level
     std::map<std::string, float> prop_y_offset;

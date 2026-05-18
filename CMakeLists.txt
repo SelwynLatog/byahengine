@@ -32,6 +32,7 @@ target_include_directories(tricycle-sim PRIVATE
     vendor/glad/include
     vendor/glfw/include
     vendor/glm
+    vendor/stb
 )
 
 target_link_libraries(tricycle-sim PRIVATE

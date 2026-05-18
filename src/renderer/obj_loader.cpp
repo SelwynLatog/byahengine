@@ -32,7 +32,29 @@ static bool load_mtl(const std::string& mtl_path,
         else if (token == "Kd" && cur) {
             ss >> cur->kd.r >> cur->kd.g >> cur->kd.b;
         }
-        // we deliberately ignore Ka, Ks, Ns, map_* etc for now
+        else if (token == "map_Kd" && cur) {
+            std::string rel_path;
+            ss >> rel_path;
+
+            // strip any directory prefix from the rel_path
+            // often emit deeply relative paths like ../../../../../tex.png
+            // that blow past the drive root. the texture is almost always
+            // sitting next to the MTL, so try filename-only first.
+            std::filesystem::path tex_name = std::filesystem::path(rel_path).filename();
+            std::filesystem::path mtl_dir  = std::filesystem::path(mtl_path).parent_path();
+            std::filesystem::path local    = mtl_dir / tex_name;
+
+            if (std::filesystem::exists(local)) {
+                cur->tex_path = std::filesystem::weakly_canonical(local).string();
+                std::cout << "[mtl] tex found: " << cur->tex_path << "\n";
+            } else {
+                // texture not found next to MTL 
+                // log to know what to copy
+                std::cout << "[mtl] tex missing (copy to assets/): " << tex_name.string() << "\n";
+                cur->tex_path = "";
+            }
+        }
+        // Ka, Ks, Ns, Ke, Ni, d, illum ignored
     }
 
     std::cout << "[obj] loaded " << out_mats.size() << " materials from " << mtl_path << "\n";
@@ -50,15 +72,15 @@ bool obj_load(const std::string& obj_path, ObjData& out){
     // temp storage for raw OBJ data
     std::vector<glm::vec3> positions;
     std::vector<glm::vec3> normals;
+    std::vector<glm::vec2> texcoords;
 
-    // vertex cache: "pi/ti/ni" -> index in out.vertices
-    // we skip texture index (ti) since we don't use UVs
-    struct FaceVert { int pi, ni; };
-    // key: packed as pi * 1000000 + ni  (works for meshes up to 1M verts)
+    // vertex cache: (pi, ti, ni) -> index in out.vertices
+    struct FaceVert { int pi, ti, ni; };
+    // key: packed pi*1e12 + ti*1e6 + ni — works for meshes up to 1M each
     std::unordered_map<int64_t, int> cache;
 
-    auto pack_key = [](int pi, int ni) -> int64_t {
-        return (int64_t)pi * 1000000LL + ni;
+    auto pack_key = [](int pi, int ti, int ni) -> int64_t {
+        return (int64_t)pi * 1000000000LL + (int64_t)ti * 1000000LL + ni;
     };
 
     // current group state
@@ -108,7 +130,9 @@ bool obj_load(const std::string& obj_path, ObjData& out){
             normals.push_back(n);
         }
         else if (token == "vt") {
-           // skip existing UV files
+            glm::vec2 uv;
+            ss >> uv.x >> uv.y;
+            texcoords.push_back(uv);
         }
         else if (token == "usemtl") {
             ss >> cur_mat;
@@ -116,64 +140,64 @@ bool obj_load(const std::string& obj_path, ObjData& out){
         else if (token == "f") {
             // OBJ face: each vert is  pos_idx/tex_idx/norm_idx  (1-based)
             // we fan-triangulate polygons (handles tris and quads)
-            std::vector<std::pair<int,int>> face_verts; // (pi, ni)
+            std::vector<FaceVert> face_verts;
 
             std::string vert_token;
 
             while (ss >> vert_token) {
-                int pi = 0, ni = 0;
+                int raw_pi = 0, raw_ti = 0, raw_ni = 0;
                 size_t s1 = vert_token.find('/');
                 size_t s2 = vert_token.rfind('/');
 
-                int raw_pi = std::stoi(vert_token.substr(0, s1));
-                int raw_ni = 0;
+                raw_pi = std::stoi(vert_token.substr(0, s1));
+
+                if (s1 != std::string::npos && s1 + 1 < vert_token.size() && s1 != s2)
+                    raw_ti = std::stoi(vert_token.substr(s1 + 1, s2 - s1 - 1));
+
                 if (s2 != std::string::npos && s2 + 1 < vert_token.size())
                     raw_ni = std::stoi(vert_token.substr(s2 + 1));
 
-                // OBJ negative indices are relative to the end of the current list
-                pi = (raw_pi < 0) ? (int)positions.size() + raw_pi : raw_pi - 1;
-                ni = (raw_ni < 0) ? (int)normals.size()   + raw_ni : raw_ni - 1;
+                int pi = (raw_pi < 0) ? (int)positions.size()  + raw_pi : raw_pi - 1;
+                int ti = (raw_ti < 0) ? (int)texcoords.size()  + raw_ti : raw_ti - 1;
+                int ni = (raw_ni < 0) ? (int)normals.size()    + raw_ni : raw_ni - 1;
 
-                face_verts.push_back({pi, ni});
+                face_verts.push_back({pi, ti, ni});
             }
             if (face_verts.size() < 3) continue;
 
             // fan triangulation: triangle (0,i,i+1) for i in [1, n-2]
             ObjGroup& grp = get_or_create_group(cur_mat);
 
-            auto emit_vert = [&](int pi, int ni) {
-                int64_t key = pack_key(pi, ni);
+            auto emit_vert = [&](FaceVert fv) {
+                int64_t key = pack_key(fv.pi, fv.ti, fv.ni);
                 auto it = cache.find(key);
                 if (it != cache.end()) {
-                    // vertex already in buffer, but we're using DrawArrays
-                    // so we just push it again (simple, no index buffer needed)
-                    // push the 6 floats from the existing entry
-                    int base = it->second * 6;
-                    float tmp[6];
-                    for (int k = 0; k < 6; ++k) tmp[k] = out.vertices[base + k];
-                    for (int k = 0; k < 6; ++k) out.vertices.push_back(tmp[k]);
-
+                    // reuse existing vertex — DrawArrays so push the 8 floats again
+                    int base = it->second * 8;
+                    float tmp[8];
+                    for (int k = 0; k < 8; ++k) tmp[k] = out.vertices[base + k];
+                    for (int k = 0; k < 8; ++k) out.vertices.push_back(tmp[k]);
                 } else {
-                    int idx = (int)out.vertices.size() / 6;
+                    int idx = (int)out.vertices.size() / 8;
                     cache[key] = idx;
-                    glm::vec3 p = (pi >= 0 && pi < (int)positions.size())
-                                  ? positions[pi] : glm::vec3(0);
-                    glm::vec3 n = (ni >= 0 && ni < (int)normals.size())
-                                  ? normals[ni] : glm::vec3(0, 1, 0);
+                    glm::vec3 p = (fv.pi >= 0 && fv.pi < (int)positions.size())
+                                  ? positions[fv.pi] : glm::vec3(0);
+                    glm::vec3 n = (fv.ni >= 0 && fv.ni < (int)normals.size())
+                                  ? normals[fv.ni] : glm::vec3(0, 1, 0);
+                    glm::vec2 uv = (fv.ti >= 0 && fv.ti < (int)texcoords.size())
+                                   ? texcoords[fv.ti] : glm::vec2(0);
                     n = glm::normalize(n);
-
-                    if (out.vertices.size() == 0)
-                        std::cout << "[debug] first emit: pi=" << pi << " p=(" << p.x << "," << p.y << "," << p.z << ")\n";
-                    out.vertices.push_back(p.x); out.vertices.push_back(p.y); out.vertices.push_back(p.z);
-                    out.vertices.push_back(n.x); out.vertices.push_back(n.y); out.vertices.push_back(n.z);
+                    out.vertices.push_back(p.x);  out.vertices.push_back(p.y);  out.vertices.push_back(p.z);
+                    out.vertices.push_back(n.x);  out.vertices.push_back(n.y);  out.vertices.push_back(n.z);
+                    out.vertices.push_back(uv.x); out.vertices.push_back(uv.y);
                 }
                 grp.vertex_count++;
             };
 
             for (size_t i = 1; i + 1 < face_verts.size(); i++) {
-                emit_vert(face_verts[0].first, face_verts[0].second);
-                emit_vert(face_verts[i].first, face_verts[i].second);
-                emit_vert(face_verts[i+1].first, face_verts[i+1].second);
+                emit_vert(face_verts[0]);
+                emit_vert(face_verts[i]);
+                emit_vert(face_verts[i+1]);
             }
         }
     }
@@ -215,7 +239,7 @@ bool obj_load(const std::string& obj_path, ObjData& out){
         }
     }
 
-    size_t tri_count = out.vertices.size() / 6 / 3;
+    size_t tri_count = out.vertices.size() / 8 / 3;
     std::cout << "[obj] loaded " << obj_path << "\n";
     std::cout << "[obj] " << positions.size() << " positions, "
               << normals.size() << " normals, "
