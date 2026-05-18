@@ -13,6 +13,8 @@ static bool s_del_last = false;
 static bool s_lmb_last = false;
 static bool s_b_last = false;
 static bool s_n_last = false;
+static bool s_c_last = false;
+static bool s_v_last = false;
 
 // dynamic physics preset table
 // adding a new type = one new row here + a const in const.hpp
@@ -360,9 +362,39 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     }
     s_n_last = n_down;
 
+    // Ctrl+C copy selected object into clipboard
+    bool ctrl = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+    bool c_down = glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS;
+    bool v_down = glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS;
+
+    if (ctrl && c_down && !s_c_last && editor.selected_id != -1){
+        for (const auto& o : map.objects){
+            if (o.id != editor.selected_id) continue;
+            editor.clipboard     = o;
+            editor.has_clipboard = true;
+            std::cout << "[editor] copied id=" << o.id << " model=" << o.model_path << "\n";
+            break;
+        }
+    }
+    s_c_last = c_down;
+
+    // Ctrl+V paste clipboard at current ghost pos
+    if (ctrl && v_down && !s_v_last && editor.has_clipboard){
+        if (editor.placement_valid){
+            WorldObject o = editor.clipboard;
+            o.position = editor.ghost_pos;
+            // y stays at ghost ground level + whatever floor offset the model needs
+            o.position.y     = editor.clipboard.position.y; // preserve vertical nudge from original
+            WorldObject& placed = world_map_place(map, o);
+            editor.selected_id  = placed.id;
+            std::cout << "[editor] pasted " << o.model_path << " id=" << placed.id
+                      << " at (" << o.position.x << ", " << o.position.z << ")\n";
+        }
+    }
+    s_v_last = v_down;
+
     // save map
-    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS &&
-        glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS){
-            world_map_save(map, Const::MAP_SAVE_PATH);
+    if (ctrl && glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS){
+        world_map_save(map, Const::MAP_SAVE_PATH);
     }
 }

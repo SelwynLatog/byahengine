@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
+#include "../world/world_object.hpp"
 
 // which transform operation currently in use
 enum EditorTool{
@@ -36,5 +37,10 @@ struct EditorState{
 
     // dynamic behavior selector
     // when DYNAMIC, select obj type N key cycles through DYN_PRESETS
-    int dyn_preset_index = 0;   
+    int dyn_preset_index = 0;
+
+    // copy/paste clipboard
+    // has_clipboard = false until user copies something
+    bool has_clipboard = false;
+    WorldObject clipboard; // last copied object, position ignored on paste
 };
