@@ -213,6 +213,39 @@ static glm::vec3 behavior_color(ObjectBehavior b){
     }
 }
 
+static void rotated_world_bounds(
+    glm::vec3 lmin, glm::vec3 lmax,
+    const glm::vec3& pos, float yaw, const glm::vec3& scale, float yoff,
+    glm::vec3& out_min, glm::vec3& out_max
+){
+
+    // apply scale and y offset to local corners
+    glm::vec3 smin = glm::vec3(lmin.x * scale.x, lmin.y * scale.y + yoff, lmin.z * scale.z);
+    glm::vec3 smax = glm::vec3(lmax.x * scale.x, lmax.y * scale.y + yoff, lmax.z * scale.z);
+
+    float c = std::cos(yaw);
+    float s = std::sin(yaw);
+
+    out_min = glm::vec3( 1e9f);
+    out_max = glm::vec3(-1e9f);
+
+    for (int i = 0; i < 8; i++){
+        glm::vec3 corner = {
+            (i & 1) ? smax.x : smin.x,
+            (i & 2) ? smax.y : smin.y,
+            (i & 4) ? smax.z : smin.z,
+        };
+        glm::vec3 rotated = {
+            c * corner.x - s * corner.z,
+            corner.y,
+            s * corner.x + c * corner.z,
+        };
+        glm::vec3 world = pos + rotated;
+        out_min = glm::min(out_min, world);
+        out_max = glm::max(out_max, world);
+    }
+}
+
 void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj){
 
@@ -250,9 +283,8 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
                 ? er.prop_y_offset[o.model_path] : 0.0f;
             glm::vec3 lmin = bit->second.local_min;
             glm::vec3 lmax = bit->second.local_max;
-            glm::vec3 wmin = o.position + glm::vec3(lmin.x * o.scale.x, lmin.y * o.scale.y + yoff, lmin.z * o.scale.z);
-            glm::vec3 wmax = o.position + glm::vec3(lmax.x * o.scale.x, lmax.y * o.scale.y + yoff, lmax.z * o.scale.z);
-
+            glm::vec3 wmin, wmax;
+            rotated_world_bounds(lmin, lmax, o.position, o.rotation.y, o.scale, yoff, wmin, wmax);
             draw_wire_box(er.shader, wmin, wmax, view, proj, behavior_color(o.behavior));
         } 
         else {
@@ -294,8 +326,8 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
                     ? er.prop_y_offset[o.model_path] : 0.0f;
                 glm::vec3 lmin = bit->second.local_min;
                 glm::vec3 lmax = bit->second.local_max;
-                glm::vec3 wmin = o.position + glm::vec3( lmin.x * o.scale.x, lmin.y * o.scale.y + yoff, lmin.z * o.scale.z);
-                glm::vec3 wmax = o.position + glm::vec3( lmax.x * o.scale.x, lmax.y * o.scale.y + yoff, lmax.z * o.scale.z);
+                glm::vec3 wmin, wmax;
+                rotated_world_bounds(lmin, lmax, o.position, o.rotation.y, o.scale, yoff, wmin, wmax);
                 draw_wire_box(er.shader, wmin, wmax, view, proj, {1.0f, 0.55f, 0.0f});
             } 
             else {
