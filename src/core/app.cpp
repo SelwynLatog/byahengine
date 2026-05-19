@@ -234,6 +234,26 @@ void app_run(App& app){
         if (f_down && !s_f_pressed_last) s_free_cam = !s_free_cam;
         s_f_pressed_last = f_down;
 
+        // R key resets trike and dynamic objects to initial state
+        static bool s_r_last = false;
+        bool r_down = glfwGetKey(app.window.handle, GLFW_KEY_R) == GLFW_PRESS;
+        if (r_down && !s_r_last){
+            // reset trike to spawn
+            app.trike = TrikeState{};
+            s_cam_yaw   = Const::CAM_YAW_DEFAULT;
+            s_cam_pitch = Const::CAM_PITCH_DEFAULT;
+            s_cam_dist  = Const::CAM_DIST_DEFAULT;
+
+            // reset all dynamic sims to their placed world positions
+            app.dynamic_sims.clear();
+            init_dynamic_sims(app);
+
+            // clear all obstacle hit timers
+            for (auto& obs : app.obstacles)
+                obs.hit_timer = 0.0f;
+        }
+        s_r_last = r_down;
+
         // camera orbit input
         if (glfwGetKey(app.window.handle, GLFW_KEY_LEFT)  == GLFW_PRESS) s_cam_yaw -= Const::CAM_YAW_SPEED * dt;
         if (glfwGetKey(app.window.handle, GLFW_KEY_RIGHT) == GLFW_PRESS) s_cam_yaw += Const::CAM_YAW_SPEED * dt;
