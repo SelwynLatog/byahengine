@@ -279,16 +279,26 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
 
     // LMB place object
     bool lmb = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+    bool shift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
     if (lmb && !s_lmb_last){
 
-        // check first if we cliked an existing object
-        int hit = editor_raycast_objects(mx, my, view, proj, screen_w, screen_h, map, er);
-        if (hit != -1){
-            // select it but dont place
-            editor.selected_id = hit;
-            std::cout << "editor selected id=" << hit << "\n";
+        // shift+click = force place on top of selected object, skip raycast
+        // prevents buggy lmb spam clicking
+        if (shift && editor.selected_id != -1 && editor.placement_valid && !editor.selected_model.empty()){
+            // fall through to place block below with selected_id intact
         }
-        else if(editor.placement_valid && !editor.selected_model.empty()){
+        // check first if we clicked an existing object
+        else {
+            int hit = editor_raycast_objects(mx, my, view, proj, screen_w, screen_h, map, er);
+            if (hit != -1){
+                editor.selected_id = hit;
+                std::cout << "editor selected id=" << hit << "\n";
+                s_lmb_last = lmb;
+                return; // early out, don't place
+            }
+        }
+
+        if(editor.placement_valid && !editor.selected_model.empty()){
             // no object hit
             // place new one
             WorldObject o;
@@ -296,6 +306,29 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             o.model_path = editor.selected_model;
             o.behavior = STATIC;
             o.y_floor_offset = editor_get_y_floor_offset(er, editor.selected_model);
+
+            // vertical stacking
+            // scan objects sharing this XZ grid cell
+            // if any exist just land on top of highes one
+            float stack_y = 0.0f;
+            if (editor.selected_id != -1){
+                for (const auto& other : map.objects){
+                    if (other.id != editor.selected_id) continue;
+
+                    // compute world-space top using real mesh bounds when cached
+                    float obj_height = other.scale.y;
+                    auto bit = er.prop_bounds.find(other.model_path);
+                    if (bit != er.prop_bounds.end()){
+                        float yoff = er.prop_y_offset.count(other.model_path)
+                            ? er.prop_y_offset.at(other.model_path) : 0.0f;
+                        obj_height = (bit->second.local_max.y + yoff) * other.scale.y;
+                    }
+                    stack_y = other.position.y + obj_height;
+                    break;
+                }
+            }
+            o.position.y = stack_y;
+
             WorldObject& placed = world_map_place(map, o);
             editor.selected_id = placed.id;
             std::cout << " editor placed " << o.model_path << " id = " << placed.id
