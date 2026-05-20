@@ -24,6 +24,7 @@ add_executable(tricycle-sim
     src/physics/trike_physics.cpp
     src/physics/trike_aabb.cpp
     src/world/world_map.cpp
+    src/world/road_builder.cpp
     vendor/glad/src/glad.c
 )
 

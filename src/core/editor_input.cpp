@@ -35,6 +35,14 @@ static const DynPreset DYN_PRESETS[] = {
     { "MOTORCYCLE", Const::DYN_MOTORCYCLE_MASS,    Const::DYN_MOTORCYCLE_RESTITUTION,   Const::DYN_MOTORCYCLE_FRICTION   },
     { "POLE",       Const::DYN_POLE_MASS,          Const::DYN_POLE_RESTITUTION,         Const::DYN_POLE_FRICTION         },
     { "TRIKE",      Const::DYN_TRIKE_MASS,         Const::DYN_TRIKE_RESTITUTION,        Const::DYN_TRIKE_FRICTION        },
+    { "RAILING",    Const::DYN_RAILING_MASS,       Const::DYN_RAILING_RESTITUTION,      Const::DYN_RAILING_FRICTION      },
+    { "STALL",      Const::DYN_STALL_MASS,         Const::DYN_STALL_RESTITUTION,        Const::DYN_STALL_FRICTION        },
+    { "BARREL",     Const::DYN_BARREL_MASS,        Const::DYN_BARREL_RESTITUTION,       Const::DYN_BARREL_FRICTION       },
+    { "CAR",        Const::DYN_CAR_MASS,           Const::DYN_CAR_RESTITUTION,          Const::DYN_CAR_FRICTION          },
+    { "TRUCK",      Const::DYN_TRUCK_MASS,         Const::DYN_TRUCK_RESTITUTION,        Const::DYN_TRUCK_FRICTION        },
+    { "FRUIT",      Const::DYN_FRUIT_MASS,         Const::DYN_FRUIT_RESTITUTION,        Const::DYN_FRUIT_FRICTION        },
+    { "BUS",        Const::DYN_BUS_MASS,           Const::DYN_BUS_RESTITUTION,          Const::DYN_BUS_FRICTION          },
+    { "DEFAULT",    Const::DYN_DEFAULT_MASS,       Const::DYN_DEFAULT_RESTITUTION,      Const::DYN_DEFAULT_FRICTION      },
 };
 static const int DYN_PRESET_COUNT = (int)(sizeof(DYN_PRESETS) / sizeof(DYN_PRESETS[0]));
 
@@ -304,8 +312,21 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             WorldObject o;
             o.position = editor.ghost_pos;
             o.model_path = editor.selected_model;
-            o.behavior = STATIC;
             o.y_floor_offset = editor_get_y_floor_offset(er, editor.selected_model);
+
+            // ground/road surfaces default to DECORATION — no collision
+            // everything else defaults to STATIC
+            // extend this list as new ground types are added
+            static const char* GROUND_TYPES[] = {
+                "asphalt", "gravel", "dirt", "sand", "grass", "cement"
+            };
+            o.behavior = STATIC;
+            for (const char* gt : GROUND_TYPES){
+                if (o.model_path.find(gt) != std::string::npos){
+                    o.behavior = DECORATION;
+                    break;
+                }
+            }
 
             // vertical stacking
             // scan objects sharing this XZ grid cell
@@ -417,7 +438,17 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             WorldObject o = editor.clipboard;
             o.position = editor.ghost_pos;
             // y stays at ghost ground level + whatever floor offset the model needs
-            o.position.y     = editor.clipboard.position.y; // preserve vertical nudge from original
+            o.position.y = editor.clipboard.position.y; // preserve vertical nudge from original
+            static const char* GROUND_TYPES[] = {
+                "asphalt", "gravel", "dirt", "sand", "grass", "cement"
+            };
+            for (const char* gt : GROUND_TYPES){
+                if (o.model_path.find(gt) != std::string::npos){
+                    o.behavior = DECORATION;
+                    break;
+                }
+            }
+            
             WorldObject& placed = world_map_place(map, o);
             editor.selected_id  = placed.id;
             std::cout << "[editor] pasted " << o.model_path << " id=" << placed.id

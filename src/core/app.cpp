@@ -9,6 +9,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/constants.hpp>
+#include "../world/world_map.hpp"
+#include "../world/road_builder.hpp"
 #include <cmath>
 #include <iostream>
 
@@ -92,7 +94,7 @@ void init_dynamic_sims(App& app){
 
         DynamicSim sim;
         sim.position = o.position;
-        sim.yaw = o.rotation.y;
+        sim.yaw = 0.0f;
 
         // builds initial AABB from prop bounds
         auto bit = app.editor_renderer.prop_bounds.find(o.model_path);
@@ -121,7 +123,9 @@ void app_init(App& app){
 
     scene_init(app.scene);
     editor_renderer_init(app.editor_renderer);
-
+    
+    road_builder_init("../assets");
+    
     // scan assets/ for placeable props
     editor_scan_props(app.editor, "../assets");
 

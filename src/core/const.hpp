@@ -23,7 +23,7 @@ namespace Const{
     inline constexpr float TRIKE_ENGINE_FORCE = 300.0f; // N
     inline constexpr float TRIKE_BRAKE_FORCE= 600.0f; // N
     inline constexpr float TRIKE_FRICTION = 8.5f; // rolling resistance coefficient
-    inline constexpr float TRIKE_MAX_STEER_ANGLE = 20.0f; // degrees
+    inline constexpr float TRIKE_MAX_STEER_ANGLE = 35.0f; // degrees
     inline constexpr float TRIKE_STEER_SPEED = 90.0f; //degrees /sec
     inline constexpr float TRIKE_WHEELBASE = 1.8f; // metres, front to rear angle
 
@@ -166,6 +166,11 @@ namespace Const{
     inline constexpr float DYN_CAR_MASS = 1100.0f;
     inline constexpr float DYN_CAR_RESTITUTION = 0.12f;
     inline constexpr float DYN_CAR_FRICTION = 0.90f;
+
+    // bus
+    inline constexpr float DYN_BUS_MASS = 6000.0f;
+    inline constexpr float DYN_BUS_RESTITUTION = 0.08f;
+    inline constexpr float DYN_BUS_FRICTION = 0.95f;
 
     inline constexpr float DYN_TRUCK_MASS = 8000.0f;
     inline constexpr float DYN_TRUCK_RESTITUTION = 0.08f;
