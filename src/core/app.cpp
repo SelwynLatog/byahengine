@@ -52,11 +52,11 @@ void world_map_to_obstacles(App& app){
             glm::vec3 lmin = bit->second.local_min;
             glm::vec3 lmax = bit->second.local_max;
 
-            world_min = o.position + glm::vec3( 
-                lmin.x * o.scale.x, lmin.y * o.scale.y + yoff, lmin.z * o.scale.z);
+            world_min = o.position + glm::vec3(
+                lmin.x * o.scale.x, (lmin.y + yoff) * o.scale.y, lmin.z * o.scale.z);
 
-            world_max = o.position + glm::vec3( 
-                lmax.x * o.scale.x, lmax.y * o.scale.y + yoff, lmax.z * o.scale.z);
+            world_max = o.position + glm::vec3(
+                lmax.x * o.scale.x, (lmax.y + yoff) * o.scale.y, lmax.z * o.scale.z);
         }
         else{
             // fallback to unit cube scaled by obj scale
@@ -103,8 +103,8 @@ void init_dynamic_sims(App& app){
                 ? app.editor_renderer.prop_y_offset.at(o.model_path) : 0.0f;
             glm::vec3 lmin = bit->second.local_min;
             glm::vec3 lmax = bit->second.local_max;
-            glm::vec3 wmin = sim.position + glm::vec3(lmin.x*o.scale.x, lmin.y*o.scale.y+yoff, lmin.z*o.scale.z);
-            glm::vec3 wmax = sim.position + glm::vec3(lmax.x*o.scale.x, lmax.y*o.scale.y+yoff, lmax.z*o.scale.z);
+            glm::vec3 wmin = sim.position + glm::vec3(lmin.x*o.scale.x, (lmin.y+yoff)*o.scale.y, lmin.z*o.scale.z);
+            glm::vec3 wmax = sim.position + glm::vec3(lmax.x*o.scale.x, (lmax.y+yoff)*o.scale.y, lmax.z*o.scale.z);
             sim.aabb = { wmin, wmax };
         }
         else{
@@ -413,8 +413,8 @@ void app_run(App& app){
                         ? app.editor_renderer.prop_y_offset.at(wo->model_path) : 0.0f;
                     glm::vec3 lmin = bit->second.local_min;
                     glm::vec3 lmax = bit->second.local_max;
-                    sim.aabb.min = sim.position + glm::vec3(lmin.x*wo->scale.x, lmin.y*wo->scale.y+yoff, lmin.z*wo->scale.z);
-                    sim.aabb.max = sim.position + glm::vec3(lmax.x*wo->scale.x, lmax.y*wo->scale.y+yoff, lmax.z*wo->scale.z);
+                    sim.aabb.min = sim.position + glm::vec3(lmin.x*wo->scale.x, (lmin.y+yoff)*wo->scale.y, lmin.z*wo->scale.z);
+                    sim.aabb.max = sim.position + glm::vec3(lmax.x*wo->scale.x, (lmax.y+yoff)*wo->scale.y, lmax.z*wo->scale.z);
                 }
             }
 
@@ -462,6 +462,15 @@ void app_run(App& app){
                 // trike loses speed proportional to object mass
                 app.trike.speed *= (1.0f - glm::clamp(wo->mass / total_mass * 0.6f, 0.0f, 0.6f));
 
+                // flash + cam shake scaled to closing speed same as static hits
+                if (closing > 0.8f){
+                    sim.hit_timer = glm::clamp(closing * 0.12f, 0.15f, 0.45f);
+                    if (closing > 2.0f){
+                        app.trike.last_impact_force = closing;
+                        app.trike.impact_timer = glm::clamp(closing * 0.08f, 0.15f, 0.35f);
+                    }
+                }
+
                 aabb_update(app.trike.aabb, app.trike.position, app.trike.heading);
             }
 
@@ -505,7 +514,9 @@ void app_run(App& app){
                 sim.roll_vel  = 0.0f;
             }
 
-            // sleep when everything is nearly still
+            // tick flash timer
+            if (sim.hit_timer > 0.0f) sim.hit_timer -= dt;
+
             float lin_spd = glm::length(sim.velocity);
             float ang_spd = std::abs(sim.yaw_vel) + std::abs(sim.pitch_vel) + std::abs(sim.roll_vel);
             if (lin_spd < 0.05f && ang_spd < 0.02f){
@@ -614,6 +625,9 @@ void app_run(App& app){
         for (const auto& obs : app.obstacles)
             if (obs.world_id != -1 && obs.hit_timer > 0.0f)
                 flash_map[obs.world_id] = obs.hit_timer;
+        for (const auto& [id, sim] : app.dynamic_sims)
+            if (sim.hit_timer > 0.0f)
+                flash_map[id] = sim.hit_timer;
 
         editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims);
         hud_draw(app.hud, app.trike);

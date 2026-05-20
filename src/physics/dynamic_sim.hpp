@@ -15,5 +15,6 @@ struct DynamicSim {
     float pitch_vel = 0.0f; // angular vel X rad/s
     float roll_vel = 0.0f; // angular vel Z rad/s
     bool sleeping = true; // skip integration when nearly still
+    float hit_timer = 0.0f; // counts down after impact
     Aabb aabb; // world space, rebuilt each frame when awake
 };
