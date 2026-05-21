@@ -15,6 +15,7 @@ static bool s_b_last = false;
 static bool s_n_last = false;
 static bool s_c_last = false;
 static bool s_v_last = false;
+static bool s_f5_last = false;
 
 // dynamic physics preset table
 // adding a new type = one new row here + a const in const.hpp
@@ -479,4 +480,13 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     if (ctrl && glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS){
         world_map_save(map, Const::MAP_SAVE_PATH);
     }
+
+    // F5 rescan assets/ for new/removed props
+    bool f5_down = glfwGetKey(window, GLFW_KEY_F5) == GLFW_PRESS;
+    if (f5_down && !s_f5_last){
+        editor_scan_props(editor, "../assets");
+        editor.prop_page = 0;
+        std::cout<< "[editor] assets refreshed total=" << editor.prop_list.size() << "\n";
+     }
+    s_f5_last = f5_down;
 }
