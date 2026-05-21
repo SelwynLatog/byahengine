@@ -52,8 +52,9 @@ uniform int       u_use_texture;
 void main(){
     float diff = max(dot(normalize(v_world_normal), u_light_dir), 0.0);
     float ambient = 0.55;
-    vec3 base = (u_use_texture == 1) ? texture(u_tex, v_uv).rgb : u_kd;
-    vec3 lit = base * (ambient + diff * 0.85);
+    vec4 tex_sample = (u_use_texture == 1) ? texture(u_tex, v_uv) : vec4(u_kd, 1.0);
+    if (u_use_texture == 1 && tex_sample.a < 0.5) discard;
+    vec3 lit = tex_sample.rgb * (ambient + diff * 0.85);
     frag_color = vec4(lit, 1.0);
 }
 )";
@@ -513,6 +514,8 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     shader_bind(er.obj_shader);
     set_mat4(er.obj_shader, "u_view", view);
     set_mat4(er.obj_shader, "u_proj", proj);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glUniform3f(glGetUniformLocation(er.obj_shader.id, "u_light_dir"),
         LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
 
@@ -582,6 +585,7 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
             if (tex) glBindTexture(GL_TEXTURE_2D, 0);
         }
     }
+    glDisable(GL_BLEND);
 }
 
 void editor_renderer_destroy(EditorRenderer& er){

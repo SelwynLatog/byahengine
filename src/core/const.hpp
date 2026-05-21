@@ -153,6 +153,11 @@ namespace Const{
     inline constexpr float DYN_STALL_RESTITUTION = 0.15f;
     inline constexpr float DYN_STALL_FRICTION = 0.70f;
 
+    // light chairs
+    inline constexpr float DYN_CHAIR_MASS = 4.5f;
+    inline constexpr float DYN_CHAIR_RESTITUTION = 0.25f;
+    inline constexpr float DYN_CHAIR_FRICTION = 0.75f;
+
     // barrells
     inline constexpr float DYN_BARREL_MASS = 20.0f;
     inline constexpr float DYN_BARREL_RESTITUTION = 0.55f;
