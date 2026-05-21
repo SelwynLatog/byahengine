@@ -78,6 +78,8 @@ namespace Const{
     inline constexpr const char* MAP_SAVE_PATH = "../assets/map.txt";
     inline constexpr int EDITOR_GRID_RADIUS = 50;  // grid lines extend 50m from origin
     inline constexpr int EDITOR_PAGE_SIZE = 9; // num of prop selection
+    inline constexpr float EDITOR_GRID_SNAP_FINE = 0.05f;  // alt+arrows: 5cm steps
+    inline constexpr float EDITOR_SCALE_SPEED_FINE = 0.05f;  // alt+scale: slow creep
 
     // lighting
     inline constexpr float LIGHT_DIR_X= 1.0f;
@@ -140,8 +142,7 @@ namespace Const{
     inline constexpr float DYN_CART_RESTITUTION = 0.30f;
     inline constexpr float DYN_CART_FRICTION = 0.60f; 
 
-    // poles and posts
-    // street lamps, sign posts
+    // street lamps, sign posts, fences
     inline constexpr float DYN_POLE_MASS = 18.0f;
     inline constexpr float DYN_POLE_RESTITUTION = 0.25f;
     inline constexpr float DYN_POLE_FRICTION = 0.90f;

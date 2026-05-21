@@ -26,5 +26,5 @@ bool editor_raycast_ground( double mx, double my, const glm::mat4& view, const g
 // check if ray hits any placed object's AABB
 // uses real mesh bounds from er.prop_bounds when available
 // returns id of the closest hit object, -1 if none
-int editor_raycast_objects( double mx, double my, const glm::mat4& view, const glm::mat4& proj,
-    int screen_w, int screen_h, const WorldMap& map, const EditorRenderer& er);
+int editor_raycast_objects(double mx, double my, const glm::mat4& view, const glm::mat4& proj,
+    int screen_w, int screen_h, const WorldMap& map, const EditorRenderer& er, bool prefer_small = false);

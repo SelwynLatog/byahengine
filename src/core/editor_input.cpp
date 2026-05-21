@@ -105,7 +105,8 @@ bool editor_raycast_ground( double mx, double my,
 }
 
 int editor_raycast_objects (double mx, double my, const glm::mat4& view, const glm::mat4& proj,
-    int screen_w, int screen_h, const WorldMap& map, const EditorRenderer& er){
+    int screen_w, int screen_h, const WorldMap& map, const EditorRenderer& er,
+    bool prefer_small){
 
     float ndc_x = (2.0f * (float)mx / screen_w) - 1.0f;
     float ndc_y = 1.0f - (2.0f * (float)my / screen_h);
@@ -119,13 +120,11 @@ int editor_raycast_objects (double mx, double my, const glm::mat4& view, const g
     glm::vec3 ray_origin = glm::vec3(near_pt);
     glm::vec3 ray_dir = glm::normalize(glm::vec3(far_pt) - ray_origin);
 
-    float closest_t = 1e9f;
+    float closest_t   = 1e9f;
+    float smallest_vol = 1e9f;
     int hit_id = -1;
 
     for (const auto& o : map.objects){
-        // we build a simple AABB from pos + scale for picking
-        // assume center bottom convention as it is pretty much used for all trike and obstacles
-        // updated to use real mesh bounds when cached
         glm::vec3 aabb_min, aabb_max;
         auto bit = er.prop_bounds.find(o.model_path);
         if (bit != er.prop_bounds.end()){
@@ -148,9 +147,8 @@ int editor_raycast_objects (double mx, double my, const glm::mat4& view, const g
             aabb_max = o.position + glm::vec3( half.x, o.scale.y,  half.z);
         }
 
-        // ray vs AABB slab test
         float tmin = 0.0f, tmax = 1e9f;
-        for (int i =0; i<3; i++){
+        for (int i = 0; i < 3; i++){
             float inv_d = 1.0f / ray_dir[i];
             float t0 = (aabb_min[i] - ray_origin[i]) * inv_d;
             float t1 = (aabb_max[i] - ray_origin[i]) * inv_d;
@@ -158,14 +156,22 @@ int editor_raycast_objects (double mx, double my, const glm::mat4& view, const g
             tmin = std::max(tmin, t0);
             tmax = std::min(tmax, t1);
             if (tmax < tmin) goto next_object;
-            // goto is intentional
-            // cleanest way to break out of nested loop without a bool flag or a lambda
-            // goes nowhere weird and simply skips to next object
         }
 
-        if (tmin < closest_t){
-            closest_t = tmin;
-            hit_id = o.id;
+        if (prefer_small){
+            // ctrl held: pick smallest AABB volume among all ray hits
+            glm::vec3 sz = aabb_max - aabb_min;
+            float vol = sz.x * sz.y * sz.z;
+            if (vol < smallest_vol){
+                smallest_vol = vol;
+                hit_id = o.id;
+            }
+        } else {
+            // normal: pick closest to camera
+            if (tmin < closest_t){
+                closest_t = tmin;
+                hit_id = o.id;
+            }
         }
 
         next_object:;
@@ -253,15 +259,19 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
                 bool pgup = glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS;
                 bool pgdn = glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS;
 
+                // alt held = fine mode: 5cm steps instead of grid snap
+                bool alt = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+                float step = alt ? Const::EDITOR_GRID_SNAP_FINE : Const::EDITOR_GRID_SNAP;
+
                 // xz movement
-                if (al && !s_arr_left_last) o.position.x -= Const::EDITOR_GRID_SNAP;
-                if (ar && !s_arr_right_last) o.position.x += Const::EDITOR_GRID_SNAP;
-                if (au && !s_arr_up_last) o.position.z -= Const::EDITOR_GRID_SNAP;
-                if (ad && !s_arr_down_last) o.position.z += Const::EDITOR_GRID_SNAP;
+                if (al && !s_arr_left_last) o.position.x -= step;
+                if (ar && !s_arr_right_last) o.position.x += step;
+                if (au && !s_arr_up_last) o.position.z -= step;
+                if (ad && !s_arr_down_last) o.position.z += step;
 
                 // y nudge for vert pos adjustment
-                if (pgup && !s_pgup_last) o.position.y += Const::EDITOR_GRID_SNAP;
-                if (pgdn && !s_pgdn_last) o.position.y -= Const::EDITOR_GRID_SNAP;
+                if (pgup && !s_pgup_last) o.position.y += step;
+                if (pgdn && !s_pgdn_last) o.position.y -= step;
 
                 s_arr_left_last = al;
                 s_arr_right_last = ar;
@@ -277,8 +287,11 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             }
 
             if (editor.tool == TOOL_SCALE){
-                if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) o.scale -= Const::EDITOR_SCALE_SPEED * dt;
-                if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) o.scale += Const::EDITOR_SCALE_SPEED * dt;
+                // alt held = fine scale: slow creep for small prop tuning
+                bool alt = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+                float sspeed = alt ? Const::EDITOR_SCALE_SPEED_FINE : Const::EDITOR_SCALE_SPEED;
+                if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) o.scale -= sspeed * dt;
+                if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) o.scale += sspeed * dt;
                 o.scale = glm::max(o.scale, glm::vec3(0.005f));
             }
             break;
@@ -297,12 +310,16 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         }
         // check first if we clicked an existing object
         else {
-            int hit = editor_raycast_objects(mx, my, view, proj, screen_w, screen_h, map, er);
+            // ctrl held = small object priority: picks smallest AABB volume hit
+            // select smaller objects for easier placement
+            // when putting smaller objects inside a bigger object
+            bool ctrl_held = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+            int hit = editor_raycast_objects(mx, my, view, proj, screen_w, screen_h, map, er, ctrl_held);
             if (hit != -1){
                 editor.selected_id = hit;
                 std::cout << "editor selected id=" << hit << "\n";
                 s_lmb_last = lmb;
-                return; // early out, don't place
+                return;
             }
         }
 
