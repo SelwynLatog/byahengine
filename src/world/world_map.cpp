@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <filesystem>
 
 WorldObject& world_map_place(WorldMap& map, WorldObject obj){
     obj.id = map.next_id++;
@@ -36,6 +37,17 @@ void world_map_save(const WorldMap& map, const std::string& path){
           << o.mass << " " << o.restitution << " " << o.friction << "\n";
     }
     std::cout << "world_map saved " << map.objects.size() << " objects to " << path << "\n";
+
+    // derive sibling paths from the map path
+    // objects stay in the main file, terrain and roads get their own files
+    // keeps map path small and safe
+    // by safe I mean in case I fuck up I dont want to restart the entire map
+    std::filesystem::path base(path);
+    std::string terrain_path = (base.parent_path() / (base.stem().string() + "_terrain.hf")).string();
+    std::string roads_path = (base.parent_path() / (base.stem().string() + "_roads.rd")).string();
+
+    heightfield_save(map.terrain, terrain_path);
+    road_splines_save(map.roads, roads_path);
 }
 
 bool world_map_load(WorldMap& map, const std::string& path){
@@ -69,5 +81,18 @@ bool world_map_load(WorldMap& map, const std::string& path){
         map.objects.push_back(o);
     }
     std::cout << "world_map loaded " << map.objects.size() << " objects from " << path << "\n";
+
+    // load terrain and roads from sibling files if they exist
+    // missing files are not an error
+    // fresh map starts flat with no roads
+    std::filesystem::path base(path);
+    std::string terrain_path = (base.parent_path() / (base.stem().string() + "_terrain.hf")).string();
+    std::string roads_path = (base.parent_path() / (base.stem().string() + "_roads.rd")).string();
+
+    if (std::filesystem::exists(terrain_path))
+        heightfield_load(map.terrain, terrain_path);
+    if (std::filesystem::exists(roads_path))
+        road_splines_load(map.roads, roads_path);
+
     return true;
 }

@@ -93,6 +93,25 @@ namespace Const{
     inline constexpr float GROUND_Y_OFFSET= -0.002f;
     inline constexpr float GROUND_KD= 0.18f;   // uniform RGB, dark asphalt
 
+    // heightfield terrain
+    inline constexpr int TERRAIN_ROWS = 100; // grid cells z
+    inline constexpr int TERRAIN_COLS = 100; // grid cells x
+    inline constexpr float TERRAIN_CELL_SIZE = 4.0f; // meters per cell
+    inline constexpr float TERRAIN_MAX_Y = 40.0f;  // sculpt clamp ceiling
+    inline constexpr float TERRAIN_MIN_Y = -10.0f;  // sculpt clamp floor for below sea level beach areas
+
+    // terrain sculpt brush in editor
+    // everything meters
+    inline constexpr float TERRAIN_BRUSH_RADIUS_DEFAULT = 8.0f;
+    inline constexpr float TERRAIN_BRUSH_RADIUS_MIN = 2.0f;
+    inline constexpr float TERRAIN_BRUSH_RADIUS_MAX = 40.0f;
+    inline constexpr float TERRAIN_BRUSH_STRENGTH = 0.25;
+    inline constexpr float TERRAIN_BRUSH_SMOOTH_STRENGTH = 0.35f;
+
+    // slope physics
+    inline constexpr float TERRAIN_SLOPE_GRAVITY_SCALE = 1.0f; // multiplier on gravity component along slopes
+    inline constexpr float TERRAIN_SNAP_LERP_SPEED = 12.0f; // how fast trike y snaps height
+
     // model
     inline constexpr float MODEL_NORMALIZE_SIZE= 2.0f;  // auto-scale longest axis to this (metres)
     inline constexpr float MODEL_FLOOR_FUDGE= 0.03f; // nudge model down so wheels kiss ground

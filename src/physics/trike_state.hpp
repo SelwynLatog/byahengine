@@ -10,6 +10,9 @@ struct TrikeState{
     
     glm::vec3 position = glm::vec3(0.0f); //world position of rear axle, ground level
     float heading = 0.0f; // yaw in radians, 0 = facing +X axis
+    float pitch_angle = 0.0f; // body pitch radians positive means nose up
+    glm::vec3 surface_normal = glm::vec3(0.0f, 1.0f, 0.0f); // ground normal under trike
+    float slope_force = 0.0f; // gravity component along slope, m/s^2. negative = uphill drag
     float speed = 0.0f; // signed scalar m/s, positive = forward longitudinal
     float steer_angle = 0.0f; // current float wheel angle, radians
     float lateral_speed= 0.0f;
