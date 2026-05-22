@@ -11,6 +11,10 @@ struct HeightField{
     int cols = 0;
     float cell_size = 2.0f;
     glm::vec3 origin = glm::vec3(0.0f); // world space corner row=0 col=0
+
+    // undo stack each entry is a full snapshot of heights
+    std::vector<std::vector<float>> undo_stack;
+    static constexpr int UNDO_MAX = 32;
 };
 
 // init flat grid of given dimension centered on world origin
@@ -28,6 +32,15 @@ void heightfield_smooth(HeightField& hf, float cx, float cz, float radius, float
 
 // clamp all heights to min_y max_y
 void heightfield_clamp(HeightField& hf, float min_y, float max_y);
+
+// reset every cell to y=0
+void heightfield_flatten(HeightField& hf);
+
+// snapshot current heights onto the undo stack
+void heightfield_push_undo(HeightField& hf);
+
+// restore last snapshot
+void heightfield_pop_undo(HeightField& hf);
 
 // save/load
 void heightfield_save(const HeightField& hf, const std::string& path);

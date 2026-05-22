@@ -3,12 +3,20 @@
 #include <string>
 #include <vector>
 #include "../world/world_object.hpp"
+#include "../core/const.hpp"
 
 // which transform operation currently in use
 enum EditorTool{
     TOOL_TRANSLATE,
     TOOL_ROTATE,
     TOOL_SCALE
+};
+
+// which editor sub mode is active
+enum EditorMode{
+    MODE_OBJECT, // default - place/select/move props
+    MODE_TERRAIN, // sculpt heightfield
+    MODE_ROAD // place/edit road spline control points
 };
 
 // editor mode state lives in App
@@ -43,4 +51,15 @@ struct EditorState{
     // has_clipboard = false until user copies something
     bool has_clipboard = false;
     WorldObject clipboard; // last copied object, position ignored on paste
+
+    // editor mode
+    EditorMode mode = MODE_OBJECT;
+
+    float brush_radius = Const::TERRAIN_BRUSH_RADIUS_DEFAULT;
+    bool brush_smooth = false;
+
+    int active_road_id = -1;
+    int selected_point_idx = -1;
+    bool road_placing = false;
+    
 };

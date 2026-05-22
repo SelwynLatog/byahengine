@@ -5,6 +5,8 @@
 #include "obj_mesh.hpp"
 #include "../core/editor_state.hpp"
 #include "../world/world_map.hpp"
+#include "../world/height_field.hpp"
+#include "../world/road_spline.hpp"
 #include <glm/glm.hpp>
 #include <map>
 #include <string>
@@ -38,6 +40,12 @@ struct EditorRenderer{
     };
     std::map<std::string, PropBounds> prop_bounds;
 
+    // terrain wireframe mesh
+    Mesh terrain_mesh;
+    bool terrain_mesh_dirty = true; // set true after any sculpt op
+
+    // road spline shader same attrib layout as Roadvertex
+    Shader road_shader;
 };
 
 // builds the static grid mesh and compiles the flat shader
@@ -65,3 +73,9 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
 void editor_renderer_destroy(EditorRenderer& er);
 
 float editor_get_y_floor_offset(EditorRenderer& er, const std::string& filename);
+
+void editor_renderer_build_terrain_mesh(EditorRenderer& er, const HeightField& hf);
+
+void editor_renderer_draw_terrain(EditorRenderer& er, const HeightField& hf, const glm::mat4& view, const glm::mat4& proj);
+
+void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline>& roads, const glm::mat4& view, const glm::mat4& proj);

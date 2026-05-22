@@ -125,6 +125,11 @@ void app_init(App& app){
     editor_renderer_init(app.editor_renderer);
     
     road_builder_init("../assets");
+
+    heightfield_init(app.map.terrain,
+        Const::TERRAIN_ROWS, Const::TERRAIN_COLS,
+        Const::TERRAIN_CELL_SIZE,
+        glm::vec3( -(Const::TERRAIN_COLS * Const::TERRAIN_CELL_SIZE) * 0.5f, 0.0f,-(Const::TERRAIN_ROWS * Const::TERRAIN_CELL_SIZE) * 0.5f));
     
     // scan assets/ for placeable props
     editor_scan_props(app.editor, "../assets");
@@ -213,6 +218,13 @@ void app_run(App& app){
             // grid, ghost, selection highlight
             editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj);
 
+            // terrain wireframe
+            if (app.editor.mode == MODE_TERRAIN)
+                editor_renderer_draw_terrain(app.editor_renderer, app.map.terrain, view, proj);
+
+            // road splines
+            editor_renderer_draw_roads(app.editor_renderer, app.map.roads, view, proj);
+
             // temp editor control hud
             font_draw(app.editor_renderer.font,"[TAB] drive  [L CLICK] place/select  [DEL] delete  [B] behavior  [Ctrl+S] save",
                       10, Const::WINDOW_HEIGHT - 40, 2, 0.7f, 0.7f, 0.7f);
@@ -274,7 +286,7 @@ void app_run(App& app){
         // this prevents the sim from going insane in slow frames
         app.accumulator += dt;
         while (app.accumulator >= Const::FIXED_TIMESTEP){
-            trike_physics_update(app.trike, input, Const::FIXED_TIMESTEP);
+            trike_physics_update(app.trike, input, app.map.terrain, Const::FIXED_TIMESTEP);
             app.accumulator -= Const::FIXED_TIMESTEP;
         }
 
@@ -479,6 +491,10 @@ void app_run(App& app){
             // integrate position
             sim.position += sim.velocity * dt;
 
+            // snap dyn objects to terrain
+            float sim_ground = heightfield_sample(app.map.terrain, sim.position.x, sim.position.z);
+            if (sim.position.y < sim_ground) sim.position.y = sim_ground;
+
             // ground friction bleeds linear velocity
             float drag = 1.0f - wo->friction * dt;
             sim.velocity *= glm::clamp(drag, 0.0f, 1.0f);
@@ -630,6 +646,7 @@ void app_run(App& app){
                 flash_map[id] = sim.hit_timer;
 
         editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims);
+        editor_renderer_draw_roads(app.editor_renderer, app.map.roads, view, proj);
         hud_draw(app.hud, app.trike);
 
         window_swap_buffers(app.window);

@@ -7,6 +7,57 @@
 #include <algorithm>
 #include <iostream>
 
+/*
+=============================================================
+  EDITOR CONTROLS
+=============================================================
+
+  [TAB]           toggle editor / drive mode
+
+  --- OBJECT MODE (default) ---
+  [L CLICK]       select object / place new prop
+  [CTRL+L CLICK]  select smallest object under cursor
+  [SHIFT+L CLICK] place on top of selected object
+  [DEL]           delete selected object
+  [B]             cycle behavior: STATIC > DYNAMIC > DECORATION > PEDESTRIAN
+  [N]             cycle physics preset on DYNAMIC object
+  [T]             translate tool
+  [R]             rotate tool
+  [Y]             scale tool
+  [ARROW KEYS]    move / rotate / scale selected object
+  [SHIFT+ARROWS]  fine move (5cm steps)
+  [PgUp / PgDn]   nudge Y up / down
+  [1-9]           select prop from current page
+  [[ / ]]         prev / next prop page
+  [CTRL+C]        copy selected object
+  [CTRL+V]        paste at cursor
+  [CTRL+S]        save map
+  [F5]            rescan assets/
+
+  --- TERRAIN MODE [H] ---
+  [L CLICK hold]        raise terrain
+  [R CLICK hold]        lower terrain
+  [SHIFT+L/R CLICK]     smooth brush
+  [[ / ]]               shrink / grow brush radius
+  [CTRL+Z]              undo last sculpt stroke (32 levels)
+  [CTRL+SHIFT+F]        flatten entire terrain to y=0 (undoable)
+  [CTRL+S]              save
+  [H]                   exit terrain mode
+
+  --- ROAD MODE [M] ---
+  [L CLICK]       add control point to active spline
+  [R CLICK]       undo last control point
+  [[ / ]]         cycle road type (asphalt>gravel>dirt>sand>grass>cement)
+  [PgUp / PgDn]   nudge selected point Y up / down
+  [SHIFT+PgUp/Dn] fine Y nudge (5cm)
+  [ENTER]         finish spline, return to object mode
+  [DEL]           delete entire active spline
+  [CTRL+S]        save
+  [M]             exit road mode
+
+=============================================================
+*/
+
 // key state tracking to prevent held key repeat
 static bool s_tab_last = false;
 static bool s_del_last = false;
@@ -16,6 +67,10 @@ static bool s_n_last = false;
 static bool s_c_last = false;
 static bool s_v_last = false;
 static bool s_f5_last = false;
+static bool s_h_last = false; // terrain mode toggle
+static bool s_m_last = false; // road mode toggle
+static bool s_rmb_last = false; // road spline: right click cancels, terrain: lower
+static bool s_enter_last = false; // road spline : finish curr spline
 
 // dynamic physics preset table
 // adding a new type = one new row here + a const in const.hpp
@@ -76,7 +131,8 @@ void editor_scan_props(EditorState& editor, const char* assets_dir){
 
 bool editor_raycast_ground( double mx, double my,
     const glm::mat4& view, const glm::mat4& proj,
-    int screen_w, int screen_h, glm::vec3& out_pos){
+    int screen_w, int screen_h, glm::vec3& out_pos,
+    const HeightField* terrain){
 
     // convert screen pixel to NDC [-1, 1]
     float ndc_x = (2.0f * (float)mx / screen_w) - 1.0f;
@@ -86,7 +142,7 @@ bool editor_raycast_ground( double mx, double my,
     glm::mat4 inv = glm::inverse(proj * view);
 
     glm::vec4 near_pt = inv * glm::vec4(ndc_x, ndc_y, -1.0f, 1.0f);
-    glm::vec4 far_pt  = inv * glm::vec4(ndc_x, ndc_y,  1.0f, 1.0f);
+    glm::vec4 far_pt = inv * glm::vec4(ndc_x, ndc_y,  1.0f, 1.0f);
 
     near_pt /= near_pt.w;
     far_pt /= far_pt.w;
@@ -94,16 +150,43 @@ bool editor_raycast_ground( double mx, double my,
     glm::vec3 ray_origin = glm::vec3(near_pt);
     glm::vec3 ray_dir = glm::normalize(glm::vec3(far_pt) - ray_origin);
 
-    // intersect with y=0 ground plane
-    // ray : P = origin + t * dir
-    // solve for t when P.y = 0
-    if (std::abs(ray_dir.y) < 1e-6f ) return false; // ray parallel to ground
+    if (terrain && terrain->rows > 0){
+        // iterative ray march against heightfield
+        // step along ray until we dip below terrain surface
+        // then binary search the crossing for precision
+        float step = terrain->cell_size * 0.5f;
+        float t = 0.0f;
+        float t_max = Const::CAM_FAR;
+        float prev_t = 0.0f;
 
+        while (t < t_max){
+            glm::vec3 p = ray_origin + ray_dir * t;
+            float ground = heightfield_sample(*terrain, p.x, p.z);
+            if (p.y <= ground){
+                float lo =  prev_t, hi = t;
+                for (int i = 0; i<8; i++){
+                    float mid = (lo + hi) * 0.5f;
+                    glm::vec3 mp = ray_origin + ray_dir * mid;
+                    if (mp.y <= heightfield_sample(*terrain, mp.x, mp.z)) hi = mid;
+                    else lo = mid;
+                }
+                out_pos = ray_origin + ray_dir * ((lo+hi) * 0.5f);
+                out_pos.y = heightfield_sample(*terrain, out_pos.x, out_pos.z);
+                return true;
+            }
+            prev_t = t;
+            t += step;
+        }
+        return false;
+    }
+
+    // flat y=0 fallback when no terrain
+    if (std::abs(ray_dir.y) < 1e-6f) return false;
     float t = -ray_origin.y / ray_dir.y;
-    if (t < 0.0f) return false;  // intersection behind camera
-    
+    if (t < 0.0f) return false;
     out_pos = ray_origin + ray_dir * t;
     return true;
+
 }
 
 int editor_raycast_objects (double mx, double my, const glm::mat4& view, const glm::mat4& proj,
@@ -192,13 +275,218 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
 
     // update ghost pos every frame by raycasting mouse to ground
     editor.placement_valid = editor_raycast_ground(
-        mx, my, view, proj, screen_w, screen_h, editor.ghost_pos);
+        mx, my, view, proj, screen_w, screen_h, editor.ghost_pos,
+        (map.terrain.rows > 0) ? &map.terrain : nullptr);
     
     // snap ghost to grid
     if (editor.placement_valid){
         editor.ghost_pos.x = std::round(editor.ghost_pos.x / Const::EDITOR_GRID_SNAP) * Const::EDITOR_GRID_SNAP;
         editor.ghost_pos.z = std::round(editor.ghost_pos.z / Const::EDITOR_GRID_SNAP) * Const::EDITOR_GRID_SNAP;
-        editor.ghost_pos.y = 0.0f;
+        editor.ghost_pos.y = heightfield_sample(map.terrain, editor.ghost_pos.x, editor.ghost_pos.z);
+    }
+
+    // H to toggle terain sculpt mode
+    bool h_down = glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS;
+    if (h_down && !s_h_last){
+        editor.mode = (editor.mode == MODE_TERRAIN) ? MODE_OBJECT : MODE_TERRAIN;
+        std::cout << "[editor] mode -> " << (editor.mode == MODE_TERRAIN ? "TERRAIN" : "OBJECT") << "\n";
+    }
+    s_h_last = h_down;
+
+    // M to toggle to raod spline mode
+    bool m_down = glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS;
+    if (m_down && !s_m_last){
+        editor.mode = (editor.mode == MODE_ROAD) ? MODE_OBJECT : MODE_ROAD;
+        editor.road_placing = (editor.mode == MODE_ROAD);
+        std::cout << "[editor] mode -> " << (editor.mode == MODE_ROAD ? "ROAD" : "OBJECT") << "\n";
+    }
+    s_m_last = m_down;
+
+    // *******************************
+    // TERRAIN MODE
+    // *******************************
+    if (editor.mode == MODE_TERRAIN){
+        bool lmb = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT)  == GLFW_PRESS;
+        bool rmb = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+        bool shift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+
+        // [ and ] adjust brush radius in terrain mode
+        bool brk_l = glfwGetKey(window, GLFW_KEY_LEFT_BRACKET)  == GLFW_PRESS;
+        bool brk_r = glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS;
+        if (brk_l) editor.brush_radius = std::max(Const::TERRAIN_BRUSH_RADIUS_MIN, editor.brush_radius - 6.0f * dt);
+        if (brk_r) editor.brush_radius = std::min(Const::TERRAIN_BRUSH_RADIUS_MAX, editor.brush_radius + 6.0f * dt);
+
+        if (editor.placement_valid){
+            float cx = editor.ghost_pos.x;
+            float cz = editor.ghost_pos.z;
+            static bool s_sculpt_pushed = false;
+            bool sculpting = (lmb || rmb) && !shift;
+            bool smoothing = (lmb || rmb) && shift;
+            if ((sculpting || smoothing) && !s_sculpt_pushed){
+                heightfield_push_undo(map.terrain);
+                s_sculpt_pushed = true;
+            }
+            if (!lmb && !rmb) s_sculpt_pushed = false;
+
+            if (shift){
+                // shift + any button = smooth brush
+                if (lmb || rmb)
+                    heightfield_smooth(map.terrain, cx, cz,
+                        editor.brush_radius, Const::TERRAIN_BRUSH_SMOOTH_STRENGTH * dt);
+            } 
+            else if (lmb){
+                // LMB = raise
+                heightfield_sculpt(map.terrain, cx, cz,
+                    editor.brush_radius, Const::TERRAIN_BRUSH_STRENGTH * dt * 60.0f);
+            } 
+            else if (rmb){
+                // RMB = lower
+                heightfield_sculpt(map.terrain, cx, cz,
+                    editor.brush_radius, -Const::TERRAIN_BRUSH_STRENGTH * dt * 60.0f);
+            }
+
+            // clamp terrain to designed limits after every sculpt
+            if (lmb || rmb)
+                heightfield_clamp(map.terrain,
+                    Const::TERRAIN_MIN_Y, Const::TERRAIN_MAX_Y);
+
+            // mark terrain mesh for rebuild next draw
+            if (lmb || rmb) er.terrain_mesh_dirty = true;
+        }
+
+        bool ctrl = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+        bool shift_held = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+
+        // Ctrl+Z undo last sculpt stroke
+        static bool s_z_last = false;
+        bool z_down = glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS;
+        if (ctrl && z_down && !s_z_last){
+            heightfield_pop_undo(map.terrain);
+            er.terrain_mesh_dirty = true;
+            std::cout << "[terrain] undo — stack remaining=" << map.terrain.undo_stack.size() << "\n";
+        }
+        s_z_last = z_down;
+
+        // Ctrl+Shift+F flatten entire terrain to y=0
+        static bool s_f_last = false;
+        bool f_down = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
+        if (ctrl && shift_held && f_down && !s_f_last){
+            heightfield_push_undo(map.terrain); // allow undoing the flatten too
+            heightfield_flatten(map.terrain);
+            er.terrain_mesh_dirty = true;
+            std::cout << "[terrain] flattened\n";
+        }
+        s_f_last = f_down;
+
+        // Ctrl+S saves
+        if (ctrl && glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            world_map_save(map, Const::MAP_SAVE_PATH);
+
+        return;
+    }
+
+    //*******************************
+    // ROAD MODE
+    //********************************
+    if (editor.mode == MODE_ROAD){
+        bool lmb = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT)  == GLFW_PRESS;
+        bool rmb = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+        bool enter = glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS;
+        bool shift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+
+        // find or create the active spline
+        RoadSpline* active = nullptr;
+        if (editor.active_road_id != -1){
+            for (auto& r : map.roads)
+                if (r.id == editor.active_road_id){ active = &r; break; }
+        }
+
+        // LMB = add control point to active spline
+        if (lmb && !s_lmb_last && editor.placement_valid){
+            if (!active){
+                // start a new spline
+                RoadSpline nr;
+                nr.id    = map.next_road_id++;
+                nr.type  = ROAD_ASPHALT;
+                nr.width = 7.0f;
+                map.roads.push_back(nr);
+                active = &map.roads.back();
+                editor.active_road_id = nr.id;
+                std::cout << "[road] new spline id=" << nr.id << "\n";
+            }
+            glm::vec3 pt = editor.ghost_pos;
+            active->points.push_back(pt);
+            road_spline_build_mesh(*active);
+            std::cout << "[road] added point (" << pt.x << "," << pt.y << "," << pt.z
+                      << ") total=" << active->points.size() << "\n";
+        }
+
+        // PgUp/PgDn nudge selected point Y
+        // fine-tune height independent of terrain
+        if (active && editor.selected_point_idx >= 0
+            && editor.selected_point_idx < (int)active->points.size())
+        {
+            bool pgup = glfwGetKey(window, GLFW_KEY_PAGE_UP)   == GLFW_PRESS;
+            bool pgdn = glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS;
+            float step = shift ? 0.05f : 0.25f;
+            if (pgup){ active->points[editor.selected_point_idx].y += step; road_spline_build_mesh(*active); }
+            if (pgdn){ active->points[editor.selected_point_idx].y -= step; road_spline_build_mesh(*active); }
+        }
+
+        // [ / ] cycle road type on active spline
+        bool brk_l = glfwGetKey(window, GLFW_KEY_LEFT_BRACKET)  == GLFW_PRESS;
+        bool brk_r = glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS;
+        static bool s_brk_l_last = false, s_brk_r_last = false;
+        if (active){
+            if (brk_l && !s_brk_l_last){
+                active->type = (RoadType)(((int)active->type - 1 + ROAD_COUNT) % ROAD_COUNT);
+                std::cout << "[road] type -> " << (int)active->type << "\n";
+            }
+            if (brk_r && !s_brk_r_last){
+                active->type = (RoadType)(((int)active->type + 1) % ROAD_COUNT);
+                std::cout << "[road] type -> " << (int)active->type << "\n";
+            }
+        }
+        s_brk_l_last = brk_l;
+        s_brk_r_last = brk_r;
+
+        // Enter = finish spline, return to object mode
+        if (enter && !s_enter_last){
+            if (active && active->points.size() >= 2)
+                road_spline_build_mesh(*active);
+            editor.active_road_id    = -1;
+            editor.selected_point_idx = -1;
+            editor.mode = MODE_OBJECT;
+            std::cout << "[road] spline finished\n";
+        }
+        s_enter_last = enter;
+
+        // RMB = undo last point
+        if (rmb && !s_rmb_last && active && !active->points.empty()){
+            active->points.pop_back();
+            if (active->points.size() >= 2) road_spline_build_mesh(*active);
+            std::cout << "[road] removed last point, remaining=" << active->points.size() << "\n";
+        }
+        s_rmb_last = rmb;
+
+        // DEL = delete entire active spline
+        bool del = glfwGetKey(window, GLFW_KEY_DELETE) == GLFW_PRESS;
+        if (del && !s_del_last && editor.active_road_id != -1){
+            map.roads.erase(std::remove_if(map.roads.begin(), map.roads.end(),
+                [&](const RoadSpline& r){ return r.id == editor.active_road_id; }),
+                map.roads.end());
+            editor.active_road_id = -1;
+            std::cout << "[road] deleted spline\n";
+        }
+        s_del_last = del;
+
+        // Ctrl+S saves in road mode too
+        bool ctrl = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+        if (ctrl && glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            world_map_save(map, Const::MAP_SAVE_PATH);
+
+        s_lmb_last = lmb;
+        return;
     }
 
     // prop palette

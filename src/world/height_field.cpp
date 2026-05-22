@@ -137,6 +137,22 @@ void heightfield_clamp(HeightField& hf, float min_y, float max_y){
         h = std::clamp(h, min_y, max_y);
 }
 
+void heightfield_flatten(HeightField& hf){
+    std::fill(hf.heights.begin(), hf.heights.end(), 0.0f);
+}
+
+void heightfield_push_undo(HeightField& hf){
+    hf.undo_stack.push_back(hf.heights);
+    if ((int)hf.undo_stack.size() > HeightField::UNDO_MAX)
+        hf.undo_stack.erase(hf.undo_stack.begin());
+}
+
+void heightfield_pop_undo(HeightField& hf){
+    if (hf.undo_stack.empty()) return;
+    hf.heights = hf.undo_stack.back();
+    hf.undo_stack.pop_back();
+}
+
 void heightfield_save(const HeightField& hf, const std::string& path){
     std::ofstream f(path);
     if (!f){ std::cerr << "[heightfield] save failed: " << path << "\n"; return; }

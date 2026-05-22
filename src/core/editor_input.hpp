@@ -1,6 +1,7 @@
 #pragma once
 #include "editor_state.hpp"
 #include "../world/world_map.hpp"
+#include "../world/height_field.hpp"
 #include "../renderer/editor_renderer.hpp"
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -21,7 +22,8 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
 // returns the XZ ground plane hit pos y=0
 // returns false if ray is parallel to ground
 bool editor_raycast_ground( double mx, double my, const glm::mat4& view, const glm::mat4& proj,
-    int screen_w, int screen_h, glm::vec3& out_pos);
+    int screen_w, int screen_h, glm::vec3& out_pos,
+    const HeightField* terrain = nullptr);
 
 // check if ray hits any placed object's AABB
 // uses real mesh bounds from er.prop_bounds when available

@@ -1,11 +1,12 @@
 #include "trike_physics.hpp"
 #include "../core/const.hpp"
+#include "../world/height_field.hpp"
 #include <glm/gtc/constants.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 
-void trike_physics_update(TrikeState& state, const TrikeInput& input, float dt){
+void trike_physics_update(TrikeState& state, const TrikeInput& input, const HeightField& terrain, float dt){
     // if tipped over, count down respawn timer then reset
     if (state.is_rolled_over){
         state.rollover_timer+= dt;
@@ -57,7 +58,9 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, float dt){
     float friction = (input.brake == 0.0f && input.reverse == 0.0f)
         ? -state.speed * Const::TRIKE_FRICTION : -state.speed * Const::TRIKE_FRICTION * 0.4f;
 
-    float net_force = engine + brake_force + reverse_force + friction;
+    float slope = state.slope_force * Const::TRIKE_MASS;
+    float net_force = engine + brake_force + reverse_force + friction + slope;
+    
     float acceleration = net_force / Const::TRIKE_MASS;
     state.speed += acceleration * dt;
 
@@ -135,6 +138,27 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, float dt){
         // integrate lateral pos
         state.position += right * state.lateral_speed * dt;
 
+        // terrain snap
+        // lerp Y toward ground height under trike
+        // smoothen so bumps dont teleport trike to another dimension
+        float ground_y = heightfield_sample(terrain, state.position.x, state.position.z);
+        state.position.y = glm::mix(state.position.y, ground_y, 
+            glm::clamp(Const::TERRAIN_SNAP_LERP_SPEED * dt, 0.0f, 1.0f));
+        
+        // surface normal + pitch angle
+        state.surface_normal = heightfield_normal(terrain, state.position.x, state.position.z);
+
+        // pitch is the angle between the surface normal and world up, projected onto heading
+        glm::vec3 fwd_flat = glm::vec3(std::cos(state.heading), 0.0f, std::sin(state.heading));
+        float slope_along_fwd = glm::dot(state.surface_normal, fwd_flat);
+        state.pitch_angle = std::asin(glm::clamp(-slope_along_fwd, -1.0f, 1.0f));
+
+        // slope force - gravity component pulling along forward axis
+        // negative = going uphill (drag)
+        // positive = going downhill (free acceleration)
+         state.slope_force = -Const::GRAVITY * Const::TERRAIN_SLOPE_GRAVITY_SCALE
+            * std::sin(state.pitch_angle);
+
         // roll dynamics
         // lateral acceleration is what tips the trike
         // a = v^2 / R, R = wheelbase / tan(steer_angle)
@@ -201,7 +225,7 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, float dt){
             state.roll_angle= std::remainder(state.roll_angle, glm::two_pi<float>());
 
             // keep on ground lvl
-            state.position.y = 0.0f;
+            state.position.y = heightfield_sample(terrain, state.position.x, state.position.z);
 
             // stop when spin rate is nearly dead
             if (std::abs(state.roll_rate) < 0.08f) {

@@ -170,9 +170,46 @@ static void draw_wire_box(
     mesh_destroy(wire);
 }
 
+static const char* ER_ROAD_VERT = R"(
+#version 330 core
+layout(location = 0) in vec3 a_pos;
+layout(location = 1) in vec3 a_normal;
+layout(location = 2) in vec2 a_uv;
+uniform mat4 u_model;
+uniform mat4 u_view;
+uniform mat4 u_proj;
+uniform mat3 u_normal_mat;
+out vec3 v_world_normal;
+out vec2 v_uv;
+void main(){
+    gl_Position = u_proj * u_view * u_model * vec4(a_pos, 1.0);
+    v_world_normal = normalize(u_normal_mat * a_normal);
+    v_uv = a_uv;
+}
+)";
+
+static const char* ER_ROAD_FRAG = R"(
+#version 330 core
+in vec3 v_world_normal;
+in vec2 v_uv;
+out vec4 frag_color;
+uniform vec3      u_kd;
+uniform vec3      u_light_dir;
+uniform sampler2D u_tex;
+uniform int       u_use_texture;
+void main(){
+    float diff    = max(dot(normalize(v_world_normal), u_light_dir), 0.0);
+    float ambient = 0.55;
+    vec4 tex_col  = (u_use_texture == 1) ? texture(u_tex, v_uv) : vec4(u_kd, 1.0);
+    vec3 lit      = tex_col.rgb * (ambient + diff * 0.85);
+    frag_color    = vec4(lit, 1.0);
+}
+)";
+
 void editor_renderer_init(EditorRenderer& er){
     shader_init(er.shader,     ER_VERT,     ER_FRAG);
     shader_init(er.obj_shader, ER_LIT_VERT, ER_LIT_FRAG);
+    shader_init(er.road_shader, ER_ROAD_VERT, ER_ROAD_FRAG);
     font_init(er.font, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
 
     // buid the snap grid as a static mesh
@@ -588,10 +625,118 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     glDisable(GL_BLEND);
 }
 
+void editor_renderer_build_terrain_mesh(EditorRenderer& er, const HeightField& hf){
+    if (hf.rows < 2 || hf.cols < 2) return;
+
+    // wireframe grid that follows the heightfield surface
+    // one quad per cell, drawn as GL_LINES
+    // color encodes height 
+    // low=dark blue, high=bright green, gives instant readability
+    std::vector<float> lines;
+    lines.reserve(hf.rows * hf.cols * 24); // rough upper bound
+
+    float max_h = *std::max_element(hf.heights.begin(), hf.heights.end());
+    float min_h = *std::min_element(hf.heights.begin(), hf.heights.end());
+    float range = (max_h - min_h) < 0.01f ? 1.0f : (max_h - min_h);
+
+    auto get_pos = [&](int r, int c) -> glm::vec3 {
+        float x = hf.origin.x + c * hf.cell_size;
+        float z = hf.origin.z + r * hf.cell_size;
+        float y = hf.heights[r * hf.cols + c];
+        return glm::vec3(x, y, z);
+    };
+
+    auto height_color = [&](float h) -> glm::vec3 {
+        float t = (h - min_h) / range; // 0=low, 1=high
+        // low = dark teal, high = bright lime
+        return glm::mix(glm::vec3(0.10f, 0.35f, 0.45f), glm::vec3(0.30f, 0.90f, 0.25f), t);
+    };
+
+    auto push_line = [&](glm::vec3 a, glm::vec3 b){
+        glm::vec3 ca = height_color(a.y);
+        glm::vec3 cb = height_color(b.y);
+        lines.insert(lines.end(), { a.x,a.y,a.z, ca.r,ca.g,ca.b });
+        lines.insert(lines.end(), { b.x,b.y,b.z, cb.r,cb.g,cb.b });
+    };
+
+    for (int r = 0; r < hf.rows; r++){
+        for (int c = 0; c < hf.cols; c++){
+            glm::vec3 p = get_pos(r, c);
+            // horizontal edge (along X)
+            if (c < hf.cols - 1) push_line(p, get_pos(r,     c + 1));
+            // vertical edge (along Z)
+            if (r < hf.rows - 1) push_line(p, get_pos(r + 1, c    ));
+        }
+    }
+
+    if (er.terrain_mesh.vao) mesh_destroy(er.terrain_mesh);
+    mesh_init(er.terrain_mesh, lines);
+    er.terrain_mesh_dirty = false;
+}
+
+void editor_renderer_draw_terrain(EditorRenderer& er, const HeightField& hf,
+    const glm::mat4& view, const glm::mat4& proj){
+    if (er.terrain_mesh_dirty)
+        editor_renderer_build_terrain_mesh(er, hf);
+
+    shader_bind(er.shader);
+    set_mat4(er.shader, "u_model", glm::mat4(1.0f));
+    set_mat4(er.shader, "u_view",  view);
+    set_mat4(er.shader, "u_proj",  proj);
+    glBindVertexArray(er.terrain_mesh.vao);
+    glDrawArrays(GL_LINES, 0, er.terrain_mesh.count);
+    glBindVertexArray(0);
+}
+
+void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline>& roads,
+    const glm::mat4& view, const glm::mat4& proj){
+    if (roads.empty()) return;
+
+    static const glm::vec3 LIGHT_DIR = glm::normalize(
+        glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
+
+    // road type colors
+    // used when no texture is present
+    static const glm::vec3 ROAD_COLORS[ROAD_COUNT] = {
+        {0.20f, 0.20f, 0.20f}, // asphalt
+        {0.55f, 0.48f, 0.38f}, // gravel
+        {0.45f, 0.32f, 0.18f}, // dirt
+        {0.85f, 0.78f, 0.55f}, // sand
+        {0.25f, 0.55f, 0.18f}, // grass
+        {0.70f, 0.70f, 0.68f}, // cement
+    };
+
+    shader_bind(er.road_shader);
+    set_mat4(er.road_shader, "u_model", glm::mat4(1.0f));
+    set_mat4(er.road_shader, "u_view",  view);
+    set_mat4(er.road_shader, "u_proj",  proj);
+    glm::mat3 nm = glm::mat3(1.0f);
+    glUniformMatrix3fv(glGetUniformLocation(er.road_shader.id, "u_normal_mat"),
+        1, GL_FALSE, glm::value_ptr(nm));
+    glUniform3f(glGetUniformLocation(er.road_shader.id, "u_light_dir"),
+        LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
+    glUniform1i(glGetUniformLocation(er.road_shader.id, "u_use_texture"), 0);
+
+    for (const auto& road : roads){
+        if (road.vao == 0 || road.index_count == 0) continue;
+
+        int type_idx = glm::clamp((int)road.type, 0, (int)ROAD_COUNT - 1);
+        glm::vec3 kd = ROAD_COLORS[type_idx];
+        glUniform3f(glGetUniformLocation(er.road_shader.id, "u_kd"),
+            kd.r, kd.g, kd.b);
+
+        glBindVertexArray(road.vao);
+        glDrawElements(GL_TRIANGLES, road.index_count, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+    }
+}
+
 void editor_renderer_destroy(EditorRenderer& er){
     shader_destroy(er.shader);
     shader_destroy(er.obj_shader);
+    shader_destroy(er.road_shader);
     mesh_destroy(er.grid);
+    if (er.terrain_mesh.vao) mesh_destroy(er.terrain_mesh);
     font_destroy(er.font);
     for (auto& [name, mesh] : er.prop_cache)
         obj_mesh_destroy(mesh);
