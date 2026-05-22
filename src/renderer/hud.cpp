@@ -54,7 +54,8 @@ void hud_draw(const Hud& h, const TrikeState& trike){
     if (trike.speed > 0.1f){
         state_str = "THROTTLE";
         sr = 0.2f; sg = 1.0f; sb = 0.2f; // green
-    } else if (trike.speed < -0.1f){
+    } 
+    else if (trike.speed < -0.1f){
         state_str = "BRAKING";
         sr = 1.0f; sg = 0.3f; sb = 0.2f; // red
     }
@@ -62,9 +63,9 @@ void hud_draw(const Hud& h, const TrikeState& trike){
     // steer direction string
     float steer_deg = glm::degrees(trike.steer_angle);
     std::string steer_str;
-    if      (steer_deg >  1.0f) steer_str = fmt("%.1f R", steer_deg);
+    if (steer_deg >  1.0f) steer_str = fmt("%.1f R", steer_deg);
     else if (steer_deg < -1.0f) steer_str = fmt("%.1f L", -steer_deg);
-    else                        steer_str = "STRAIGHT";
+    else steer_str = "STRAIGHT";
 
     // heading
     float hdg_deg = glm::degrees(trike.heading);

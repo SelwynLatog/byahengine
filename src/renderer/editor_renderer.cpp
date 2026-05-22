@@ -348,6 +348,28 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
     glBindVertexArray(er.grid.vao);
     glDrawArrays(GL_LINES, 0, er.grid.count);
     glBindVertexArray(0);
+
+       if (editor.mode == MODE_TERRAIN){
+        font_draw(er.font, "[ TERRAIN MODE ]", 180, 16, 3, 0.30f, 0.90f, 0.25f);
+        font_draw(er.font, "LMB=raise  RMB=lower  SHIFT=smooth  [/]=brush size  H=exit",
+            220, 40, 2, 0.30f, 0.90f, 0.25f);
+        char brush_buf[64];
+        snprintf(brush_buf, sizeof(brush_buf), "BRUSH RADIUS: %.1fm", editor.brush_radius);
+        font_draw(er.font, brush_buf, 220, 60, 2, 0.30f, 0.90f, 0.25f);
+    }
+    if (editor.mode == MODE_ROAD){
+        font_draw(er.font, "[ ROAD MODE ]", 180, 16, 3, 0.25f, 0.75f, 1.00f);
+        font_draw(er.font, "LMB=add point  RMB=undo  ENTER=finish  DEL=delete  [/]=road type  M=exit",
+            220, 40, 2, 0.25f, 0.75f, 1.00f);
+        for (const auto& r : map.roads){
+            if (r.id == editor.active_road_id){
+                char buf[64];
+                snprintf(buf, sizeof(buf), "POINTS: %d", (int)r.points.size());
+                font_draw(er.font, buf, 220, 60, 2, 0.25f, 0.75f, 1.00f);
+                break;
+            }
+        }
+    }
     
     // 2. wireframe box colored by behavior
     // gives visual feedback for every placed object even before OBJ meshes load
@@ -536,6 +558,61 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
                 }
                 break;
             }
+        }
+    }
+
+    // road mode cursor small diamond at ghost pos so you can see where clicks land
+    if (editor.mode == MODE_ROAD && editor.placement_valid){
+        glm::vec3 p = editor.ghost_pos;
+        float s = 0.4f; // diamond half-size in metres
+
+        // 6 points of a diamond: top, bottom, left, right, front, back
+        glm::vec3 top = p + glm::vec3( 0,  s,  0);
+        glm::vec3 bot = p + glm::vec3( 0, -s,  0);
+        glm::vec3 lft = p + glm::vec3(-s,  0,  0);
+        glm::vec3 rgt = p + glm::vec3( s,  0,  0);
+        glm::vec3 fwd = p + glm::vec3( 0,  0, -s);
+        glm::vec3 bck = p + glm::vec3( 0,  0,  s);
+
+        // 12 edges connecting the 6 points
+        std::vector<float> diamond;
+        auto push_edge = [&](glm::vec3 a, glm::vec3 b){
+            diamond.insert(diamond.end(), {a.x,a.y,a.z, 0.25f,0.75f,1.00f});
+            diamond.insert(diamond.end(), {b.x,b.y,b.z, 0.25f,0.75f,1.00f});
+        };
+        push_edge(top, lft); push_edge(top, rgt);
+        push_edge(top, fwd); push_edge(top, bck);
+        push_edge(bot, lft); push_edge(bot, rgt);
+        push_edge(bot, fwd); push_edge(bot, bck);
+        push_edge(lft, fwd); push_edge(fwd, rgt);
+        push_edge(rgt, bck); push_edge(bck, lft);
+
+        Mesh dm;
+        mesh_init(dm, diamond);
+        shader_bind(er.shader);
+        set_mat4(er.shader, "u_model", glm::mat4(1.0f));
+        set_mat4(er.shader, "u_view",  view);
+        set_mat4(er.shader, "u_proj",  proj);
+        glBindVertexArray(dm.vao);
+        glDrawArrays(GL_LINES, 0, dm.count);
+        glBindVertexArray(0);
+        mesh_destroy(dm);
+
+        for (const auto& r : map.roads){
+            if (r.id != editor.active_road_id) continue;
+            if (r.points.empty()) break;
+            glm::vec3 last = r.points.back();
+            std::vector<float> preview = {
+                last.x, last.y, last.z, 0.25f, 0.75f, 1.00f,
+                p.x, p.y, p.z, 0.25f, 0.75f, 1.00f,
+            };
+            Mesh pm;
+            mesh_init(pm, preview);
+            glBindVertexArray(pm.vao);
+            glDrawArrays(GL_LINES, 0, pm.count);
+            glBindVertexArray(0);
+            mesh_destroy(pm);
+            break;
         }
     }
 }
