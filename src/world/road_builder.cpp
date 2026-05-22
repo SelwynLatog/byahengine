@@ -7,43 +7,49 @@
 // name = stem used for .obj/.mtl/texture filenames
 // tex  = texture filename expected in assets/
 // uv_tile = how many times the texture repeats across the 4m quad
-//           1.0 = stretched to fit, 4.0 = 1 repeat per metre (good for most surfaces)
+// 1.0 = stretched to fit, 4.0 = 1 repeat per metre (good for most surfaces)
 struct RoadDef {
     const char* name;
     const char* tex;
-    float       uv_tile;
+    float uv_tile;
+    float w;
+    float depth;
+    float y_off;
 };
 
 static const RoadDef ROAD_TYPES[] = {
-    { "asphalt", "asphalt.jpg", 4.0f },
-    { "gravel",  "gravel.jpg",  4.0f },
-    { "dirt",    "dirt.jpg",    4.0f },
-    { "sand",    "sand.jpg",    3.0f },
-    { "grass",   "grass.jpg",   4.0f },
-    { "cement",  "cement.jpg",  4.0f },
+    { "asphalt",    "asphalt.jpg",    4.0f, 7.0f, 7.0f, 0.0f    },
+    { "gravel",     "gravel.jpg",     4.0f, 7.0f, 7.0f, 0.0f    },
+    { "dirt",       "dirt.jpg",       4.0f, 7.0f, 7.0f, 0.0f    },
+    { "sand",       "sand.jpg",       3.0f, 7.0f, 7.0f, 0.0f    },
+    { "grass",      "grass.jpg",      4.0f, 7.0f, 7.0f, 0.0f    },
+    { "cement",     "cement.jpg",     4.0f, 7.0f, 7.0f, 0.0f    },
+    { "road_lines", "road_lines.jpg", 1.0f, 7.0f, 0.5f, 0.01f  },
 };
+
 static const int ROAD_TYPE_COUNT = (int)(sizeof(ROAD_TYPES) / sizeof(ROAD_TYPES[0]));
 
 // writes a flat 4x4m quad OBJ with tiled UVs
 // origin at center, y=0, faces up
-static void write_road_obj(const std::string& obj_path, const std::string& mtl_name, float uv_tile){
+static void write_road_obj(const std::string& obj_path, const std::string& mtl_name, float uv_tile, float w, float depth, float y_off){
     std::ofstream f(obj_path);
     if (!f.is_open()){
         std::cerr << "[road] failed to write " << obj_path << "\n";
         return;
     }
 
-    float h = 3.5f; // half-size, so full quad is 7m wide standard 2-lane road
-    float u = uv_tile;
-
     f << "mtllib " << mtl_name << ".mtl\n";
     f << "usemtl " << mtl_name << "\n";
 
     // 4 corners: positions
-    f << "v -" << h << " 0  " << h << "\n"; // 1: back-left
-    f << "v  " << h << " 0  " << h << "\n"; // 2: back-right
-    f << "v  " << h << " 0 -" << h << "\n"; // 3: front-right
-    f << "v -" << h << " 0 -" << h << "\n"; // 4: front-left
+    float hw = w * 0.5f;
+    float hd = depth * 0.5f;
+    float u = uv_tile;
+
+    f << "v -" << hw << " " << y_off << "  " << hd << "\n";
+    f << "v  " << hw << " " << y_off << "  " << hd << "\n";
+    f << "v  " << hw << " " << y_off << " -" << hd << "\n";
+    f << "v -" << hw << " " << y_off << " -" << hd << "\n";
 
     // UVs tiled
     f << "vt 0 0\n";
@@ -87,7 +93,7 @@ void road_builder_init(const std::string& assets_dir){
             continue;
         }
 
-        write_road_obj(obj_path, r.name, r.uv_tile);
+        write_road_obj(obj_path, r.name, r.uv_tile, r.w, r.depth, r.y_off);
         write_road_mtl(mtl_path, r.name, r.tex);
         std::cout << "[road] generated: " << r.name << "\n";
     }
