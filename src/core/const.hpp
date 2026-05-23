@@ -96,7 +96,7 @@ namespace Const{
     // heightfield terrain
     inline constexpr int TERRAIN_ROWS = 100; // grid cells z
     inline constexpr int TERRAIN_COLS = 100; // grid cells x
-    inline constexpr float TERRAIN_CELL_SIZE = 4.0f; // meters per cell
+    inline constexpr float TERRAIN_CELL_SIZE = 8.0f; // meters per cell
     inline constexpr float TERRAIN_MAX_Y = 40.0f;  // sculpt clamp ceiling
     inline constexpr float TERRAIN_MIN_Y = -10.0f;  // sculpt clamp floor for below sea level beach areas
 
@@ -105,7 +105,7 @@ namespace Const{
     inline constexpr float TERRAIN_BRUSH_RADIUS_DEFAULT = 8.0f;
     inline constexpr float TERRAIN_BRUSH_RADIUS_MIN = 2.0f;
     inline constexpr float TERRAIN_BRUSH_RADIUS_MAX = 40.0f;
-    inline constexpr float TERRAIN_BRUSH_STRENGTH = 0.25;
+    inline constexpr float TERRAIN_BRUSH_STRENGTH = 0.12;
     inline constexpr float TERRAIN_BRUSH_SMOOTH_STRENGTH = 0.35f;
 
     // slope physics

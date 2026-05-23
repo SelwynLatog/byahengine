@@ -816,7 +816,8 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
         if (tex){
             glBindTexture(GL_TEXTURE_2D, tex);
             glUniform1i(glGetUniformLocation(er.road_shader.id, "u_use_texture"), 1);
-        } else {
+        }
+        else {
             glBindTexture(GL_TEXTURE_2D, 0);
             glUniform1i(glGetUniformLocation(er.road_shader.id, "u_use_texture"), 0);
             glm::vec3 kd = ROAD_COLORS[type_idx];
@@ -824,9 +825,14 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
                 kd.r, kd.g, kd.b);
         }
 
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(-1.0f, -1.0f);
+
         glBindVertexArray(road.vao);
         glDrawElements(GL_TRIANGLES, road.index_count, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
+
+        glDisable(GL_POLYGON_OFFSET_FILL);
     }
 
     glBindTexture(GL_TEXTURE_2D, 0);

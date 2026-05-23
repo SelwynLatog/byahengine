@@ -14,57 +14,87 @@ struct RoadVertex {
 void road_spline_build_mesh(RoadSpline& road){
     if (road.points.size() < 2) return;
 
+    // Catmull-Rom subdivision
+    // expand the sparse control points into a dense smooth curve
+    // each segment between two control points is subdivided into STEPS smaller steps
+    // phantom points at both ends mirror the first/last segment so the curve
+    static const int STEPS = 12; // subdivisions per segment - higher means smoother
+
+    auto catmull_rom = [](glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t) -> glm::vec3 {
+        // standard Catmull-Rom formula, alpha=0.5 (centripetal)
+        float t2 = t * t;
+        float t3 = t2 * t;
+        return 0.5f * (
+            (2.0f * p1) +
+            (-p0 + p2) * t +
+            (2.0f*p0 - 5.0f*p1 + 4.0f*p2 - p3) * t2 +
+            (-p0 + 3.0f*p1 - 3.0f*p2 + p3) * t3
+        );
+    };
+
+    // build the smooth point list from the control points
+    std::vector<glm::vec3> smooth;
+    int n = (int)road.points.size();
+
+    for (int i = 0; i < n - 1; i++){
+        // phantom endpoints mirror the curve at the ends
+        glm::vec3 p0 = (i == 0)
+            ? road.points[0] - (road.points[1] - road.points[0])
+            : road.points[i - 1];
+        glm::vec3 p1 = road.points[i];
+        glm::vec3 p2 = road.points[i + 1];
+        glm::vec3 p3 = (i + 2 >= n)
+            ? road.points[n-1] + (road.points[n-1] - road.points[n-2])
+            : road.points[i + 2];
+
+        for (int s = 0; s < STEPS; s++){
+            float t = (float)s / (float)STEPS;
+            smooth.push_back(catmull_rom(p0, p1, p2, p3, t));
+        }
+    }
+
+    smooth.push_back(road.points[n - 1]);
+
     std::vector<RoadVertex> verts;
     std::vector<unsigned int> indices;
 
-    int n = (int)road.points.size();
+    int m = (int)smooth.size();
     float half_w = road.width * 0.5f;
-    float v_acc  = 0.0f;  // accumulated V coordinate along road length
+    float v_acc  = 0.0f;
 
-    for (int i = 0; i < n; i++){
-        // tangent: forward direction at this point
+    for (int i = 0; i < m; i++){
         glm::vec3 tangent;
         if (i == 0)
-            tangent = glm::normalize(road.points[1] - road.points[0]);
-        else if (i == n - 1)
-            tangent = glm::normalize(road.points[n-1] - road.points[n-2]);
+            tangent = glm::normalize(smooth[1] - smooth[0]);
+        else if (i == m - 1)
+            tangent = glm::normalize(smooth[m-1] - smooth[m-2]);
         else
-            // central difference gives a smoother tangent at interior points
-            tangent = glm::normalize(road.points[i+1] - road.points[i-1]);
+            tangent = glm::normalize(smooth[i+1] - smooth[i-1]);
 
-        // road lies on a slope
-        // normal is perpendicular to tangent in the XZ plane
-        // we derive a local up from the cross of tangent and world right
-        // then re-cross to get the true road-surface normal
         glm::vec3 world_up = glm::vec3(0.0f, 1.0f, 0.0f);
-        glm::vec3 right = glm::normalize(glm::cross(tangent, world_up));
-        glm::vec3 normal = glm::normalize(glm::cross(right, tangent));
+        glm::vec3 right    = glm::normalize(glm::cross(tangent, world_up));
+        glm::vec3 normal   = glm::normalize(glm::cross(right, tangent));
 
-        // left and right edge vertices
-        glm::vec3 left_pos = road.points[i] - right * half_w;
-        glm::vec3 right_pos = road.points[i] + right * half_w;
+        glm::vec3 left_pos  = smooth[i] - right * half_w;
+        glm::vec3 right_pos = smooth[i] + right * half_w;
 
-        // accumulate V so texture tiles along road length
         if (i > 0){
-            float seg_len = glm::length(road.points[i] - road.points[i-1]);
-            v_acc += seg_len / road.width; // 1 tile per road-width length
+            float seg_len = glm::length(smooth[i] - smooth[i-1]);
+            v_acc += seg_len / road.width;
         }
 
         RoadVertex vL, vR;
-        vL.pos = left_pos; vL.normal = normal; vL.uv = glm::vec2(0.0f, v_acc);
+        vL.pos = left_pos;  vL.normal = normal; vL.uv = glm::vec2(0.0f, v_acc);
         vR.pos = right_pos; vR.normal = normal; vR.uv = glm::vec2(1.0f, v_acc);
         verts.push_back(vL);
         verts.push_back(vR);
     }
 
-    // build index buffer
-    // two triangles per quad between consecutive point pairs
-    // winding: CCW from above
-    for (int i = 0; i < n - 1; i++){
-        unsigned int bl = i * 2 + 0; // bottom-left  (left  edge, current point)
-        unsigned int br = i * 2 + 1; // bottom-right (right edge, current point)
-        unsigned int tl = i * 2 + 2; // top-left (left  edge, next point)
-        unsigned int tr = i * 2 + 3; // top-right (right edge, next point)
+    for (int i = 0; i < m - 1; i++){
+        unsigned int bl = i * 2 + 0;
+        unsigned int br = i * 2 + 1;
+        unsigned int tl = i * 2 + 2;
+        unsigned int tr = i * 2 + 3;
 
         indices.push_back(bl); indices.push_back(br); indices.push_back(tl);
         indices.push_back(br); indices.push_back(tr); indices.push_back(tl);

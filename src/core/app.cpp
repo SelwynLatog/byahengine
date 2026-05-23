@@ -219,7 +219,7 @@ void app_run(App& app){
             editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj);
 
             // terrain wireframe
-            if (app.editor.mode == MODE_TERRAIN)
+            if (app.editor.mode == MODE_TERRAIN || app.editor.mode == MODE_ROAD)
                 editor_renderer_draw_terrain(app.editor_renderer, app.map.terrain, view, proj);
 
             // road splines
