@@ -44,7 +44,14 @@ struct EditorRenderer{
     Mesh terrain_mesh;
     bool terrain_mesh_dirty = true; // set true after any sculpt op
 
-    // road spline shader same attrib layout as Roadvertex
+    // terrain solid surface mesh, one triangle per half-cell
+    // rebuilt when sculpt or paint changes the terrain
+    Mesh terrain_surface_mesh;
+    bool terrain_surface_dirty = true;
+    std::vector<int> terrain_surface_offsets; // vertex start per surface type
+    std::vector<int> terrain_surface_counts;  // vertex count per surface type
+
+    // road spline shader
     Shader road_shader;
 };
 
@@ -77,5 +84,8 @@ float editor_get_y_floor_offset(EditorRenderer& er, const std::string& filename)
 void editor_renderer_build_terrain_mesh(EditorRenderer& er, const HeightField& hf);
 
 void editor_renderer_draw_terrain(EditorRenderer& er, const HeightField& hf, const glm::mat4& view, const glm::mat4& proj);
+
+void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField& hf);
+void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField& hf, const glm::mat4& view, const glm::mat4& proj);
 
 void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline>& roads, const glm::mat4& view, const glm::mat4& proj);

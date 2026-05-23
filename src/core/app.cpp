@@ -218,7 +218,10 @@ void app_run(App& app){
             // grid, ghost, selection highlight
             editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj);
 
-            // terrain wireframe
+            // solid terrain surface
+            editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj);
+
+            // terrain wireframe — only in terrain/road mode so it doesn't clutter object mode
             if (app.editor.mode == MODE_TERRAIN || app.editor.mode == MODE_ROAD)
                 editor_renderer_draw_terrain(app.editor_renderer, app.map.terrain, view, proj);
 
@@ -619,7 +622,8 @@ void app_run(App& app){
         if (s_free_cam){
             glm::vec3 top = app.trike.position + glm::vec3(0.0f, 15.0f, 0.0f);
             view = glm::lookAt(top, app.trike.position, glm::vec3(1,0,0));
-        } else {
+        } 
+        else {
             view = glm::lookAt(s_cam_pos, target, glm::vec3(0,1,0));
         }
 
@@ -645,6 +649,7 @@ void app_run(App& app){
             if (sim.hit_timer > 0.0f)
                 flash_map[id] = sim.hit_timer;
 
+        editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj);
         editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims);
         editor_renderer_draw_roads(app.editor_renderer, app.map.roads, view, proj);
         hud_draw(app.hud, app.trike);

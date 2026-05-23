@@ -12,10 +12,30 @@ struct HeightField{
     float cell_size = 2.0f;
     glm::vec3 origin = glm::vec3(0.0f); // world space corner row=0 col=0
 
-    // undo stack each entry is a full snapshot of heights
-    std::vector<std::vector<float>> undo_stack;
+    // per-cell surface type, parallel to heights[]
+    std::vector<uint8_t> surface; // SurfaceType cast to uint8_t
+
+    // undo stack
+    struct UndoFrame {
+        std::vector<float>   heights;
+        std::vector<uint8_t> surface;
+    };
+    std::vector<UndoFrame> undo_stack;
     static constexpr int UNDO_MAX = 32;
 };
+
+enum SurfaceType : uint8_t {
+    SURFACE_NONE     = 0,
+    SURFACE_GRAVEL   = 2,
+    SURFACE_DIRT     = 3,
+    SURFACE_SAND     = 4,
+    SURFACE_GRASS    = 5,
+    SURFACE_CEMENT   = 6,
+    SURFACE_COUNT    = 7
+};
+
+// paint a circular region with a surface type
+void heightfield_paint(HeightField& hf, float cx, float cz, float radius, SurfaceType type);
 
 // init flat grid of given dimension centered on world origin
 void heightfield_init(HeightField& hf, int rows, int cols, float cell_size, glm::vec3 origin);

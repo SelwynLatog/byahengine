@@ -251,7 +251,8 @@ int editor_raycast_objects (double mx, double my, const glm::mat4& view, const g
                 smallest_vol = vol;
                 hit_id = o.id;
             }
-        } else {
+        } 
+        else {
             // normal: pick closest to camera
             if (tmin < closest_t){
                 closest_t = tmin;
@@ -285,6 +286,15 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         editor.ghost_pos.y = heightfield_sample(map.terrain, editor.ghost_pos.x, editor.ghost_pos.z);
     }
 
+    // P toggles paint sub-mode inside terrain mode
+    static bool s_p_last = false;
+    bool p_down = glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
+    if (p_down && !s_p_last && editor.mode == MODE_TERRAIN){
+        editor.paint_mode = !editor.paint_mode;
+        std::cout << "[editor] paint mode " << (editor.paint_mode ? "ON" : "OFF") << "\n";
+    }
+    s_p_last = p_down;
+
     // H to toggle terain sculpt mode
     bool h_down = glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS;
     if (h_down && !s_h_last){
@@ -316,42 +326,87 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         if (brk_l) editor.brush_radius = std::max(Const::TERRAIN_BRUSH_RADIUS_MIN, editor.brush_radius - 6.0f * dt);
         if (brk_r) editor.brush_radius = std::min(Const::TERRAIN_BRUSH_RADIUS_MAX, editor.brush_radius + 6.0f * dt);
 
+        // *******************************
+        // PAINT MODE
+        // *******************************
+        // 1-6 select surface type in paint mode
+        if (editor.paint_mode){
+            // 1-6 = asphalt gravel dirt sand grass cement (SURFACE_NONE=0 is erase, mapped to 0 key)
+            static const int surf_keys[6] = {
+                GLFW_KEY_1, GLFW_KEY_2, GLFW_KEY_3,
+                GLFW_KEY_4, GLFW_KEY_5, GLFW_KEY_6
+            };
+            for (int i = 0; i < 6; i++){
+                if (glfwGetKey(window, surf_keys[i]) == GLFW_PRESS)
+                    editor.paint_surface = (SurfaceType)(i + 1); // +1 skips SURFACE_NONE
+            }
+            // 0 = erase (paint SURFACE_NONE, checker shows through)
+            if (glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS)
+                editor.paint_surface = SURFACE_NONE;
+
+            // Ctrl+Shift+W wipes entire surface map back to blank canvas
+            static bool s_wipe_last = false;
+            bool wipe = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS
+                     && glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS
+                     && glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS;
+            if (wipe && !s_wipe_last){
+                map.terrain.surface.assign(map.terrain.rows * map.terrain.cols, (uint8_t)SURFACE_NONE);
+                er.terrain_surface_dirty = true;
+                std::cout << "[paint] canvas wiped\n";
+            }
+            s_wipe_last = wipe;
+        }
+
         if (editor.placement_valid){
             float cx = editor.ghost_pos.x;
             float cz = editor.ghost_pos.z;
             static bool s_sculpt_pushed = false;
-            bool sculpting = (lmb || rmb) && !shift;
-            bool smoothing = (lmb || rmb) && shift;
+            bool sculpting = (lmb || rmb) && !shift && !editor.paint_mode;
+            bool smoothing = (lmb || rmb) &&  shift && !editor.paint_mode;
             if ((sculpting || smoothing) && !s_sculpt_pushed){
                 heightfield_push_undo(map.terrain);
                 s_sculpt_pushed = true;
             }
             if (!lmb && !rmb) s_sculpt_pushed = false;
 
-            if (shift){
-                // shift + any button = smooth brush
-                if (lmb || rmb)
-                    heightfield_smooth(map.terrain, cx, cz,
-                        editor.brush_radius, Const::TERRAIN_BRUSH_SMOOTH_STRENGTH * dt);
-            } 
-            else if (lmb){
-                // LMB = raise
-                heightfield_sculpt(map.terrain, cx, cz,
-                    editor.brush_radius, Const::TERRAIN_BRUSH_STRENGTH * dt * 60.0f);
-            } 
-            else if (rmb){
-                // RMB = lower
-                heightfield_sculpt(map.terrain, cx, cz,
-                    editor.brush_radius, -Const::TERRAIN_BRUSH_STRENGTH * dt * 60.0f);
+            if (editor.paint_mode){
+                if (lmb){
+                    if (!s_sculpt_pushed){
+                        heightfield_push_undo(map.terrain);
+                        s_sculpt_pushed = true;
+                    }
+                    heightfield_paint(map.terrain, cx, cz,
+                        editor.brush_radius, editor.paint_surface);
+                    er.terrain_surface_dirty = true;
+                    er.terrain_mesh_dirty    = false;
+                }
             }
+            else {
+                if (shift){
+                    // shift + any button = smooth brush
+                    if (lmb || rmb)
+                        heightfield_smooth(map.terrain, cx, cz,
+                            editor.brush_radius, Const::TERRAIN_BRUSH_SMOOTH_STRENGTH * dt);
+                }
+                else if (lmb){
+                    // LMB = raise
+                    heightfield_sculpt(map.terrain, cx, cz,
+                        editor.brush_radius, Const::TERRAIN_BRUSH_STRENGTH * dt * 60.0f);
+                }
+                else if (rmb){
+                    // RMB = lower
+                    heightfield_sculpt(map.terrain, cx, cz,
+                        editor.brush_radius, -Const::TERRAIN_BRUSH_STRENGTH * dt * 60.0f);
+                }
 
-            // clamp terrain to designed limits after every sculpt
-            if (lmb || rmb)
-                heightfield_clamp(map.terrain,
-                    Const::TERRAIN_MIN_Y, Const::TERRAIN_MAX_Y);
+                // clamp terrain to designed limits after every sculpt
+                if (lmb || rmb)
+                    heightfield_clamp(map.terrain,
+                        Const::TERRAIN_MIN_Y, Const::TERRAIN_MAX_Y);
 
-            // mark terrain mesh for rebuild next draw
-            if (lmb || rmb) er.terrain_mesh_dirty = true;
+                // mark terrain mesh for rebuild next draw
+                if (lmb || rmb) er.terrain_mesh_dirty = true;
+            }
         }
 
         bool ctrl = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
@@ -362,8 +417,9 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         bool z_down = glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS;
         if (ctrl && z_down && !s_z_last){
             heightfield_pop_undo(map.terrain);
-            er.terrain_mesh_dirty = true;
-            std::cout << "[terrain] undo — stack remaining=" << map.terrain.undo_stack.size() << "\n";
+            er.terrain_mesh_dirty    = true;
+            er.terrain_surface_dirty = true;
+            std::cout << "[terrain] undo stack remaining=" << map.terrain.undo_stack.size() << "\n";
         }
         s_z_last = z_down;
 
@@ -694,10 +750,11 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
                 o.friction    = p.friction;
                 std::cout << "[editor] id=" << o.id << " DYNAMIC preset=" << p.name
                           << " mass=" << p.mass << "\n";
-            } else {
-                o.mass        = 999.0f;
+            } 
+            else {
+                o.mass = 999.0f;
                 o.restitution = 0.10f;
-                o.friction    = 0.99f;
+                o.friction = 0.99f;
                 std::cout << "[editor] id=" << o.id << " behavior -> " << o.behavior << "\n";
             }
             break;

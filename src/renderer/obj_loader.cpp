@@ -47,7 +47,8 @@ static bool load_mtl(const std::string& mtl_path,
             if (std::filesystem::exists(local)) {
                 cur->tex_path = std::filesystem::weakly_canonical(local).string();
                 std::cout << "[mtl] tex found: " << cur->tex_path << "\n";
-            } else {
+            } 
+            else {
                 // texture not found next to MTL 
                 // log to know what to copy
                 std::cout << "[mtl] tex missing (copy to assets/): " << tex_name.string() << "\n";
@@ -177,7 +178,8 @@ bool obj_load(const std::string& obj_path, ObjData& out){
                     float tmp[8];
                     for (int k = 0; k < 8; ++k) tmp[k] = out.vertices[base + k];
                     for (int k = 0; k < 8; ++k) out.vertices.push_back(tmp[k]);
-                } else {
+                } 
+                else {
                     int idx = (int)out.vertices.size() / 8;
                     cache[key] = idx;
                     glm::vec3 p = (fv.pi >= 0 && fv.pi < (int)positions.size())

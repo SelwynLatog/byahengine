@@ -10,6 +10,7 @@ void heightfield_init(HeightField& hf, int rows, int cols, float cell_size, glm:
     hf.cell_size = cell_size;
     hf.origin = origin;
     hf.heights.assign(rows * cols, 0.0f);
+    hf.surface.assign(rows * cols, (uint8_t)SURFACE_NONE);
 }
 
 float heightfield_sample(const HeightField& hf, float x, float z){
@@ -141,15 +142,42 @@ void heightfield_flatten(HeightField& hf){
     std::fill(hf.heights.begin(), hf.heights.end(), 0.0f);
 }
 
+void heightfield_paint(HeightField& hf, float cx, float cz, float radius, SurfaceType type){
+    float inv = 1.0f / hf.cell_size;
+    int c_min = (int)std::floor((cx - radius - hf.origin.x) * inv);
+    int c_max = (int)std::ceil ((cx + radius - hf.origin.x) * inv);
+    int r_min = (int)std::floor((cz - radius - hf.origin.z) * inv);
+    int r_max = (int)std::ceil ((cz + radius - hf.origin.z) * inv);
+
+    c_min = std::clamp(c_min, 0, hf.cols - 1);
+    c_max = std::clamp(c_max, 0, hf.cols - 1);
+    r_min = std::clamp(r_min, 0, hf.rows - 1);
+    r_max = std::clamp(r_max, 0, hf.rows - 1);
+
+    for (int r = r_min; r <= r_max; r++){
+        for (int c = c_min; c <= c_max; c++){
+            float wx = hf.origin.x + (c + 0.5f) * hf.cell_size;
+            float wz = hf.origin.z + (r + 0.5f) * hf.cell_size;
+            float dist = std::sqrt((wx - cx)*(wx - cx) + (wz - cz)*(wz - cz));
+            if (dist >= radius) continue;
+            hf.surface[r * hf.cols + c] = (uint8_t)type;
+        }
+    }
+}
+
 void heightfield_push_undo(HeightField& hf){
-    hf.undo_stack.push_back(hf.heights);
+    HeightField::UndoFrame frame;
+    frame.heights = hf.heights;
+    frame.surface = hf.surface;
+    hf.undo_stack.push_back(std::move(frame));
     if ((int)hf.undo_stack.size() > HeightField::UNDO_MAX)
         hf.undo_stack.erase(hf.undo_stack.begin());
 }
 
 void heightfield_pop_undo(HeightField& hf){
     if (hf.undo_stack.empty()) return;
-    hf.heights = hf.undo_stack.back();
+    hf.heights = hf.undo_stack.back().heights;
+    hf.surface = hf.undo_stack.back().surface;
     hf.undo_stack.pop_back();
 }
 
@@ -167,6 +195,14 @@ void heightfield_save(const HeightField& hf, const std::string& path){
         }
         f << "\n";
     }
+
+    for (int r = 0; r < hf.rows; r++){
+        for (int c = 0; c < hf.cols; c++){
+            f << (int)hf.surface[r * hf.cols + c];
+            if (c < hf.cols - 1) f << " ";
+        }
+        f << "\n";
+    }
 }
 
 bool heightfield_load(HeightField& hf, const std::string& path){
@@ -177,9 +213,21 @@ bool heightfield_load(HeightField& hf, const std::string& path){
     f >> hf.rows >> hf.cols >> hf.cell_size >> ox >> oy >> oz;
     hf.origin = glm::vec3(ox, oy, oz);
     hf.heights.resize(hf.rows * hf.cols);
-
     for (int i = 0; i < hf.rows * hf.cols; i++)
         f >> hf.heights[i];
+
+    hf.surface.assign(hf.rows * hf.cols, (uint8_t)SURFACE_NONE);
+    int surf_loaded = 0;
+    for (int i = 0; i < hf.rows * hf.cols; i++){
+        int v;
+        if (!(f >> v)) break;
+        hf.surface[i] = (uint8_t)v;
+        surf_loaded++;
+    }
+    if (surf_loaded > 0)
+        std::cout << "[heightfield] loaded " << surf_loaded << " surface cells\n";
+    else
+        std::cout << "[heightfield] no surface data in file, defaulting to grass\n";
 
     return true;
 }

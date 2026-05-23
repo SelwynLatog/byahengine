@@ -12,7 +12,8 @@ void shader_init(Shader& s, const char* vert_src, const char* frag_src)
         if (!ok) {
             glGetShaderInfoLog(vert, 1024, nullptr, log);
             std::cerr << "[shader] vert error:\n" << log << "\n";
-        } else {
+        } 
+        else {
             std::cerr << "[shader] vert OK\n";
         }
     }
@@ -26,7 +27,8 @@ void shader_init(Shader& s, const char* vert_src, const char* frag_src)
         if (!ok) {
             glGetShaderInfoLog(frag, 1024, nullptr, log);
             std::cerr << "[shader] frag error:\n" << log << "\n";
-        } else {
+        } 
+        else {
             std::cerr << "[shader] frag OK\n";
         }
     }
@@ -41,7 +43,8 @@ void shader_init(Shader& s, const char* vert_src, const char* frag_src)
         if (!ok) {
             glGetProgramInfoLog(s.id, 1024, &len, log);
             std::cerr << "[shader] link error:\n" << log << "\n";
-        } else {
+        } 
+        else {
             std::cerr << "[shader] program linked OK\n";
         }
     }

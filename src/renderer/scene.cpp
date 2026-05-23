@@ -172,7 +172,8 @@ void scene_init(SceneState& scene){
         scene.model_center = glm::vec3(0.0f);
         scene.model_scale = 1.0f;
         scene.model_half_height = 0.625f;
-    } else {
+    } 
+    else {
         ObjData data;
         if (!obj_load(Const::TRIKE_MODEL_PATH, data))
             std::cerr << "failed to load trike OBJ\n";
@@ -279,7 +280,8 @@ void scene_draw(
         glDrawArrays(GL_TRIANGLES, 0, scene.proc_mesh.count);
         glBindVertexArray(0);
         shader_bind(scene.shader);
-    } else {
+    } 
+    else {
         for (int i = 0; i < (int)scene.trike_mesh.data.groups.size(); i++){
             const ObjGroup& grp = scene.trike_mesh.data.groups[i];
             const ObjMaterial* mat = obj_find_material(scene.trike_mesh.data, grp.mat_name);

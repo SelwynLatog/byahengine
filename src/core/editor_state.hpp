@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "../world/world_object.hpp"
+#include "../world/height_field.hpp"
 #include "../core/const.hpp"
 
 // which transform operation currently in use
@@ -57,6 +58,10 @@ struct EditorState{
 
     float brush_radius = Const::TERRAIN_BRUSH_RADIUS_DEFAULT;
     bool brush_smooth = false;
+
+    // paint sub-mode inside MODE_TERRAIN
+    bool paint_mode = false;
+    SurfaceType paint_surface = SURFACE_GRASS;
 
     int active_road_id = -1;
     int selected_point_idx = -1;

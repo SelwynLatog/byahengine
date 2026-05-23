@@ -349,14 +349,26 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
     glDrawArrays(GL_LINES, 0, er.grid.count);
     glBindVertexArray(0);
 
-       if (editor.mode == MODE_TERRAIN){
-        font_draw(er.font, "[ TERRAIN MODE ]", 180, 16, 3, 0.30f, 0.90f, 0.25f);
-        font_draw(er.font, "LMB=raise  RMB=lower  SHIFT=smooth  [/]=brush size  H=exit",
-            220, 40, 2, 0.30f, 0.90f, 0.25f);
-        char brush_buf[64];
-        snprintf(brush_buf, sizeof(brush_buf), "BRUSH RADIUS: %.1fm", editor.brush_radius);
-        font_draw(er.font, brush_buf, 220, 60, 2, 0.30f, 0.90f, 0.25f);
+    if (editor.mode == MODE_TERRAIN){
+        if (!editor.paint_mode){
+            font_draw(er.font, "[ TERRAIN MODE ]  P=paint mode", 220, 16, 3, 0.30f, 0.90f, 0.25f);
+            font_draw(er.font, "LMB=raise  RMB=lower  SHIFT=smooth  [/]=brush size  H=exit",
+                220, 40, 2, 0.30f, 0.90f, 0.25f);
+            char brush_buf[64];
+            snprintf(brush_buf, sizeof(brush_buf), "BRUSH RADIUS: %.1fm", editor.brush_radius);
+            font_draw(er.font, brush_buf, 220, 60, 2, 0.30f, 0.90f, 0.25f);
+        } 
+        else {
+            font_draw(er.font, "[ PAINT MODE ]  P=sculpt mode", 220, 16, 3, 0.95f, 0.70f, 0.10f);
+            font_draw(er.font, "LMB=paint  [/]=brush  0=erase 1=asphalt 2=gravel 3=dirt 4=sand 5=grass 6=cement  Ctrl+Shift+W=wipe  H=exit",
+                220, 40, 2, 0.95f, 0.70f, 0.10f);
+            char surf_buf[64];
+            snprintf(surf_buf, sizeof(surf_buf), "SURFACE: %s   BRUSH: %.1fm",
+                Const::SURFACE_NAMES[(int)editor.paint_surface], editor.brush_radius);
+            font_draw(er.font, surf_buf, 220, 60, 2, 0.95f, 0.70f, 0.10f);
+        }
     }
+
     if (editor.mode == MODE_ROAD){
         font_draw(er.font, "[ ROAD MODE ]", 180, 16, 3, 0.25f, 0.75f, 1.00f);
         font_draw(er.font, "LMB=add point  RMB=undo  ENTER=finish  DEL=delete  [/]=road type  M=exit",
@@ -466,7 +478,6 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
                 int slot = i - page_start + 1; // 1-9
                 bool active = (editor.prop_list[i] == editor.selected_model);
 
-                // truncate long filenames so they don't overflow the panel
                 std::string name = editor.prop_list[i];
                 if (name.size() > 20) name = name.substr(0, 18) + "..";
 
@@ -647,8 +658,8 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
             const DynamicSim& sim = dit->second;
             model = glm::translate(model, sim.position);
             model = glm::rotate(model, sim.yaw + o.rotation.y, glm::vec3(0,1,0));
-            model = glm::rotate(model, sim.pitch,              glm::vec3(1,0,0));
-            model = glm::rotate(model, sim.roll,               glm::vec3(0,0,1));
+            model = glm::rotate(model, sim.pitch, glm::vec3(1,0,0));
+            model = glm::rotate(model, sim.roll,  glm::vec3(0,0,1));
             model = glm::translate(model, glm::vec3(0.0f, o.y_floor_offset, 0.0f));
             model = glm::scale(model, o.scale);
         } 
@@ -690,7 +701,8 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
                 glBindTexture(GL_TEXTURE_2D, tex);
                 glUniform1i(glGetUniformLocation(er.obj_shader.id, "u_tex"), 0);
                 glUniform1i(glGetUniformLocation(er.obj_shader.id, "u_use_texture"), 1);
-            } else {
+            } 
+            else {
                 glUniform1i(glGetUniformLocation(er.obj_shader.id, "u_use_texture"), 0);
             }
 
@@ -747,6 +759,7 @@ void editor_renderer_build_terrain_mesh(EditorRenderer& er, const HeightField& h
     }
 
     if (er.terrain_mesh.vao) mesh_destroy(er.terrain_mesh);
+    if (er.terrain_surface_mesh.vao) mesh_destroy(er.terrain_surface_mesh);
     mesh_init(er.terrain_mesh, lines);
     er.terrain_mesh_dirty = false;
 }
@@ -782,6 +795,11 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
         {0.25f, 0.55f, 0.18f}, // grass
         {0.70f, 0.70f, 0.68f}, // cement
     };
+
+    /*
+    ROAD SPLINE TEX NAMES ADD _COLOR.JPEG FILES IN ASSETS/
+    AND CHANGE IT BASED ON NAME DEFS HERE
+    */
 
      static const char* ROAD_TEX_NAMES[ROAD_COUNT] = {
         "asphalt.jpg",
@@ -838,12 +856,193 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField& hf){
+    if (hf.rows < 2 || hf.cols < 2) return;
+
+    // flat colors per surface type — used when texture is missing
+    static const glm::vec3 SURF_COLORS[(int)SURFACE_COUNT] = {
+        {0.20f, 0.20f, 0.20f}, // asphalt
+        {0.55f, 0.48f, 0.38f}, // gravel
+        {0.45f, 0.32f, 0.18f}, // dirt
+        {0.85f, 0.78f, 0.55f}, // sand
+        {0.25f, 0.55f, 0.18f}, // grass
+        {0.70f, 0.70f, 0.68f}, // cement
+    };
+
+    // one sub-mesh per surface type so we can batch by texture
+    // each bucket holds interleaved pos+normal+uv floats
+    std::vector<float> buckets[(int)SURFACE_COUNT];
+
+    auto get_pos = [&](int r, int c) -> glm::vec3 {
+        return glm::vec3(
+            hf.origin.x + c * hf.cell_size,
+            hf.heights[r * hf.cols + c],
+            hf.origin.z + r * hf.cell_size);
+    };
+
+    // returns the dominant surface type for a quad cell
+    // uses top-left corner cell value — paint brush writes all covered cells
+    auto cell_surface = [&](int r, int c) -> int {
+        return (int)hf.surface[r * hf.cols + c];
+    };
+
+    for (int r = 0; r < hf.rows - 1; r++){
+        for (int c = 0; c < hf.cols - 1; c++){
+            glm::vec3 p00 = get_pos(r,   c  );
+            glm::vec3 p10 = get_pos(r+1, c  );
+            glm::vec3 p01 = get_pos(r,   c+1);
+            glm::vec3 p11 = get_pos(r+1, c+1);
+
+            int si = cell_surface(r, c);
+            auto& bucket = buckets[si];
+
+            float u0 = (float)c,     v0 = (float)r;
+            float u1 = (float)(c+1), v1 = (float)(r+1);
+
+            auto push_tri = [&](glm::vec3 a, glm::vec3 b, glm::vec3 cc,
+                                glm::vec2 uva, glm::vec2 uvb, glm::vec2 uvc){
+                glm::vec3 n = glm::normalize(glm::cross(b - a, cc - a));
+                auto push = [&](glm::vec3 p, glm::vec3 n_, glm::vec2 uv){
+                    bucket.insert(bucket.end(), {
+                        p.x, p.y, p.z, n_.x, n_.y, n_.z, uv.x, uv.y
+                    });
+                };
+                push(a, n, uva);
+                push(b, n, uvb);
+                push(cc, n, uvc);
+            };
+
+            push_tri(p00, p10, p01, {u0,v0}, {u0,v1}, {u1,v0});
+            push_tri(p10, p11, p01, {u0,v1}, {u1,v1}, {u1,v0});
+        }
+    }
+
+    // rebuild per-surface VAOs stored in er.terrain_surface_mesh
+    // we reuse the single Mesh slot for the first bucket and store extras inline
+    // simplest approach: pack all buckets into one mesh, draw in surface-type passes
+    // store bucket byte offsets so draw call can glDrawArrays with offset+count
+    if (er.terrain_surface_mesh.vao) mesh_destroy(er.terrain_surface_mesh);
+
+    // flatten all buckets into one buffer, record offsets
+    std::vector<float> combined;
+    er.terrain_surface_offsets.clear();
+    er.terrain_surface_counts.clear();
+
+    for (int i = 0; i < (int)SURFACE_COUNT; i++){
+        int vert_count = (int)buckets[i].size() / 8; // 8 floats per vertex
+        er.terrain_surface_offsets.push_back((int)combined.size() / 8);
+        er.terrain_surface_counts.push_back(vert_count);
+        combined.insert(combined.end(), buckets[i].begin(), buckets[i].end());
+    }
+
+    if (!combined.empty()){
+        int vert_count = (int)combined.size() / 8;
+
+        glGenVertexArrays(1, &er.terrain_surface_mesh.vao);
+        glGenBuffers(1, &er.terrain_surface_mesh.vbo);
+        glBindVertexArray(er.terrain_surface_mesh.vao);
+        glBindBuffer(GL_ARRAY_BUFFER, er.terrain_surface_mesh.vbo);
+        glBufferData(GL_ARRAY_BUFFER,
+            combined.size() * sizeof(float), combined.data(), GL_STATIC_DRAW);
+
+        // pos
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        // normal
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(3*sizeof(float)));
+        glEnableVertexAttribArray(1);
+        // uv
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(6*sizeof(float)));
+        glEnableVertexAttribArray(2);
+
+        glBindVertexArray(0);
+        er.terrain_surface_mesh.count = vert_count;
+    }
+
+    er.terrain_surface_dirty = false;
+}
+
+void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField& hf,
+    const glm::mat4& view, const glm::mat4& proj){
+    if (er.terrain_surface_dirty)
+        editor_renderer_build_terrain_surface(er, hf);
+    if (!er.terrain_surface_mesh.vao) return;
+
+    static const glm::vec3 LIGHT_DIR = glm::normalize(
+        glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
+
+    static const glm::vec3 SURF_COLORS[(int)SURFACE_COUNT] = {
+        {0.00f, 0.00f, 0.00f}, // grid checker
+        {0.20f, 0.20f, 0.20f}, // asphalt
+        {0.55f, 0.48f, 0.38f}, // gravel
+        {0.45f, 0.32f, 0.18f}, // dirt
+        {0.85f, 0.78f, 0.55f}, // sand
+        {0.25f, 0.55f, 0.18f}, // grass
+        {0.70f, 0.70f, 0.68f}, // cement
+    };
+
+    /*
+    SURFACE PAINT TEX NAMES ADD _COLOR.JPEG FILES IN ASSETS/
+    AND CHANGE IT BASED ON NAME DEFS HERE
+    */
+    static const char* SURF_TEX_NAMES[(int)SURFACE_COUNT] = {
+        "",
+        "asphalt.jpg", 
+        "gravel.jpg", 
+        "dirt.jpg",
+        "sand.jpg",    
+        "grass.jpg",
+        "cement.jpg",
+    };
+
+    shader_bind(er.road_shader);
+    set_mat4(er.road_shader, "u_model", glm::mat4(1.0f));
+    set_mat4(er.road_shader, "u_view",  view);
+    set_mat4(er.road_shader, "u_proj",  proj);
+    glm::mat3 nm = glm::mat3(1.0f);
+    glUniformMatrix3fv(glGetUniformLocation(er.road_shader.id, "u_normal_mat"),
+        1, GL_FALSE, glm::value_ptr(nm));
+    glUniform3f(glGetUniformLocation(er.road_shader.id, "u_light_dir"),
+        LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
+
+    glBindVertexArray(er.terrain_surface_mesh.vao);
+
+    for (int i = 0; i < (int)SURFACE_COUNT; i++){
+        if (er.terrain_surface_counts[i] == 0) continue;
+        if (i == (int)SURFACE_NONE) continue;
+
+        std::string tex_path = std::string("../assets/") + SURF_TEX_NAMES[i];
+        GLuint tex = load_texture(er, tex_path);
+        if (tex){
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, tex);
+            glUniform1i(glGetUniformLocation(er.road_shader.id, "u_tex"), 0);
+            glUniform1i(glGetUniformLocation(er.road_shader.id, "u_use_texture"), 1);
+        } 
+        else {
+            glUniform1i(glGetUniformLocation(er.road_shader.id, "u_use_texture"), 0);
+            glm::vec3 kd = SURF_COLORS[i];
+            glUniform3f(glGetUniformLocation(er.road_shader.id, "u_kd"),
+                kd.r, kd.g, kd.b);
+        }
+
+        glDrawArrays(GL_TRIANGLES,
+            er.terrain_surface_offsets[i],
+            er.terrain_surface_counts[i]);
+
+        if (tex) glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    glBindVertexArray(0);
+}
+
 void editor_renderer_destroy(EditorRenderer& er){
     shader_destroy(er.shader);
     shader_destroy(er.obj_shader);
     shader_destroy(er.road_shader);
     mesh_destroy(er.grid);
     if (er.terrain_mesh.vao) mesh_destroy(er.terrain_mesh);
+    if (er.terrain_surface_mesh.vao) mesh_destroy(er.terrain_surface_mesh);
     font_destroy(er.font);
     for (auto& [name, mesh] : er.prop_cache)
         obj_mesh_destroy(mesh);

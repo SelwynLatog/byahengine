@@ -100,6 +100,11 @@ namespace Const{
     inline constexpr float TERRAIN_MAX_Y = 40.0f;  // sculpt clamp ceiling
     inline constexpr float TERRAIN_MIN_Y = -10.0f;  // sculpt clamp floor for below sea level beach areas
 
+    // surface type names index matches SurfaceType enum
+    inline constexpr const char* SURFACE_NAMES[7] = {
+        "none", "asphalt", "gravel", "dirt", "sand", "grass", "cement"
+    };
+
     // terrain sculpt brush in editor
     // everything meters
     inline constexpr float TERRAIN_BRUSH_RADIUS_DEFAULT = 8.0f;
