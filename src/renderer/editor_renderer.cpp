@@ -783,6 +783,15 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
         {0.70f, 0.70f, 0.68f}, // cement
     };
 
+     static const char* ROAD_TEX_NAMES[ROAD_COUNT] = {
+        "asphalt.jpg",
+        "gravel.jpg",
+        "dirt.jpg",
+        "sand.jpg",
+        "grass.jpg",
+        "cement.jpg",
+    };
+
     shader_bind(er.road_shader);
     set_mat4(er.road_shader, "u_model", glm::mat4(1.0f));
     set_mat4(er.road_shader, "u_view",  view);
@@ -792,20 +801,35 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
         1, GL_FALSE, glm::value_ptr(nm));
     glUniform3f(glGetUniformLocation(er.road_shader.id, "u_light_dir"),
         LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
-    glUniform1i(glGetUniformLocation(er.road_shader.id, "u_use_texture"), 0);
+
+    glActiveTexture(GL_TEXTURE0);
+    glUniform1i(glGetUniformLocation(er.road_shader.id, "u_tex"), 0);
 
     for (const auto& road : roads){
         if (road.vao == 0 || road.index_count == 0) continue;
 
         int type_idx = glm::clamp((int)road.type, 0, (int)ROAD_COUNT - 1);
-        glm::vec3 kd = ROAD_COLORS[type_idx];
-        glUniform3f(glGetUniformLocation(er.road_shader.id, "u_kd"),
-            kd.r, kd.g, kd.b);
+
+        std::string tex_path = std::string("../assets/") + ROAD_TEX_NAMES[type_idx];
+        GLuint tex = load_texture(er, tex_path);
+
+        if (tex){
+            glBindTexture(GL_TEXTURE_2D, tex);
+            glUniform1i(glGetUniformLocation(er.road_shader.id, "u_use_texture"), 1);
+        } else {
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glUniform1i(glGetUniformLocation(er.road_shader.id, "u_use_texture"), 0);
+            glm::vec3 kd = ROAD_COLORS[type_idx];
+            glUniform3f(glGetUniformLocation(er.road_shader.id, "u_kd"),
+                kd.r, kd.g, kd.b);
+        }
 
         glBindVertexArray(road.vao);
         glDrawElements(GL_TRIANGLES, road.index_count, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
     }
+
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void editor_renderer_destroy(EditorRenderer& er){
