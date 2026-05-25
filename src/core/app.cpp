@@ -135,7 +135,10 @@ void app_init(App& app){
     editor_scan_props(app.editor, "../assets");
 
     // try to load existing map
-    world_map_load(app.map, Const::MAP_SAVE_PATH);   
+    world_map_load(app.map, Const::MAP_SAVE_PATH);
+
+    for (auto& r : app.map.roads)
+        road_spline_build_mesh(r, &app.map.terrain);
     
     // build collision obstacles from loaded map
     // call prop bounds first to trigger loads via editor_renderer
@@ -223,7 +226,8 @@ void app_run(App& app){
 
             // terrain wireframe — only in terrain/road mode so it doesn't clutter object mode
             if (app.editor.mode == MODE_TERRAIN || app.editor.mode == MODE_ROAD)
-                editor_renderer_draw_terrain(app.editor_renderer, app.map.terrain, view, proj);
+                editor_renderer_draw_terrain(app.editor_renderer, app.map.terrain, view, proj,
+                app.editor.ghost_pos, app.editor.brush_radius, app.editor.placement_valid);
 
             // road splines
             editor_renderer_draw_roads(app.editor_renderer, app.map.roads, view, proj);

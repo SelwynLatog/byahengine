@@ -1,4 +1,5 @@
 #pragma once
+#include "height_field.hpp"
 #include <glm/glm.hpp>
 #include <vector>
 #include <string>
@@ -32,7 +33,7 @@ struct RoadSpline {
 
 // build (or rebuild) the triangle mesh for a spline
 // walks the point list, extrudes width-wide quads perpendicular to each segment
-void road_spline_build_mesh(RoadSpline& road);
+void road_spline_build_mesh(RoadSpline& road, const HeightField* hf = nullptr);
 
 // free GPU buffers
 void road_spline_destroy(RoadSpline& road);

@@ -24,7 +24,8 @@ static const RoadDef ROAD_TYPES[] = {
     { "sand",       "sand.jpg",       3.0f, 7.0f, 7.0f, 0.0f    },
     { "grass",      "grass.jpg",      4.0f, 7.0f, 7.0f, 0.0f    },
     { "cement",     "cement.jpg",     4.0f, 7.0f, 7.0f, 0.0f    },
-    { "road_lines", "road_lines.jpg", 1.0f, 7.0f, 0.5f, 0.01f  },
+    { "road_lines", "road_lines.jpg", 1.0f, 7.0f, 0.5f, 0.01f   },
+    { "rock"      , "rock.jpg"      , 4.0f, 7.0f, 7.0f, 0.0f    },
 };
 
 static const int ROAD_TYPE_COUNT = (int)(sizeof(ROAD_TYPES) / sizeof(ROAD_TYPES[0]));

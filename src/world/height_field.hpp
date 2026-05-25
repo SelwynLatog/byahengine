@@ -26,12 +26,14 @@ struct HeightField{
 
 enum SurfaceType : uint8_t {
     SURFACE_NONE     = 0,
+    SURFACE_ASPHALT  = 1,
     SURFACE_GRAVEL   = 2,
     SURFACE_DIRT     = 3,
     SURFACE_SAND     = 4,
     SURFACE_GRASS    = 5,
     SURFACE_CEMENT   = 6,
-    SURFACE_COUNT    = 7
+    SURFACE_ROCK     = 7,
+    SURFACE_COUNT    = 8
 };
 
 // paint a circular region with a surface type

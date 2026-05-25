@@ -27,6 +27,7 @@
   [ARROW KEYS]    move / rotate / scale selected object
   [SHIFT+ARROWS]  fine move (5cm steps)
   [PgUp / PgDn]   nudge Y up / down
+  [SHIFT+PgUp / PgDn] fine nudge
   [1-9]           select prop from current page
   [[ / ]]         prev / next prop page
   [CTRL+C]        copy selected object
@@ -53,6 +54,7 @@
   [ENTER]         finish spline, return to object mode
   [DEL]           delete entire active spline
   [CTRL+S]        save
+  [CTRL+SHIFT+W]  wipes out entire canvas to blank 
   [M]             exit road mode
 
 =============================================================
@@ -291,6 +293,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     bool p_down = glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS;
     if (p_down && !s_p_last && editor.mode == MODE_TERRAIN){
         editor.paint_mode = !editor.paint_mode;
+        er.terrain_surface_dirty = true;
         std::cout << "[editor] paint mode " << (editor.paint_mode ? "ON" : "OFF") << "\n";
     }
     s_p_last = p_down;
@@ -299,6 +302,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     bool h_down = glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS;
     if (h_down && !s_h_last){
         editor.mode = (editor.mode == MODE_TERRAIN) ? MODE_OBJECT : MODE_TERRAIN;
+        er.terrain_surface_dirty = true;
         std::cout << "[editor] mode -> " << (editor.mode == MODE_TERRAIN ? "TERRAIN" : "OBJECT") << "\n";
     }
     s_h_last = h_down;
@@ -329,26 +333,23 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         // *******************************
         // PAINT MODE
         // *******************************
-        // 1-6 select surface type in paint mode
         if (editor.paint_mode){
-            // 1-6 = asphalt gravel dirt sand grass cement (SURFACE_NONE=0 is erase, mapped to 0 key)
-            static const int surf_keys[6] = {
+            static const int surf_keys[7] = {
                 GLFW_KEY_1, GLFW_KEY_2, GLFW_KEY_3,
-                GLFW_KEY_4, GLFW_KEY_5, GLFW_KEY_6
+                GLFW_KEY_4, GLFW_KEY_5, GLFW_KEY_6, GLFW_KEY_7
             };
-            for (int i = 0; i < 6; i++){
+            for (int i = 0; i < 7; i++){
                 if (glfwGetKey(window, surf_keys[i]) == GLFW_PRESS)
-                    editor.paint_surface = (SurfaceType)(i + 1); // +1 skips SURFACE_NONE
+                    editor.paint_surface = (SurfaceType)(i + 1);
             }
-            // 0 = erase (paint SURFACE_NONE, checker shows through)
             if (glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS)
                 editor.paint_surface = SURFACE_NONE;
 
             // Ctrl+Shift+W wipes entire surface map back to blank canvas
             static bool s_wipe_last = false;
             bool wipe = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS
-                     && glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS
-                     && glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS;
+                     && glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)   == GLFW_PRESS
+                     && glfwGetKey(window, GLFW_KEY_W)            == GLFW_PRESS;
             if (wipe && !s_wipe_last){
                 map.terrain.surface.assign(map.terrain.rows * map.terrain.cols, (uint8_t)SURFACE_NONE);
                 er.terrain_surface_dirty = true;
@@ -389,14 +390,16 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
                             editor.brush_radius, Const::TERRAIN_BRUSH_SMOOTH_STRENGTH * dt);
                 }
                 else if (lmb){
-                    // LMB = raise
+                    bool fine = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+                    float strength = fine ? Const::TERRAIN_BRUSH_STRENGTH * 0.1f : Const::TERRAIN_BRUSH_STRENGTH;
                     heightfield_sculpt(map.terrain, cx, cz,
-                        editor.brush_radius, Const::TERRAIN_BRUSH_STRENGTH * dt * 60.0f);
+                        editor.brush_radius, strength * dt * 60.0f);
                 }
                 else if (rmb){
-                    // RMB = lower
+                    bool fine = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+                    float strength = fine ? Const::TERRAIN_BRUSH_STRENGTH * 0.1f : Const::TERRAIN_BRUSH_STRENGTH;
                     heightfield_sculpt(map.terrain, cx, cz,
-                        editor.brush_radius, -Const::TERRAIN_BRUSH_STRENGTH * dt * 60.0f);
+                        editor.brush_radius, -strength * dt * 60.0f);
                 }
 
                 // clamp terrain to designed limits after every sculpt
@@ -472,7 +475,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             }
             glm::vec3 pt = editor.ghost_pos;
             active->points.push_back(pt);
-            road_spline_build_mesh(*active);
+            road_spline_build_mesh(*active, &map.terrain);
             std::cout << "[road] added point (" << pt.x << "," << pt.y << "," << pt.z
                       << ") total=" << active->points.size() << "\n";
         }
@@ -509,7 +512,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         // Enter = finish spline, return to object mode
         if (enter && !s_enter_last){
             if (active && active->points.size() >= 2)
-                road_spline_build_mesh(*active);
+                road_spline_build_mesh(*active, &map.terrain);
             editor.active_road_id    = -1;
             editor.selected_point_idx = -1;
             editor.mode = MODE_OBJECT;

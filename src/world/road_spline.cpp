@@ -11,7 +11,7 @@ struct RoadVertex {
     glm::vec2 uv;
 };
 
-void road_spline_build_mesh(RoadSpline& road){
+void road_spline_build_mesh(RoadSpline& road, const HeightField* hf){
     if (road.points.size() < 2) return;
 
     // Catmull-Rom subdivision
@@ -54,6 +54,10 @@ void road_spline_build_mesh(RoadSpline& road){
     }
 
     smooth.push_back(road.points[n - 1]);
+    if (hf && hf->rows > 0){
+        for(auto& p : smooth)
+        p.y = heightfield_sample(*hf, p.x, p.z) + 0.02f;
+    }
 
     std::vector<RoadVertex> verts;
     std::vector<unsigned int> indices;
@@ -90,14 +94,57 @@ void road_spline_build_mesh(RoadSpline& road){
         verts.push_back(vR);
     }
 
+    // skirt: for each ribbon vertex add a ground-level vertex directly below
+    // this fills the gap between road edge and terrain surface
+    // skirt verts start at index m*2
+    if (hf && hf->rows > 0){
+        for (int i = 0; i < m; i++){
+            RoadVertex vLS, vRS;
+            glm::vec3 lp = verts[i * 2 + 0].pos;
+            glm::vec3 rp = verts[i * 2 + 1].pos;
+
+            // drop straight down to terrain, slight sink so no gap at bottom
+            vLS.pos = glm::vec3(lp.x, heightfield_sample(*hf, lp.x, lp.z) - 0.5f, lp.z);
+            vRS.pos = glm::vec3(rp.x, heightfield_sample(*hf, rp.x, rp.z) - 0.5f, rp.z);
+            vLS.normal = glm::vec3(0.0f, 1.0f, 0.0f);
+            vRS.normal = glm::vec3(0.0f, 1.0f, 0.0f);
+            vLS.uv = verts[i * 2 + 0].uv;
+            vRS.uv = verts[i * 2 + 1].uv;
+            verts.push_back(vLS);
+            verts.push_back(vRS);
+        }
+    }
+
+    // top face quads
     for (int i = 0; i < m - 1; i++){
         unsigned int bl = i * 2 + 0;
         unsigned int br = i * 2 + 1;
         unsigned int tl = i * 2 + 2;
         unsigned int tr = i * 2 + 3;
-
         indices.push_back(bl); indices.push_back(br); indices.push_back(tl);
         indices.push_back(br); indices.push_back(tr); indices.push_back(tl);
+    }
+
+    // skirt quads
+    if (hf && hf->rows > 0){
+        int skirt_base = m * 2;
+        for (int i = 0; i < m - 1; i++){
+            // left skirt
+            unsigned int rt  = i * 2 + 0; // road top left current
+            unsigned int rt2 = i * 2 + 2; // road top left next
+            unsigned int sb  = skirt_base + i * 2 + 0;  // skirt bottom left current
+            unsigned int sb2 = skirt_base + i * 2 + 2;  // skirt bottom left next
+            indices.push_back(rt);  indices.push_back(sb);  indices.push_back(rt2);
+            indices.push_back(sb);  indices.push_back(sb2); indices.push_back(rt2);
+
+            // right skirt
+            unsigned int rt_r  = i * 2 + 1;
+            unsigned int rt2_r = i * 2 + 3;
+            unsigned int sb_r  = skirt_base + i * 2 + 1;
+            unsigned int sb2_r = skirt_base + i * 2 + 3;
+            indices.push_back(rt_r); indices.push_back(rt2_r); indices.push_back(sb_r);
+            indices.push_back(sb_r); indices.push_back(rt2_r); indices.push_back(sb2_r);
+        }
     }
 
     road.index_count = (int)indices.size();

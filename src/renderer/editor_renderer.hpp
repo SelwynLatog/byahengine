@@ -83,7 +83,8 @@ float editor_get_y_floor_offset(EditorRenderer& er, const std::string& filename)
 
 void editor_renderer_build_terrain_mesh(EditorRenderer& er, const HeightField& hf);
 
-void editor_renderer_draw_terrain(EditorRenderer& er, const HeightField& hf, const glm::mat4& view, const glm::mat4& proj);
+void editor_renderer_draw_terrain(EditorRenderer& er, const HeightField& hf, const glm::mat4& view, const glm::mat4& proj,
+    const glm::vec3& brush_pos, float brush_radius, bool placement_valid);
 
 void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField& hf);
 void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField& hf, const glm::mat4& view, const glm::mat4& proj);

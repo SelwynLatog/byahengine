@@ -360,12 +360,14 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
         } 
         else {
             font_draw(er.font, "[ PAINT MODE ]  P=sculpt mode", 220, 16, 3, 0.95f, 0.70f, 0.10f);
-            font_draw(er.font, "LMB=paint  [/]=brush  0=erase 1=asphalt 2=gravel 3=dirt 4=sand 5=grass 6=cement  Ctrl+Shift+W=wipe  H=exit",
+            font_draw(er.font, "LMB=paint  S=spline  [/]=brush  0=erase 1=asphalt 2=gravel 3=dirt 4=sand 5=grass 6=cement 7=rock",
                 220, 40, 2, 0.95f, 0.70f, 0.10f);
+            font_draw(er.font, "Ctrl+Shift+W=wipe canvas  H=exit terrain",
+                220, 58, 2, 0.95f, 0.70f, 0.10f);
             char surf_buf[64];
             snprintf(surf_buf, sizeof(surf_buf), "SURFACE: %s   BRUSH: %.1fm",
                 Const::SURFACE_NAMES[(int)editor.paint_surface], editor.brush_radius);
-            font_draw(er.font, surf_buf, 220, 60, 2, 0.95f, 0.70f, 0.10f);
+            font_draw(er.font, surf_buf, 220, 76, 2, 0.95f, 0.70f, 0.10f);
         }
     }
 
@@ -765,7 +767,9 @@ void editor_renderer_build_terrain_mesh(EditorRenderer& er, const HeightField& h
 }
 
 void editor_renderer_draw_terrain(EditorRenderer& er, const HeightField& hf,
-    const glm::mat4& view, const glm::mat4& proj){
+    const glm::mat4& view, const glm::mat4& proj,
+    const glm::vec3& brush_pos, float brush_radius, bool placement_valid){
+
     if (er.terrain_mesh_dirty)
         editor_renderer_build_terrain_mesh(er, hf);
 
@@ -776,6 +780,29 @@ void editor_renderer_draw_terrain(EditorRenderer& er, const HeightField& hf,
     glBindVertexArray(er.terrain_mesh.vao);
     glDrawArrays(GL_LINES, 0, er.terrain_mesh.count);
     glBindVertexArray(0);
+
+    if (!placement_valid) return;
+    static const int SEGS = 48;
+    std::vector<float> ring;
+    ring.reserve(SEGS * 12);
+    for (int i = 0; i < SEGS; i++){
+        float a0 = (float)i / SEGS * 2.0f * 3.14159265f;
+        float a1 = (float)(i + 1) / SEGS * 2.0f * 3.14159265f;
+        float x0 = brush_pos.x + std::cos(a0) * brush_radius;
+        float z0 = brush_pos.z + std::sin(a0) * brush_radius;
+        float x1 = brush_pos.x + std::cos(a1) * brush_radius;
+        float z1 = brush_pos.z + std::sin(a1) * brush_radius;
+        float y0 = heightfield_sample(hf, x0, z0) + 0.1f;
+        float y1 = heightfield_sample(hf, x1, z1) + 0.1f;
+        ring.insert(ring.end(), { x0, y0, z0,  1.0f, 1.0f, 0.0f });
+        ring.insert(ring.end(), { x1, y1, z1,  1.0f, 1.0f, 0.0f });
+    }
+    Mesh circle;
+    mesh_init(circle, ring);
+    glBindVertexArray(circle.vao);
+    glDrawArrays(GL_LINES, 0, circle.count);
+    glBindVertexArray(0);
+    mesh_destroy(circle);
 }
 
 void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline>& roads,
@@ -859,14 +886,16 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
 void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField& hf){
     if (hf.rows < 2 || hf.cols < 2) return;
 
-    // flat colors per surface type — used when texture is missing
+    // flat colors per surface type used when texture is missing
     static const glm::vec3 SURF_COLORS[(int)SURFACE_COUNT] = {
+        {0.00f, 0.00f, 0.00f}, // none
         {0.20f, 0.20f, 0.20f}, // asphalt
         {0.55f, 0.48f, 0.38f}, // gravel
         {0.45f, 0.32f, 0.18f}, // dirt
         {0.85f, 0.78f, 0.55f}, // sand
         {0.25f, 0.55f, 0.18f}, // grass
         {0.70f, 0.70f, 0.68f}, // cement
+        {0.55f, 0.52f, 0.48f}, // rock
     };
 
     // one sub-mesh per surface type so we can batch by texture
@@ -972,13 +1001,14 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
         glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
 
     static const glm::vec3 SURF_COLORS[(int)SURFACE_COUNT] = {
-        {0.00f, 0.00f, 0.00f}, // grid checker
+        {0.00f, 0.00f, 0.00f}, // none
         {0.20f, 0.20f, 0.20f}, // asphalt
         {0.55f, 0.48f, 0.38f}, // gravel
         {0.45f, 0.32f, 0.18f}, // dirt
         {0.85f, 0.78f, 0.55f}, // sand
         {0.25f, 0.55f, 0.18f}, // grass
         {0.70f, 0.70f, 0.68f}, // cement
+        {0.55f, 0.52f, 0.48f}, // rock
     };
 
     /*
@@ -993,6 +1023,7 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
         "sand.jpg",    
         "grass.jpg",
         "cement.jpg",
+        "rock.jpg",
     };
 
     shader_bind(er.road_shader);

@@ -4,7 +4,7 @@ namespace Const{
     // window
     inline constexpr int WINDOW_WIDTH = 1920;
     inline constexpr int WINDOW_HEIGHT= 1080;
-    inline constexpr const char* WINDOW_TITLE="tricyce sim";
+    inline constexpr const char* WINDOW_TITLE="tricycle sim";
     inline constexpr bool VSYNC = true;
 
     // render
@@ -70,7 +70,7 @@ namespace Const{
     inline constexpr float CAM_LOOKAHEAD= 1.5f; //metres ahead of trike at max speed
 
     // editor
-    inline constexpr float EDITOR_CAM_SPEED = 12.0f; //metres/sec freecam movement
+    inline constexpr float EDITOR_CAM_SPEED = 30.0f; //metres/sec freecam movement
     inline constexpr float EDITOR_LOOK_SENSITIVITY = 0.003f; // radians per pixel drag
     inline constexpr float EDITOR_GRID_SNAP = 0.5f; // metres, placement snaps to this grid
     inline constexpr float EDITOR_ROTATE_SPEED = 1.5f; // radians/sec
