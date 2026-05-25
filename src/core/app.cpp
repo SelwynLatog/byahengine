@@ -592,8 +592,22 @@ void app_run(App& app){
 
         // camera
         float yaw_r = glm::radians(s_cam_yaw);
-        float pitch_r = glm::radians(s_cam_pitch);
         float cam_yaw_world = app.trike.heading + yaw_r + glm::radians(180.0f);
+
+        float speed_t = glm::clamp(std::abs(app.trike.speed) / Const::TRIKE_MAX_SPEED, 0.0f, 1.0f);
+        float slope_contribution = -app.trike.pitch_angle * speed_t * Const::CAM_SLOPE_PITCH_SCALE;
+        static float s_cam_pitch_smoothed = 0.0f;
+        s_cam_pitch_smoothed = glm::mix(s_cam_pitch_smoothed, slope_contribution,
+            glm::clamp(Const::CAM_SLOPE_LERP_SPEED * dt, 0.0f, 1.0f));
+
+        float pitch_r = glm::radians(s_cam_pitch) + s_cam_pitch_smoothed;
+        pitch_r = glm::clamp(pitch_r, glm::radians(Const::CAM_PITCH_MIN), glm::radians(Const::CAM_PITCH_MAX + 25.0f));
+
+        // smooth lookat height bias
+        static float s_target_y_bias = 0.0f;
+        float target_y_goal = -app.trike.pitch_angle * speed_t * Const::CAM_SLOPE_TARGET_Y_BIAS;
+        s_target_y_bias = glm::mix(s_target_y_bias, target_y_goal,
+            glm::clamp(Const::CAM_SLOPE_LERP_SPEED * dt, 0.0f, 1.0f));
 
         glm::vec3 cam_origin = app.trike.position + glm::vec3(0.0f, Const::CAM_ORBIT_TARGET_Y, 0.0f);
         glm::vec3 ideal_eye  = cam_origin + glm::vec3(
@@ -605,7 +619,7 @@ void app_run(App& app){
         float fwd_angle = app.trike.heading;
         glm::vec3 fwd = glm::vec3(cosf(fwd_angle), 0.0f, sinf(fwd_angle));
         float lookahead = (app.trike.speed / Const::TRIKE_MAX_SPEED) * Const::CAM_LOOKAHEAD;
-        glm::vec3 target = cam_origin + fwd * lookahead;
+        glm::vec3 target = cam_origin + fwd * lookahead + glm::vec3(0.0f, s_target_y_bias, 0.0f);
 
         // camera shake on impact
         // shake the lookat target and not the eye position

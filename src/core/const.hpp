@@ -68,6 +68,9 @@ namespace Const{
     inline constexpr float CAM_ORBIT_TARGET_Y= 0.5f;
     inline constexpr float CAM_LERP_SPEED= 5.0f; // how fast cam catches to trike
     inline constexpr float CAM_LOOKAHEAD= 1.5f; //metres ahead of trike at max speed
+    inline constexpr float CAM_SLOPE_PITCH_SCALE  = 1.8f;  // how much slope tilts the cam, tune up/down
+    inline constexpr float CAM_SLOPE_LERP_SPEED = 3.0f;  // how fast cam pitch chases slope change
+    inline constexpr float CAM_SLOPE_TARGET_Y_BIAS = 1.2f; // metres lookat lifts per radian of uphill pitch
 
     // editor
     inline constexpr float EDITOR_CAM_SPEED = 30.0f; //metres/sec freecam movement
