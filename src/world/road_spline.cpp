@@ -54,9 +54,10 @@ void road_spline_build_mesh(RoadSpline& road, const HeightField* hf){
     }
 
     smooth.push_back(road.points[n - 1]);
+    float y_lift = (road.type == ROAD_LINES) ? 0.05f : 0.02f;
     if (hf && hf->rows > 0){
         for(auto& p : smooth)
-        p.y = heightfield_sample(*hf, p.x, p.z) + 0.02f;
+            p.y = heightfield_sample(*hf, p.x, p.z) + y_lift;
     }
 
     std::vector<RoadVertex> verts;

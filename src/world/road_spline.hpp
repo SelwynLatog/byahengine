@@ -12,6 +12,7 @@ enum RoadType {
     ROAD_SAND,
     ROAD_GRASS,
     ROAD_CEMENT,
+    ROAD_LINES,
     ROAD_COUNT
 };
 

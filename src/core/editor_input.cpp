@@ -499,10 +499,14 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         if (active){
             if (brk_l && !s_brk_l_last){
                 active->type = (RoadType)(((int)active->type - 1 + ROAD_COUNT) % ROAD_COUNT);
+                active->width = (active->type == ROAD_LINES) ? 0.3f : 7.0f;
+                road_spline_build_mesh(*active, &map.terrain);
                 std::cout << "[road] type -> " << (int)active->type << "\n";
             }
             if (brk_r && !s_brk_r_last){
                 active->type = (RoadType)(((int)active->type + 1) % ROAD_COUNT);
+                active->width = (active->type == ROAD_LINES) ? 0.3f : 7.0f;
+                road_spline_build_mesh(*active, &map.terrain);
                 std::cout << "[road] type -> " << (int)active->type << "\n";
             }
         }

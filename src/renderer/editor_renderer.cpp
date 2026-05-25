@@ -372,16 +372,30 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
     }
 
     if (editor.mode == MODE_ROAD){
+        static const char* ROAD_TYPE_NAMES[ROAD_COUNT] = {
+            "ASPHALT", "GRAVEL", "DIRT", "SAND", "GRASS", "CEMENT", "ROAD_LINES"
+        };
+
         font_draw(er.font, "[ ROAD MODE ]", 180, 16, 3, 0.25f, 0.75f, 1.00f);
         font_draw(er.font, "LMB=add point  RMB=undo  ENTER=finish  DEL=delete  [/]=road type  M=exit",
             220, 40, 2, 0.25f, 0.75f, 1.00f);
+
+        bool found = false;
         for (const auto& r : map.roads){
             if (r.id == editor.active_road_id){
                 char buf[64];
-                snprintf(buf, sizeof(buf), "POINTS: %d", (int)r.points.size());
+                const char* type_name = ROAD_TYPE_NAMES[glm::clamp((int)r.type, 0, (int)ROAD_COUNT - 1)];
+                snprintf(buf, sizeof(buf), "TYPE: %s   POINTS: %d", type_name, (int)r.points.size());
                 font_draw(er.font, buf, 220, 60, 2, 0.25f, 0.75f, 1.00f);
+                found = true;
                 break;
             }
+        }
+        if (!found){
+            char buf[64];
+            snprintf(buf, sizeof(buf), "TYPE: %s   (no active spline)",
+                ROAD_TYPE_NAMES[glm::clamp((int)editor.active_road_id, 0, (int)ROAD_COUNT - 1)]);
+            font_draw(er.font, buf, 220, 60, 2, 0.50f, 0.50f, 0.50f);
         }
     }
     
@@ -821,6 +835,7 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
         {0.85f, 0.78f, 0.55f}, // sand
         {0.25f, 0.55f, 0.18f}, // grass
         {0.70f, 0.70f, 0.68f}, // cement
+        {0.90f, 0.88f, 0.60f}, // road_lines
     };
 
     /*
@@ -835,6 +850,7 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
         "sand.jpg",
         "grass.jpg",
         "cement.jpg",
+        "road_lines.jpg",
     };
 
     shader_bind(er.road_shader);
@@ -871,8 +887,7 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
         }
 
         glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(-1.0f, -1.0f);
-
+        glPolygonOffset((road.type == ROAD_LINES) ? -2.0f : -1.0f, -1.0f);
         glBindVertexArray(road.vao);
         glDrawElements(GL_TRIANGLES, road.index_count, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
