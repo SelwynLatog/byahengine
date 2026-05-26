@@ -34,6 +34,11 @@ struct TrikeState{
     float last_impact_force= 0.0f; // magnitude of velocity the moment of impact
     float impact_timer= 0.0f; // counts down after impact, drives flash/shake
 
+    // suspension
+    float susp_offset = 0.0f; // spring travel in meters
+    float susp_vel = 0.0f; // suspension velocity m/s
+    float body_bob = 0.0f; // idle engine vibration which is just small sinusoidal Y offset
+
     // world-space AABB
     // used for collision detection against obstacles and world bounds
     Aabb aabb;

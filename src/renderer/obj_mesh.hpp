@@ -8,7 +8,7 @@
 struct ObjMesh {
     GLuint vao = 0;
     GLuint vbo = 0;
-    int    total_vertices = 0;
+    int total_vertices = 0;
 
     // we keep the parsed data alive so we can slice it per group at draw time
     ObjData data;

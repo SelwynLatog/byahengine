@@ -17,7 +17,9 @@ namespace Const{
     inline constexpr float FIXED_TIMESTEP= 1.0f/ 120.0f; // physics ticks at 120hz
     inline constexpr float MAX_DELTA= 0.05f; //clamp dt to avoid spiral of death!
 
-    // tricycle
+    // ***********************************
+    // TRICYCLE
+    //***********************************/
     inline constexpr float TRIKE_MASS = 180.0f; // kg + rider
     inline constexpr float TRIKE_MAX_SPEED = 12.0f; // m/s (43 km/h)
     inline constexpr float TRIKE_ENGINE_FORCE = 300.0f; // N
@@ -39,6 +41,14 @@ namespace Const{
     inline constexpr float TRIKE_ROLLOVER_THRESHOLD= 52.0f; // degrees, tip point
     inline constexpr float TRIKE_RESPAWN_DELAY= 2.5f; // seconds before reset after tip
 
+    // suspension
+    static constexpr float TRIKE_SUSP_REST = 0.0f; // ride height above ground_y (wheel radius already baked into model offset)
+    static constexpr float TRIKE_SUSP_STIFFNESS = 18000.0f; // N/m soft enough to bounce but stiff enough not to wallow
+    static constexpr float TRIKE_SUSP_DAMPING = 900.0f; // N·s/m critically damped feel
+    static constexpr float TRIKE_SUSP_BUMP = 0.12f; // max compression travel, meters
+    static constexpr float TRIKE_SUSP_DROOP = 0.08f; // max droop travel, meters
+
+
     // Mesh default front
     // Some 3d models are stupidly set to side as their forward
     // the forward is towards Z axis
@@ -53,6 +63,8 @@ namespace Const{
     inline constexpr bool USE_PROC_MESH = false;
     // tricycle model path
     inline constexpr const char* TRIKE_MODEL_PATH = "../assets/TRAYSIKEL.obj";
+    inline constexpr const char* TRIKE_PARTS_MODEL_PATH = "../assets/TRAYSIKEL_parts.obj";
+    inline constexpr float TRIKE_WHEEL_RADIUS = 0.28f; // metres, tune to model
 
     // cam
     inline constexpr float CAM_YAW_DEFAULT= 0.0f;

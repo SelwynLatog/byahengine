@@ -138,12 +138,42 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, const Heig
         // integrate lateral pos
         state.position += right * state.lateral_speed * dt;
 
-        // terrain snap
-        // lerp Y toward ground height under trike
-        // smoothen so bumps dont teleport trike to another dimension
+        // suspension spring-damper
+        // ground_y is where the wheel touches
+        // body rides above it by rest_height + susp_offset.
         float ground_y = heightfield_sample(terrain, state.position.x, state.position.z);
-        state.position.y = glm::mix(state.position.y, ground_y, 
-            glm::clamp(Const::TERRAIN_SNAP_LERP_SPEED * dt, 0.0f, 1.0f));
+        float rest_height = Const::TRIKE_SUSP_REST;   // nominal ride height
+        float target_y = ground_y + rest_height;
+
+        // spring: F = -k * x,  x = how far body is from target
+        float disp = state.position.y - target_y;
+        float spring_f = -Const::TRIKE_SUSP_STIFFNESS * disp;
+        float damper_f = -Const::TRIKE_SUSP_DAMPING   * state.susp_vel;
+        float susp_accel = (spring_f + damper_f) / Const::TRIKE_MASS;
+
+        state.susp_vel += susp_accel * dt;
+        state.position.y += state.susp_vel * dt;
+
+        // clamp travel: can't compress more than bump_limit or droop past droop_limit
+        float susp_travel = state.position.y - target_y;
+        if (susp_travel < -Const::TRIKE_SUSP_BUMP){
+            state.position.y = target_y - Const::TRIKE_SUSP_BUMP;
+            state.susp_vel = std::max(0.0f, state.susp_vel); // kill downward vel on hard bottom-out
+        }
+        if (susp_travel >  Const::TRIKE_SUSP_DROOP){
+            state.position.y = target_y + Const::TRIKE_SUSP_DROOP;
+            state.susp_vel = std::min(0.0f, state.susp_vel);
+        }
+        state.susp_offset = state.position.y - target_y;
+
+        // idle body bob 
+        // engine vibration at low speed
+        // accumulates as a phase, applied as Y offset in the renderer
+        float bob_freq = 8.0f + std::abs(state.speed) * 0.4f; // Hz, rises a little with rpm
+        float bob_amp = 0.003f * (1.0f - glm::clamp(std::abs(state.speed) / 12.0f, 0.0f, 1.0f));
+        static float bob_phase = 0.0f;
+        bob_phase += bob_freq * dt;
+        state.body_bob = std::sin(bob_phase) * bob_amp;
         
         // surface normal + pitch angle
         state.surface_normal = heightfield_normal(terrain, state.position.x, state.position.z);

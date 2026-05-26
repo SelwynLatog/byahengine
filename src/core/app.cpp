@@ -296,6 +296,7 @@ void app_run(App& app){
             trike_physics_update(app.trike, input, app.map.terrain, Const::FIXED_TIMESTEP);
             app.accumulator -= Const::FIXED_TIMESTEP;
         }
+        trike_model_update(app.scene.trike_model, app.trike.speed, dt);
 
         // update trike AABB after physics
         aabb_update(app.trike.aabb, app.trike.position, app.trike.heading);

@@ -174,16 +174,15 @@ void scene_init(SceneState& scene){
         scene.model_half_height = 0.625f;
     } 
     else {
-        ObjData data;
-        if (!obj_load(Const::TRIKE_MODEL_PATH, data))
-            std::cerr << "failed to load trike OBJ\n";
-        obj_mesh_init(scene.trike_mesh, std::move(data));
+        trike_model_init(scene.trike_model);
+
+        const auto& verts = scene.trike_model.mesh.data.vertices;
 
         float minX=1e9f,maxX=-1e9f,minY=1e9f,maxY=-1e9f,minZ=1e9f,maxZ=-1e9f;
-        for (int i = 0; i < (int)scene.trike_mesh.data.vertices.size(); i += 8){
-            float x = scene.trike_mesh.data.vertices[i];
-            float y = scene.trike_mesh.data.vertices[i+1];
-            float z = scene.trike_mesh.data.vertices[i+2];
+        for (int i = 0; i < (int)verts.size(); i += 8){
+            float x = verts[i];
+            float y = verts[i+1];
+            float z = verts[i+2];
             minX=std::min(minX,x); maxX=std::max(maxX,x);
             minY=std::min(minY,y); maxY=std::max(maxY,y);
             minZ=std::min(minZ,z); maxZ=std::max(maxZ,z);
@@ -282,12 +281,7 @@ void scene_draw(
         shader_bind(scene.shader);
     } 
     else {
-        for (int i = 0; i < (int)scene.trike_mesh.data.groups.size(); i++){
-            const ObjGroup& grp = scene.trike_mesh.data.groups[i];
-            const ObjMaterial* mat = obj_find_material(scene.trike_mesh.data, grp.mat_name);
-            set_vec3(scene.shader, "u_kd", mat ? mat->kd : glm::vec3(0.8f));
-            obj_mesh_draw_group(scene.trike_mesh, i);
-        }
+        trike_model_draw(scene.trike_model, trike, scene.shader, view, proj);
     }
 
     // cube meshes not drawn
@@ -327,6 +321,7 @@ void scene_draw(
 }
 
 void scene_destroy(SceneState& scene){
+    trike_model_destroy(scene.trike_model);
     obj_mesh_destroy(scene.trike_mesh);
     mesh_destroy(scene.proc_mesh);
     mesh_destroy(scene.ground);
