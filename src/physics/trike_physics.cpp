@@ -169,12 +169,26 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, const Heig
         // idle body bob 
         // engine vibration at low speed
         // accumulates as a phase, applied as Y offset in the renderer
-        float bob_freq = 8.0f + std::abs(state.speed) * 0.4f; // Hz, rises a little with rpm
-        float bob_amp = 0.003f * (1.0f - glm::clamp(std::abs(state.speed) / 12.0f, 0.0f, 1.0f));
-        static float bob_phase = 0.0f;
-        bob_phase += bob_freq * dt;
-        state.body_bob = std::sin(bob_phase) * bob_amp;
-        
+        float idle_t = 1.0f - glm::clamp(std::abs(state.speed) / 6.0f, 0.0f, 1.0f);
+        float bob_freq  = 28.0f + std::abs(state.speed) * 0.6f; // ~28hz at idle
+
+        static float bob_phase  = 0.0f;
+        static float bob_phase2 = 1.3f; // offset so X and Y aren't in sync
+        static float bob_phase3 = 2.7f; // Z offset
+
+        bob_phase  += bob_freq* dt;
+        bob_phase2 += bob_freq * 0.7f * dt; // X shakes at a different harmonic
+        bob_phase3 += bob_freq * 1.3f * dt; // Z is a higher harmonic
+
+        // Y bob: smooth, the main vertical engine pulse
+        state.body_bob = std::sin(bob_phase) * 0.004f * idle_t;
+
+        // XZ shake: chassis rattling
+        // rattle as micro-rotations
+        // two beating harmonics per axis = uneven single-cylinder character
+        state.shake_pitch = (std::sin(bob_phase2) * 0.6f + std::sin(bob_phase2 * 2.1f) * 0.4f) * 0.003f * idle_t;
+        state.shake_roll = (std::sin(bob_phase3) * 0.5f + std::sin(bob_phase3 * 1.7f) * 0.5f) * 0.002f * idle_t;
+
         // surface normal + pitch angle
         state.surface_normal = heightfield_normal(terrain, state.position.x, state.position.z);
 

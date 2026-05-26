@@ -37,7 +37,9 @@ struct TrikeState{
     // suspension
     float susp_offset = 0.0f; // spring travel in meters
     float susp_vel = 0.0f; // suspension velocity m/s
-    float body_bob = 0.0f; // idle engine vibration which is just small sinusoidal Y offset
+    float body_bob = 0.0f;  // idle engine vibration Y offset
+    float shake_pitch = 0.0f; // idle rattle: micro rotation around X
+    float shake_roll = 0.0f; // idle rattle: micro rotation around Z
 
     // world-space AABB
     // used for collision detection against obstacles and world bounds

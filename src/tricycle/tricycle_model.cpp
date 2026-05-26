@@ -98,19 +98,25 @@ void trike_model_draw(
 
     // render position
     glm::vec3 render_pos = trike.position;
-    render_pos.y += trike.body_bob; // engine idle vibration on top of physics Y
+    render_pos.y += trike.body_bob;
     float model_half_height = (maxY - minY) * 0.5f * model_scale;
     if (trike.is_tipping)
         render_pos.y = model_half_height * std::abs(std::cos(trike.roll_angle));
     else if (trike.is_rolled_over)
         render_pos.y = 0.0f;
 
-    // body base: translate to world pos, rotate by heading and roll, apply scale
-    glm::mat4 body =
+    // world_base: shared by body, wheels, and steer parts
+    // shake rotations go here so the entire assembly rattles as one rigid unit
+    glm::mat4 world_base =
         glm::translate(glm::mat4(1.0f), render_pos)
-        * glm::rotate(glm::mat4(1.0f), -trike.heading,    glm::vec3(0,1,0))
-        * glm::rotate(glm::mat4(1.0f), -trike.roll_angle, glm::vec3(1,0,0))
+        * glm::rotate(glm::mat4(1.0f), -trike.heading,      glm::vec3(0,1,0))
+        * glm::rotate(glm::mat4(1.0f), -trike.roll_angle,   glm::vec3(1,0,0))
         * glm::rotate(glm::mat4(1.0f), glm::radians(Const::TRIKE_MODEL_YAW_OFFSET), glm::vec3(0,1,0))
+        * glm::rotate(glm::mat4(1.0f),  trike.shake_pitch,  glm::vec3(1,0,0))
+        * glm::rotate(glm::mat4(1.0f),  trike.shake_roll,   glm::vec3(0,0,1));
+
+    // body: world_base + model-space centering + scale
+    glm::mat4 body = world_base
         * glm::translate(glm::mat4(1.0f), -sc)
         * glm::scale(glm::mat4(1.0f), glm::vec3(model_scale));
 
@@ -135,14 +141,11 @@ void trike_model_draw(
         // we insert the spin just before T(-sc)*S(scale), in raw model space.
         glm::vec3 p = pivot * model_scale - sc; // pivot in the same space body outputs
 
-        return glm::translate(glm::mat4(1.0f), trike.position)
-            * glm::rotate(glm::mat4(1.0f), -trike.heading,    glm::vec3(0,1,0))
-            * glm::rotate(glm::mat4(1.0f), -trike.roll_angle, glm::vec3(1,0,0))
-            * glm::rotate(glm::mat4(1.0f), glm::radians(Const::TRIKE_MODEL_YAW_OFFSET), glm::vec3(0,1,0))
-            * glm::translate(glm::mat4(1.0f),  p) // 1. to wheel pivot
-            * glm::rotate(glm::mat4(1.0f), extra_yaw, glm::vec3(0,1,0))  // 2. steer yaw
-            * glm::rotate(glm::mat4(1.0f), -t.wheel_spin, glm::vec3(0,0,1))  // 3. spin on axle
-            * glm::translate(glm::mat4(1.0f), -p) // 4. back to origin
+        return world_base
+            * glm::translate(glm::mat4(1.0f),  p)
+            * glm::rotate(glm::mat4(1.0f), extra_yaw,       glm::vec3(0,1,0))
+            * glm::rotate(glm::mat4(1.0f), -t.wheel_spin,   glm::vec3(0,0,1))
+            * glm::translate(glm::mat4(1.0f), -p)
             * glm::translate(glm::mat4(1.0f), -sc)
             * glm::scale(glm::mat4(1.0f), glm::vec3(model_scale));
     };
@@ -160,10 +163,7 @@ void trike_model_draw(
         glm::vec3 pivot = part ? part->pivot_offset : glm::vec3(0.0f);
         glm::vec3 p = pivot * model_scale - sc;
 
-        return glm::translate(glm::mat4(1.0f), trike.position)
-            * glm::rotate(glm::mat4(1.0f), -trike.heading,    glm::vec3(0,1,0))
-            * glm::rotate(glm::mat4(1.0f), -trike.roll_angle, glm::vec3(1,0,0))
-            * glm::rotate(glm::mat4(1.0f), glm::radians(Const::TRIKE_MODEL_YAW_OFFSET), glm::vec3(0,1,0))
+        return world_base
             * glm::translate(glm::mat4(1.0f),  p)
             * glm::rotate(glm::mat4(1.0f), -trike.steer_angle, glm::vec3(0,1,0))
             * glm::translate(glm::mat4(1.0f), -p)
