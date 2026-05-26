@@ -21,7 +21,7 @@ namespace Const{
     // TRICYCLE
     //***********************************/
     inline constexpr float TRIKE_MASS = 180.0f; // kg + rider
-    inline constexpr float TRIKE_MAX_SPEED = 12.0f; // m/s (43 km/h)
+    inline constexpr float TRIKE_MAX_SPEED = 12.0f; // 12 m/s (43 km/h)
     inline constexpr float TRIKE_ENGINE_FORCE = 300.0f; // N
     inline constexpr float TRIKE_BRAKE_FORCE= 600.0f; // N
     inline constexpr float TRIKE_FRICTION = 8.5f; // rolling resistance coefficient
@@ -36,9 +36,9 @@ namespace Const{
     // but for our place typically pretty light
 
     inline constexpr float TRIKE_LATERAL_FRICTION= 12.0f; // resists sideways slip N/(m/s)
-    inline constexpr float TRIKE_ROLL_STIFFNESS= 28.0f; // suspension spring restoring roll
+    inline constexpr float TRIKE_ROLL_STIFFNESS= 31.0f; // suspension spring restoring roll
     inline constexpr float TRIKE_ROLL_DAMPING= 14.0f; // damping on roll oscillation
-    inline constexpr float TRIKE_ROLLOVER_THRESHOLD= 52.0f; // degrees, tip point
+    inline constexpr float TRIKE_ROLLOVER_THRESHOLD= 28.0f; // degrees, tip point
     inline constexpr float TRIKE_RESPAWN_DELAY= 2.5f; // seconds before reset after tip
 
     // suspension

@@ -101,19 +101,31 @@ void trike_model_draw(
     render_pos.y += trike.body_bob;
     float model_half_height = (maxY - minY) * 0.5f * model_scale;
     if (trike.is_tipping)
-        render_pos.y = model_half_height * std::abs(std::cos(trike.roll_angle));
+        render_pos.y = model_half_height * std::abs(std::cos(trike.roll_angle))
+                     * std::abs(std::cos(trike.tumble_pitch));
     else if (trike.is_rolled_over)
         render_pos.y = 0.0f;
+    
 
-    // world_base: shared by body, wheels, and steer parts
-    // shake rotations go here so the entire assembly rattles as one rigid unit
+    // heading-relative axes for correct tumble rotation
+    glm::vec3 fwd_ws   = glm::vec3( std::cos(trike.heading), 0.0f, std::sin(trike.heading));
+    glm::vec3 right_ws = glm::vec3(-std::sin(trike.heading), 0.0f, std::cos(trike.heading));
+
+    // during tumble use independent pitch+roll accumulators
+    // during normal driving use physics roll + terrain pitch
+    float render_roll  = trike.is_tipping ? trike.roll_angle   : trike.roll_angle;
+    float render_pitch = trike.is_tipping ? trike.tumble_pitch : trike.pitch_angle;
+
+    // world_base: shared by all parts 
+    // roll around heading axis, pitch around right axis
     glm::mat4 world_base =
         glm::translate(glm::mat4(1.0f), render_pos)
-        * glm::rotate(glm::mat4(1.0f), -trike.heading,      glm::vec3(0,1,0))
-        * glm::rotate(glm::mat4(1.0f), -trike.roll_angle,   glm::vec3(1,0,0))
+        * glm::rotate(glm::mat4(1.0f), -trike.heading, glm::vec3(0,1,0))
+        * glm::rotate(glm::mat4(1.0f), -render_roll, fwd_ws)
+        * glm::rotate(glm::mat4(1.0f), render_pitch, right_ws)
         * glm::rotate(glm::mat4(1.0f), glm::radians(Const::TRIKE_MODEL_YAW_OFFSET), glm::vec3(0,1,0))
-        * glm::rotate(glm::mat4(1.0f),  trike.shake_pitch,  glm::vec3(1,0,0))
-        * glm::rotate(glm::mat4(1.0f),  trike.shake_roll,   glm::vec3(0,0,1));
+        * glm::rotate(glm::mat4(1.0f), trike.shake_pitch, glm::vec3(1,0,0))
+        * glm::rotate(glm::mat4(1.0f), trike.shake_roll,  glm::vec3(0,0,1));
 
     // body: world_base + model-space centering + scale
     glm::mat4 body = world_base

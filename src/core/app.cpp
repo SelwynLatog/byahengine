@@ -299,7 +299,8 @@ void app_run(App& app){
         trike_model_update(app.scene.trike_model, app.trike.speed, dt);
 
         // update trike AABB after physics
-        aabb_update(app.trike.aabb, app.trike.position, app.trike.heading);
+        if (!app.trike.is_tipping && !app.trike.is_rolled_over)
+            aabb_update(app.trike.aabb, app.trike.position, app.trike.heading);
 
         // tick impact timer
         if (app.trike.impact_timer > 0.0f) app.trike.impact_timer -= dt;
@@ -309,6 +310,8 @@ void app_run(App& app){
         bool any_collision = false;
 
         // collision detection + response
+        // suspended during tumble
+        if (app.trike.is_tipping || app.trike.is_rolled_over) goto skip_collision;
         for (auto& obs : app.obstacles){
             if (obs.hit_timer > 0.0f) obs.hit_timer -= dt;
             glm::vec3 to_obs = obs.position - app.trike.position;
@@ -406,6 +409,7 @@ void app_run(App& app){
             aabb_update(app.trike.aabb, app.trike.position, app.trike.heading);
         }
 
+        skip_collision:
         // clamp speed to pre-collision value after all responses
         // physics rebuilds speed inside the fixed timestep loop before we get here
         // so without this clamp, throttle held during wall contact gives free acceleration
@@ -630,7 +634,7 @@ void app_run(App& app){
         // pretty sweet if i must say
         if (app.trike.impact_timer > 0.0f){
             float t = app.trike.impact_timer;
-            float mag = glm::clamp(app.trike.last_impact_force * 0.04f, 0.0f, 0.4f);
+            float mag = glm::clamp(app.trike.last_impact_force * 0.018f, 0.0f, 0.4f);
             float decay = t / 0.35f;
             target.x += std::sin(t * 47.0f) * mag * decay;
             target.y += std::cos(t * 31.0f) * mag * decay;

@@ -37,9 +37,20 @@ struct TrikeState{
     // suspension
     float susp_offset = 0.0f; // spring travel in meters
     float susp_vel = 0.0f; // suspension velocity m/s
+    float last_ground_y = 0.0f; // ground height last frame, for bump delta detection
     float body_bob = 0.0f;  // idle engine vibration Y offset
     float shake_pitch = 0.0f; // idle rattle: micro rotation around X
     float shake_roll = 0.0f; // idle rattle: micro rotation around Z
+
+    // when you decide to drive off a cliff
+    // which is what im vibing rn
+    bool is_airborne = false;
+    float vert_vel = 0.0f;   // vertical velocity during freefall
+    float air_pitch_vel = 0.0f; // uncontrolled pitch tumble rate while airborne
+    float air_roll_vel = 0.0f; // uncontrolled roll tumble rate while airborne
+    float air_time = 0.0f; // accumulates while airborne, drives impact severity
+    float tumble_pitch = 0.0f; // independent pitch angle during tumble, driven by physics
+    float tumble_pitch_rate = 0.0f;// pitch angular velocity during tumble
 
     // world-space AABB
     // used for collision detection against obstacles and world bounds

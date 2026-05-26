@@ -23,6 +23,14 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, const Heig
             state.is_rolled_over= false;
             state.is_tipping= false;
             state.rollover_timer= 0.0f;
+            state.is_airborne = false;
+            state.vert_vel = 0.0f;
+            state.susp_vel = 0.0f;
+            state.air_pitch_vel  = 0.0f;
+            state.air_roll_vel   = 0.0f;
+            state.air_time       = 0.0f;
+            state.tumble_pitch       = 0.0f;
+            state.tumble_pitch_rate  = 0.0f;
         }
         return;
     }
@@ -138,39 +146,165 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, const Heig
         // integrate lateral pos
         state.position += right * state.lateral_speed * dt;
 
-        // suspension spring-damper
-        // ground_y is where the wheel touches
-        // body rides above it by rest_height + susp_offset.
+        // airborne vs grounded
+        // sample ground and decide which regime we're in
         float ground_y = heightfield_sample(terrain, state.position.x, state.position.z);
-        float rest_height = Const::TRIKE_SUSP_REST;   // nominal ride height
-        float target_y = ground_y + rest_height;
+        float target_y = ground_y + Const::TRIKE_SUSP_REST;
+        float air_gap = state.position.y - target_y; // how far above rest position
 
-        // spring: F = -k * x,  x = how far body is from target
-        float disp = state.position.y - target_y;
-        float spring_f = -Const::TRIKE_SUSP_STIFFNESS * disp;
-        float damper_f = -Const::TRIKE_SUSP_DAMPING   * state.susp_vel;
-        float susp_accel = (spring_f + damper_f) / Const::TRIKE_MASS;
+        // gentle re-contact (air_gap closed naturally from above, not through floor)
+        // hard landings are handled inside the airborne block
+        // low-pass the susp_vel to smooth out rapid terrain noise
+        // alpha controls cutoff: lower = smoother, higher = more responsive
+        // 0.15 keeps the feel without the seizure
+        static float susp_vel_smooth = 0.0f;
+        float susp_alpha = 0.15f;
+        susp_vel_smooth = susp_vel_smooth + susp_alpha * (state.susp_vel - susp_vel_smooth);
+        state.susp_vel = susp_vel_smooth;
 
-        state.susp_vel += susp_accel * dt;
-        state.position.y += state.susp_vel * dt;
-
-        // clamp travel: can't compress more than bump_limit or droop past droop_limit
-        float susp_travel = state.position.y - target_y;
-        if (susp_travel < -Const::TRIKE_SUSP_BUMP){
-            state.position.y = target_y - Const::TRIKE_SUSP_BUMP;
-            state.susp_vel = std::max(0.0f, state.susp_vel); // kill downward vel on hard bottom-out
+        if (state.is_airborne && air_gap <= 0.05f && state.vert_vel >= 0.0f){
+            state.last_ground_y = 0.0f;
+            state.is_airborne = false;
+            state.susp_vel = state.vert_vel;
+            state.vert_vel = 0.0f;
+            state.air_pitch_vel = 0.0f;
+            state.air_roll_vel = 0.0f;
+            state.air_time = 0.0f;
+            state.position.y = target_y;
         }
-        if (susp_travel >  Const::TRIKE_SUSP_DROOP){
-            state.position.y = target_y + Const::TRIKE_SUSP_DROOP;
-            state.susp_vel = std::min(0.0f, state.susp_vel);
+
+        // left the ground this frame: launch
+        if (!state.is_airborne && air_gap > Const::TRIKE_SUSP_DROOP + 0.05f){
+            state.is_airborne = true;
+            state.vert_vel = state.susp_vel;
+            state.susp_vel = 0.0f;
+            state.air_time = 0.0f;
+
+            // seed airborne tumble from launch conditions
+            // faster speed + steeper pitch = more uncontrolled tumble in the air
+            float launch_speed = std::abs(state.speed);
+            float pitch_chaos = state.pitch_angle * launch_speed * 0.08f;
+            float roll_chaos = state.roll_angle  * launch_speed * 0.06f;
+            state.air_pitch_vel = pitch_chaos;
+            state.air_roll_vel = roll_chaos + (state.roll_rate * 0.4f); // carry roll momentum into air
         }
-        state.susp_offset = state.position.y - target_y;
+
+        // bump detection via local height variance
+        // bilinear sampling smooths out bumps so delta-per-frame is useless
+        // instead sample the 4 raw cell corners around the trike
+        // high variance between them = rough ground = punch the suspension
+        // this correctly reads actual terrain bumpiness regardless of speed
+        float s = terrain.cell_size;
+        float h_fwd  = heightfield_sample(terrain, state.position.x + s, state.position.z);
+        float h_back = heightfield_sample(terrain, state.position.x - s, state.position.z);
+        float h_left = heightfield_sample(terrain, state.position.x, state.position.z - s);
+        float h_right= heightfield_sample(terrain, state.position.x, state.position.z + s);
+
+        float h_avg  = (h_fwd + h_back + h_left + h_right) * 0.25f;
+        float variance = (std::abs(h_fwd  - h_avg)
+                        + std::abs(h_back - h_avg)
+                        + std::abs(h_left - h_avg)
+                        + std::abs(h_right- h_avg)) * 0.25f;
+
+        // only excite suspension when variance is meaningful
+        // speed scales it
+        float bump_threshold = 0.08f;
+        if (!state.is_airborne && variance > bump_threshold){
+            float speed_scale = glm::clamp(std::abs(state.speed) / 6.0f, 0.2f, 2.5f);
+            // randomize sign each frame so it wobbles rather than always pushing one way
+            // use position as a cheap deterministic noise source
+            float sign = (std::fmod(state.position.x + state.position.z, 0.2f) > 0.1f) ? 1.0f : -1.0f;
+            float punch = sign * variance * speed_scale * 18.0f;
+            state.susp_vel += punch;
+        }
+
+        float ground_delta  = ground_y - state.last_ground_y;
+        state.last_ground_y = ground_y;
+        if (!state.is_airborne && std::abs(ground_delta) > 0.04f){
+            float speed_scale = glm::clamp(std::abs(state.speed) / 8.0f, 0.3f, 2.0f);
+            state.susp_vel += -ground_delta * speed_scale * 22.0f;
+        }
+
+        if (state.is_airborne){
+            state.air_time += dt;
+
+            // free-fall
+            state.vert_vel -= Const::GRAVITY * dt;
+            state.position.y += state.vert_vel * dt;
+
+            // mid-air tumble
+            // damp slightly over time so it doesn't go full beyblade forever
+
+            state.air_pitch_vel *= (1.0f - 0.3f * dt);
+            state.air_roll_vel *= (1.0f - 0.2f * dt);
+            state.pitch_angle += state.air_pitch_vel * dt;
+            state.roll_angle += state.air_roll_vel  * dt;
+
+
+            if (state.position.y < target_y){
+                state.position.y = target_y;
+
+                // impact severity based on how long we were airborne + fall velocity
+                float impact_vel = std::abs(state.vert_vel);
+                float severity = impact_vel * state.air_time; // fast fall + long air = brutal
+
+                state.last_impact_force = impact_vel * Const::TRIKE_MASS;
+
+                if (severity > 4.5f){
+                    // hard landing causes tip into tumble
+                    state.is_tipping = true;
+                    state.is_airborne = false;
+                    state.tumble_vel = forward * state.speed + glm::vec3(0.0f, state.vert_vel * 0.3f, 0.0f);
+                    state.roll_rate = state.air_roll_vel * 0.4f + (impact_vel * 0.2f * (state.roll_angle >= 0.0f ? 1.0f : -1.0f));
+                    // cliff landing pitches nose hard into ground
+                    state.tumble_pitch_rate = state.air_pitch_vel * 0.3f + impact_vel * 0.15f;
+                    state.tumble_pitch = state.pitch_angle;
+                    state.speed = 0.0f;
+                    state.vert_vel = 0.0f;
+                    state.air_time = 0.0f;
+                } 
+                else {
+                    // soft/medium landing then suspension absorbs it
+                    state.is_airborne = false;
+                    state.susp_vel = state.vert_vel; // punch the spring
+                    state.vert_vel = 0.0f;
+                    state.air_time = 0.0f;
+                    // bleed out the air tumble on landing
+                    state.air_pitch_vel = 0.0f;
+                    state.air_roll_vel  = 0.0f;
+                }
+            }
+
+            state.susp_offset = 0.0f;
+        } 
+        else {
+            // grounded: normal spring-damper
+            float disp = state.position.y - target_y;
+            float spring_f = -Const::TRIKE_SUSP_STIFFNESS * disp;
+            float damper_f = -Const::TRIKE_SUSP_DAMPING   * state.susp_vel;
+            float susp_accel = (spring_f + damper_f) / Const::TRIKE_MASS;
+
+            state.susp_vel += susp_accel * dt;
+            state.position.y += state.susp_vel * dt;
+
+            // clamp travel
+            float susp_travel = state.position.y - target_y;
+            if (susp_travel < -Const::TRIKE_SUSP_BUMP){
+                state.position.y = target_y - Const::TRIKE_SUSP_BUMP;
+                state.susp_vel   = std::max(0.0f, state.susp_vel);
+            }
+            if (susp_travel > Const::TRIKE_SUSP_DROOP){
+                state.position.y = target_y + Const::TRIKE_SUSP_DROOP;
+                state.susp_vel = std::min(0.0f, state.susp_vel);
+            }
+            state.susp_offset = state.position.y - target_y;
+        }
 
         // idle body bob 
         // engine vibration at low speed
         // accumulates as a phase, applied as Y offset in the renderer
         float idle_t = 1.0f - glm::clamp(std::abs(state.speed) / 6.0f, 0.0f, 1.0f);
-        float bob_freq  = 28.0f + std::abs(state.speed) * 0.6f; // ~28hz at idle
+        float bob_freq = 28.0f + std::abs(state.speed) * 0.6f; // ~28hz at idle
 
         static float bob_phase  = 0.0f;
         static float bob_phase2 = 1.3f; // offset so X and Y aren't in sync
@@ -197,88 +331,121 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, const Heig
         float slope_along_fwd = glm::dot(state.surface_normal, fwd_flat);
         state.pitch_angle = std::asin(glm::clamp(-slope_along_fwd, -1.0f, 1.0f));
 
-        // slope force - gravity component pulling along forward axis
+        // slope force
+        // gravity component pulling along forward axis
         // negative = going uphill (drag)
         // positive = going downhill (free acceleration)
          state.slope_force = -Const::GRAVITY * Const::TERRAIN_SLOPE_GRAVITY_SCALE
             * std::sin(state.pitch_angle);
 
-        // roll dynamics
-        // lateral acceleration is what tips the trike
-        // a = v^2 / R, R = wheelbase / tan(steer_angle)
-        float lateral_accel_g= 0.0f;
-        if (std::abs(state.steer_angle) > 0.001f && std::abs(state.speed) >= 5.5f){
-            float turn_radius= Const::TRIKE_WHEELBASE / std::tan(std::abs(state.steer_angle));
-            lateral_accel_g= (state.speed * state.speed) / turn_radius/ Const::GRAVITY;
+        // cross-slope: how much the terrain tilts the trike sideways
+        // project surface normal onto the local right vector
+        // positive = terrain slopes right = tips right
+        glm::vec3 right_flat = glm::vec3(
+            std::cos(state.heading + glm::half_pi<float>()),
+            0.0f,
+            std::sin(state.heading + glm::half_pi<float>()));
+        float cross_slope = glm::dot(state.surface_normal, right_flat);
+        // convert to a gravity-driven lateral accel equivalent
+        // sin(cross_angle) * g, normalized by g to stay in accel_g units
+        float slope_lateral_g = cross_slope * Const::GRAVITY / Const::GRAVITY; // = cross_slope scalar
 
-            // sign
-            // right turn= positive roll tips right
-            // left turn= negative roll tips left
+        // roll dynamics
+        // two sources of tip torque: cornering + side-slope gravity
+        float lateral_accel_g = 0.0f;
+        if (std::abs(state.steer_angle) > 0.001f && std::abs(state.speed) >= 3.5f){
+            float turn_radius = Const::TRIKE_WHEELBASE / std::tan(std::abs(state.steer_angle));
+            lateral_accel_g = (state.speed * state.speed) / turn_radius / Const::GRAVITY;
             if (state.steer_angle < 0.0f) lateral_accel_g = -lateral_accel_g;
         }
 
-        // sidecar asymmetry= sidecar on the right resists right rolls & amplifies left rolls
-        float sidecar_bias= (lateral_accel_g > 0.0f) ? 0.7f : 1.15f;
-        lateral_accel_g*= sidecar_bias;
+        // sidecar asymmetry
+        // sidecar on right resists rightward roll, amplifies left
+        float sidecar_bias = (lateral_accel_g > 0.0f) ? 0.7f : 1.15f;
+        lateral_accel_g   *= sidecar_bias;
 
-        // torque trying to tip the trike
-        // lateral_accel * CG_height * total_mass
-        float tip_torque= lateral_accel_g * Const::TRIKE_CG_HEIGHT;
+        // slope adds directly
+        // scale by CG height to convert accel to torque
+        float tip_torque = (lateral_accel_g + slope_lateral_g * 2.2f) * Const::TRIKE_CG_HEIGHT;
 
-        // restoring torque from suspension + gravity
-        // pulls roll back to 0
-        float restore= -state.roll_angle * Const::TRIKE_ROLL_STIFFNESS;
+        // restoring torque
+        float restore = -state.roll_angle * Const::TRIKE_ROLL_STIFFNESS * 0.4f;
 
-        // damping bleeds off roll oscillation
-        float damping= -state.roll_rate * Const::TRIKE_ROLL_DAMPING;
+        // damping
+        float damping = -state.roll_rate * Const::TRIKE_ROLL_DAMPING;
 
         if (!state.is_tipping){
-            float roll_accel= tip_torque + restore + damping;
-            state.roll_rate+= roll_accel * dt;
+            float roll_accel = tip_torque + restore + damping;
+            state.roll_rate += roll_accel * dt;
             state.roll_angle+= state.roll_rate * dt;
         }
 
         // rollover check
-        if (!state.is_tipping && std::abs(state.roll_angle) >= glm::radians(Const::TRIKE_ROLLOVER_THRESHOLD)) {
-            state.is_tipping= true;
-            state.tumble_vel  = forward * state.speed + right * state.lateral_speed;
-            state.speed= 0.0f;
-            printf("[TIPPING] roll=%.2f rate=%.2f\n", state.roll_angle, state.roll_rate);
+        if (!state.is_tipping && std::abs(state.roll_angle) >= glm::radians(Const::TRIKE_ROLLOVER_THRESHOLD)){
+            state.is_tipping = true;
+            state.tumble_vel = forward * state.speed + right * state.lateral_speed;
+            // pitch rate seeded from forward speed
+            state.tumble_pitch_rate = state.speed * 0.12f;
+            state.tumble_pitch = state.pitch_angle; // start from current nose angle
+            state.roll_rate = glm::clamp(state.roll_rate, -6.0f, 6.0f);
+            state.speed = 0.0f;
         }
 
-        // goofy tipping animation
-        // past threshold gravity takes over
-        // you roll goofily
+        // tumble
         if (state.is_tipping){
-            float fall_dir= (state.roll_angle> 0.0f) ? 1.0f : -1.0f;
+            glm::vec3 gravity_world = glm::vec3(0.0f, -Const::GRAVITY, 0.0f);
+            glm::vec3 slope_pull = gravity_world - state.surface_normal * glm::dot(gravity_world, state.surface_normal);
+            float slope_steepness = glm::length(slope_pull) / Const::GRAVITY; // 0..1
 
-            // trike slides in the direction it was rolling when it tipped
-            // bleeds off over time simulating friction with the ground
-            state.tumble_vel *= (1.0f - 2.5f * dt);
-            state.position   += state.tumble_vel * dt;
+            // slide down slope
+            state.tumble_vel += slope_pull * 0.35f * dt;
+            state.tumble_vel *= (1.0f - 1.8f * dt);
+            state.position += state.tumble_vel * dt;
 
-            // gravity keeps accelerating the spin
-            state.roll_rate+= fall_dir * 5.0f * dt;
+            // roll axis
+            float fall_dir = (state.roll_angle >= 0.0f) ? 1.0f : -1.0f;
+            float rolls_done = std::abs(state.roll_angle) / glm::two_pi<float>();
+            float gravity_fade = glm::clamp(1.0f - rolls_done * 1.2f, 0.0f, 1.0f);
+            float spin_gravity = (2.5f + slope_steepness * 4.0f) * gravity_fade;
+            state.roll_rate += fall_dir * spin_gravity * dt;
 
-            // bleed off spin rate over time so it eventually stops
-            state.roll_rate*= (1.0f - 0.12f * dt);
+            // hard clamp
+            state.roll_rate = glm::clamp(state.roll_rate, -9.5f, 9.5f);
 
+            // heavy bleed
+            // energy drains fast on flat, slower on steep slope
+            float spin_bleed = 0.55f * (1.0f - slope_steepness * 0.5f);
+            state.roll_rate *= (1.0f - spin_bleed * dt);
             state.roll_angle += state.roll_rate * dt;
+            state.roll_angle = std::remainder(state.roll_angle, glm::two_pi<float>());
 
-            // wrap angle so it spins full 360s visually
-            state.roll_angle= std::remainder(state.roll_angle, glm::two_pi<float>());
+            // pitch axis: forward/backward tumble
+            // much weaker than roll a trike's weight resists nose-over-tail
+            // only slope steepness drives it, and it's clamped so it can't fish-flap
+            float pitch_gravity = slope_steepness * 1.2f * (glm::dot(state.tumble_vel, forward) > 0.0f ? 1.0f : -1.0f);
+            state.tumble_pitch_rate += pitch_gravity * dt;
 
-            // keep on ground lvl
+            // hard clamp: pitch can wobble but never full continuous spin
+            state.tumble_pitch_rate = glm::clamp(state.tumble_pitch_rate, -2.5f, 2.5f);
+            state.tumble_pitch_rate *= (1.0f - 0.55f * dt); // bleeds fast — pitch dies before roll
+            state.tumble_pitch += state.tumble_pitch_rate * dt;
+            state.tumble_pitch = glm::clamp(state.tumble_pitch, -glm::half_pi<float>(), glm::half_pi<float>());
+
+            state.is_airborne = false;
+            state.vert_vel = 0.0f;
             state.position.y = heightfield_sample(terrain, state.position.x, state.position.z);
 
-            // stop when spin rate is nearly dead
-            if (std::abs(state.roll_rate) < 0.08f) {
-                state.roll_angle     = 0.0f;
-                state.roll_rate      = 0.0f;
+            // stop when both roll and pitch spin die on flat ground
+            if (std::abs(state.roll_rate) < 0.08f
+             && std::abs(state.tumble_pitch_rate) < 0.08f
+             && slope_steepness < 0.15f){
+                state.roll_angle = 0.0f;
+                state.roll_rate = 0.0f;
+                state.tumble_pitch = 0.0f;
+                state.tumble_pitch_rate = 0.0f;
                 state.is_rolled_over = true;
-                state.is_tipping     = false;
+                state.is_tipping = false;
                 state.rollover_timer = 0.0f;
             }
-
         }
 }
