@@ -329,7 +329,7 @@ static void rotated_world_bounds(
 }
 
 void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const WorldMap& map,
-    const glm::mat4& view, const glm::mat4& proj){
+    const glm::mat4& view, const glm::mat4& proj, bool show_hitboxes){
 
     // light dir which matches scene.cpp
     static const glm::vec3 LIGHT_DIR = glm::normalize(
@@ -401,6 +401,7 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
     
     // 2. wireframe box colored by behavior
     // gives visual feedback for every placed object even before OBJ meshes load
+    if (!show_hitboxes) goto skip_wireframes;
     for (const auto& o : map.objects){
 
         // skip selected
@@ -428,7 +429,7 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
                 view, proj, behavior_color(o.behavior));
         }
     }
-    
+    skip_wireframes:
     // draw placed object meshes
     editor_renderer_draw_props(er, map, view, proj);
 

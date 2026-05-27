@@ -66,7 +66,7 @@ void editor_renderer_init(EditorRenderer& er);
 // 5. prop palette panel (left side)
 // 6. status HUD (bottom left)
 void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const WorldMap& map,
-    const glm::mat4& view, const glm::mat4& proj);
+    const glm::mat4& view, const glm::mat4& proj, bool show_hitboxes = false);
 
 // draws only placed obj meshes
 // called both in editor and drive mode

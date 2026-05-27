@@ -178,6 +178,12 @@ void app_run(App& app){
         app.last_time = now;
         if (dt > Const::MAX_DELTA) dt = Const::MAX_DELTA;
 
+        // H key hitbox toggle universal
+        static bool s_h_last = false;
+        bool h_down = glfwGetKey(app.window.handle, GLFW_KEY_H) == GLFW_PRESS;
+        if (h_down && !s_h_last) app.editor.show_hitboxes = !app.editor.show_hitboxes;
+        s_h_last = h_down;
+
         // tab toggle
         // switch from editor/ drive mode
         bool tab_down = glfwGetKey(app.window.handle, GLFW_KEY_TAB) == GLFW_PRESS;
@@ -215,22 +221,22 @@ void app_run(App& app){
             // draw world scene:
             // ground, gizmo
             // trike parked where it stopped last
-            scene_draw(app.scene, app.trike, app.obstacles, view, proj);
+            scene_draw(app.scene, app.trike, app.obstacles, view, proj, app.editor.show_hitboxes);
 
-            // draw editor overlays:
-            // grid, ghost, selection highlight
-            editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj);
-
-            // solid terrain surface
+             // solid terrain surface
             editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj);
 
-            // terrain wireframe — only in terrain/road mode so it doesn't clutter object mode
+            // terrain wireframe
             if (app.editor.mode == MODE_TERRAIN || app.editor.mode == MODE_ROAD)
                 editor_renderer_draw_terrain(app.editor_renderer, app.map.terrain, view, proj,
                 app.editor.ghost_pos, app.editor.brush_radius, app.editor.placement_valid);
 
             // road splines
             editor_renderer_draw_roads(app.editor_renderer, app.map.roads, view, proj);
+
+            // draw editor overlays:
+            // grid, ghost, selection highlight
+            editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj, app.editor.show_hitboxes);
 
             // temp editor control hud
             font_draw(app.editor_renderer.font,"[TAB] drive  [L CLICK] place/select  [DEL] delete  [B] behavior  [Ctrl+S] save",
@@ -661,7 +667,7 @@ void app_run(App& app){
         
         // entire render pass in one call
         // ground, gizmo, trike, obstacles, wireframes
-        scene_draw(app.scene, app.trike, app.obstacles, view, proj);
+        scene_draw(app.scene, app.trike, app.obstacles, view, proj, app.editor.show_hitboxes);
 
         // build flash map from current obstacle hit timers
         std::map<int,float> flash_map;
@@ -673,10 +679,9 @@ void app_run(App& app){
                 flash_map[id] = sim.hit_timer;
 
         editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj);
-        editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims);
         editor_renderer_draw_roads(app.editor_renderer, app.map.roads, view, proj);
+        editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims);
         hud_draw(app.hud, app.trike);
-
         window_swap_buffers(app.window);
         window_poll_events();
     }

@@ -214,7 +214,8 @@ void scene_draw(
     const TrikeState& trike,
     const std::vector<Obstacle>& obstacles,
     const glm::mat4& view,
-    const glm::mat4& proj)
+    const glm::mat4& proj,
+    bool show_hitboxes)
 {
     // ground
     glm::mat4 gm = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, Const::GROUND_Y_OFFSET, 0.0f));
@@ -313,9 +314,11 @@ void scene_draw(
     // AABB wireframes
     // green=trike, 
     // yellow=obstacles
-    draw_wire_aabb(scene.gizmo_shader, trike.aabb, {0.0f,1.0f,0.3f}, view, proj);
-    for (const auto& obs : obstacles)
-        draw_wire_aabb(scene.gizmo_shader, obs.aabb, {1.0f,0.9f,0.0f}, view, proj);
+    if (show_hitboxes){
+        draw_wire_aabb(scene.gizmo_shader, trike.aabb, {0.0f,1.0f,0.3f}, view, proj);
+        for (const auto& obs : obstacles)
+            draw_wire_aabb(scene.gizmo_shader, obs.aabb, {1.0f,0.9f,0.0f}, view, proj);
+    }
 
     shader_bind(scene.shader);
 }

@@ -1,4 +1,5 @@
 #include "hud.hpp"
+#include <glad/glad.h>
 #include "../../src/core/const.hpp"
 #include <glm/glm.hpp>
 #include <cstdio>

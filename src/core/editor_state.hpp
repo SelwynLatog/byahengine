@@ -66,5 +66,6 @@ struct EditorState{
     int active_road_id = -1;
     int selected_point_idx = -1;
     bool road_placing = false;
+    bool show_hitboxes = false;
     
 };

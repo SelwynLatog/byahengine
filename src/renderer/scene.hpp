@@ -38,5 +38,6 @@ void scene_draw(
     const TrikeState& trike,
     const std::vector<Obstacle>& obstacles,
     const glm::mat4& view,
-    const glm::mat4& proj
+    const glm::mat4& proj,
+    bool show_hitboxes = false
 );
