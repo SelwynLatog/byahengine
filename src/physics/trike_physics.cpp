@@ -26,11 +26,11 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, const Heig
             state.is_airborne = false;
             state.vert_vel = 0.0f;
             state.susp_vel = 0.0f;
-            state.air_pitch_vel  = 0.0f;
-            state.air_roll_vel   = 0.0f;
-            state.air_time       = 0.0f;
-            state.tumble_pitch       = 0.0f;
-            state.tumble_pitch_rate  = 0.0f;
+            state.air_pitch_vel = 0.0f;
+            state.air_roll_vel = 0.0f;
+            state.air_time = 0.0f;
+            state.tumble_pitch = 0.0f;
+            state.tumble_pitch_rate = 0.0f;
         }
         return;
     }
