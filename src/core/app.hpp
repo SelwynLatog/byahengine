@@ -29,6 +29,7 @@ struct App {
     EditorRenderer editor_renderer;
 
     std::unordered_map<int, DynamicSim> dynamic_sims;
+    bool obstacles_dirty = true;
 };
 
 void app_init(App& app);

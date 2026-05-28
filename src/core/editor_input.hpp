@@ -16,7 +16,7 @@ void editor_scan_props(EditorState& editor, const char* assets_dir);
 // save/load
 void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     GLFWwindow* window, const glm::mat4& view, const glm::mat4& proj,
-    int screen_w, int screen_h, float dt);
+    int screen_w, int screen_h, float dt, bool& map_dirty);
 
 // casts a ray from screen pixel (mx, my) into the world
 // returns the XZ ground plane hit pos y=0

@@ -33,10 +33,12 @@ static bool s_f_pressed_last = false;
 static bool s_tab_pressed_last = false;
 
 void world_map_to_obstacles(App& app){
+
     
     // tag generated objects by rebuilding from scratch each time
     // im sure there's definitely a much more efficient way but for now
     // this is fine :>
+    app.obstacles_dirty = false;
     app.obstacles.clear();
     
     for(const auto& o: app.map.objects){
@@ -233,9 +235,11 @@ void app_run(App& app){
             } 
             else {
                 // returning to drive mode
-                // rebuild collision obstacles from current map state
-                world_map_to_obstacles(app);
-                init_dynamic_sims(app);
+                // only rebuild if map changed since last switch
+                if (app.obstacles_dirty){
+                    world_map_to_obstacles(app);
+                    init_dynamic_sims(app);
+                }
             }
         }
         s_tab_pressed_last = tab_down;
@@ -248,7 +252,7 @@ void app_run(App& app){
             glm::mat4 proj = glm::perspective ( glm::radians(Const::CAM_FOV), (float)Const::WINDOW_WIDTH/ (float)Const::WINDOW_HEIGHT,
             Const::CAM_NEAR, Const::CAM_FAR);
 
-            editor_input_update(app.editor, app.map, app.editor_renderer, app.window.handle, view, proj, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, dt);
+            editor_input_update(app.editor, app.map, app.editor_renderer, app.window.handle, view, proj, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, dt, app.obstacles_dirty);
 
             // render
             glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);

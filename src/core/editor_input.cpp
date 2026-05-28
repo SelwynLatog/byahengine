@@ -274,7 +274,7 @@ int editor_raycast_objects(double mx, double my, const glm::mat4& view, const gl
 
 void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     GLFWwindow* window, const glm::mat4& view, const glm::mat4& proj,
-    int screen_w, int screen_h, float dt){
+    int screen_w, int screen_h, float dt, bool& map_dirty){
 
     double mx, my;
     glfwGetCursorPos(window, &mx, &my);
@@ -725,8 +725,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
 
             WorldObject& placed = world_map_place(map, o);
             editor.selected_id = placed.id;
-            std::cout << " editor placed " << o.model_path << " id = " << placed.id
-            << " at (" << o.position.x << ", "<< o.position.z << ")\n";
+            map_dirty = true;
         }
     }
     s_lmb_last = lmb;
@@ -736,8 +735,8 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     if (del && !s_del_last){
         if (editor.selected_id != -1){
             world_map_remove(map, editor.selected_id);
-            std::cout<< "editor removed id = "<< editor.selected_id<< "\n";
             editor.selected_id = -1;
+            map_dirty = true;
         }
     }
     
