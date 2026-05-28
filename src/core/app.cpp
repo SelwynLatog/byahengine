@@ -46,33 +46,56 @@ void world_map_to_obstacles(App& app){
         glm::vec3 world_min, world_max;
         auto bit = app.editor_renderer.prop_bounds.find(o.model_path);
         if (bit != app.editor_renderer.prop_bounds.end()){
-            float yoff = app.editor_renderer.prop_y_offset.count(o.model_path)?
-                app.editor_renderer.prop_y_offset.at(o.model_path) : 0.0f;
-            
+            float yoff = app.editor_renderer.prop_y_offset.count(o.model_path)
+                ? app.editor_renderer.prop_y_offset.at(o.model_path) : 0.0f;
             glm::vec3 lmin = bit->second.local_min;
             glm::vec3 lmax = bit->second.local_max;
+            // scale and apply y offset, then rotate all 8 corners by object yaw
+            glm::vec3 smin = { lmin.x * o.scale.x, (lmin.y + yoff) * o.scale.y, lmin.z * o.scale.z };
+            glm::vec3 smax = { lmax.x * o.scale.x, (lmax.y + yoff) * o.scale.y, lmax.z * o.scale.z };
+            float c = std::cos(o.rotation.y), s = std::sin(o.rotation.y);
+            world_min = glm::vec3( 1e9f);
+            world_max = glm::vec3(-1e9f);
 
-            world_min = o.position + glm::vec3(
-                lmin.x * o.scale.x, (lmin.y + yoff) * o.scale.y, lmin.z * o.scale.z);
+            std::cout << "[obs_local] id=" << o.id
+                << " lmin=(" << lmin.x << "," << lmin.y << "," << lmin.z << ")"
+                << " lmax=(" << lmax.x << "," << lmax.y << "," << lmax.z << ")"
+                << " yoff=" << yoff
+                << " smin=(" << smin.x << "," << smin.y << "," << smin.z << ")"
+                << " smax=(" << smax.x << "," << smax.y << "," << smax.z << ")\n";
 
-            world_max = o.position + glm::vec3(
-                lmax.x * o.scale.x, (lmax.y + yoff) * o.scale.y, lmax.z * o.scale.z);
+            for (int k = 0; k < 8; k++){
+                glm::vec3 corner = {
+                    (k & 1) ? smax.x : smin.x,
+                    (k & 2) ? smax.y : smin.y,
+                    (k & 4) ? smax.z : smin.z,
+                };
+                glm::vec3 world = o.position + glm::vec3(
+                    c * corner.x - s * corner.z, corner.y, s * corner.x + c * corner.z);
+                world_min = glm::min(world_min, world);
+                world_max = glm::max(world_max, world);
+            }
         }
         else{
-            // fallback to unit cube scaled by obj scale
             glm::vec3 half = o.scale * 0.5f;
             world_min = o.position + glm::vec3(-half.x, 0.0f, -half.z);
             world_max = o.position + glm::vec3( half.x, o.scale.y, half.z);
         }
 
-        // build obstacles from world bounds
-        glm::vec3 size = world_max - world_min;
-        glm::vec3 half = size * 0.5f;
-        glm::vec3 center_bottom = glm::vec3(
-            (world_min.x + world_max.x) * 0.5f, world_min.y, (world_min.z + world_max.z) * 0.5f
-        );
+        // world_min/max are already full world bounds from the corner loop
+        glm::vec3 half = (world_max - world_min) * 0.5f;
+        glm::vec3 center = (world_min + world_max) * 0.5f;
 
-        Obstacle obs = make_obstacle(center_bottom, half);
+        Obstacle obs;
+        obs.position = glm::vec3(center.x, world_min.y, center.z); // center-bottom for ref
+        obs.half_extents = half;
+        obs.aabb.min = world_min;
+        obs.aabb.max = world_max;
+        std::cout << "[obs] id=" << o.id << " model=" << o.model_path
+            << " scale=(" << o.scale.x << "," << o.scale.y << "," << o.scale.z << ")"
+            << " wmin=(" << world_min.x << "," << world_min.y << "," << world_min.z << ")"
+            << " wmax=(" << world_max.x << "," << world_max.y << "," << world_max.z << ")"
+            << " lmin=(" << 0 << ") pos=(" << o.position.x << "," << o.position.y << "," << o.position.z << ")\n";
         obs.world_id = o.id;
         app.obstacles.push_back(obs);
 
@@ -103,8 +126,21 @@ void init_dynamic_sims(App& app){
                 ? app.editor_renderer.prop_y_offset.at(o.model_path) : 0.0f;
             glm::vec3 lmin = bit->second.local_min;
             glm::vec3 lmax = bit->second.local_max;
-            glm::vec3 wmin = sim.position + glm::vec3(lmin.x*o.scale.x, (lmin.y+yoff)*o.scale.y, lmin.z*o.scale.z);
-            glm::vec3 wmax = sim.position + glm::vec3(lmax.x*o.scale.x, (lmax.y+yoff)*o.scale.y, lmax.z*o.scale.z);
+            glm::vec3 smin = { lmin.x*o.scale.x, (lmin.y + yoff)*o.scale.y, lmin.z*o.scale.z };
+            glm::vec3 smax = { lmax.x*o.scale.x, (lmax.y + yoff)*o.scale.y, lmax.z*o.scale.z };
+            float c = std::cos(o.rotation.y), s = std::sin(o.rotation.y);
+            glm::vec3 wmin( 1e9f), wmax(-1e9f);
+            for (int k = 0; k < 8; k++){
+                glm::vec3 corner = {
+                    (k & 1) ? smax.x : smin.x,
+                    (k & 2) ? smax.y : smin.y,
+                    (k & 4) ? smax.z : smin.z,
+                };
+                glm::vec3 world = sim.position + glm::vec3(
+                    c * corner.x - s * corner.z, corner.y, s * corner.x + c * corner.z);
+                wmin = glm::min(wmin, world);
+                wmax = glm::max(wmax, world);
+            }
             sim.aabb = { wmin, wmax };
         }
         else{

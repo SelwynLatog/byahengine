@@ -302,8 +302,8 @@ static void rotated_world_bounds(
 ){
 
     // apply scale and y offset to local corners
-    glm::vec3 smin = glm::vec3(lmin.x * scale.x, lmin.y * scale.y + yoff, lmin.z * scale.z);
-    glm::vec3 smax = glm::vec3(lmax.x * scale.x, lmax.y * scale.y + yoff, lmax.z * scale.z);
+    glm::vec3 smin = glm::vec3(lmin.x * scale.x, (lmin.y + yoff) * scale.y, lmin.z * scale.z);
+    glm::vec3 smax = glm::vec3(lmax.x * scale.x, (lmax.y + yoff) * scale.y, lmax.z * scale.z);
 
     float c = std::cos(yaw);
     float s = std::sin(yaw);

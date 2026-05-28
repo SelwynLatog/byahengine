@@ -192,7 +192,7 @@ bool editor_raycast_ground( double mx, double my,
 
 }
 
-int editor_raycast_objects (double mx, double my, const glm::mat4& view, const glm::mat4& proj,
+int editor_raycast_objects(double mx, double my, const glm::mat4& view, const glm::mat4& proj,
     int screen_w, int screen_h, const WorldMap& map, const EditorRenderer& er,
     bool prefer_small){
 
@@ -201,14 +201,14 @@ int editor_raycast_objects (double mx, double my, const glm::mat4& view, const g
 
     glm::mat4 inv = glm::inverse(proj * view);
     glm::vec4 near_pt = inv * glm::vec4(ndc_x, ndc_y, -1.0f, 1.0f);
-    glm::vec4 far_pt = inv * glm::vec4(ndc_x, ndc_y,  1.0f, 1.0f);
+    glm::vec4 far_pt  = inv * glm::vec4(ndc_x, ndc_y,  1.0f, 1.0f);
     near_pt /= near_pt.w;
     far_pt  /= far_pt.w;
 
     glm::vec3 ray_origin = glm::vec3(near_pt);
     glm::vec3 ray_dir = glm::normalize(glm::vec3(far_pt) - ray_origin);
 
-    float closest_t   = 1e9f;
+    float closest_t = 1e9f;
     float smallest_vol = 1e9f;
     int hit_id = -1;
 
@@ -218,21 +218,31 @@ int editor_raycast_objects (double mx, double my, const glm::mat4& view, const g
         if (bit != er.prop_bounds.end()){
             float yoff = er.prop_y_offset.count(o.model_path)
                 ? er.prop_y_offset.at(o.model_path) : 0.0f;
+            
+            float yaw = o.rotation.y;
             glm::vec3 lmin = bit->second.local_min;
             glm::vec3 lmax = bit->second.local_max;
-            aabb_min = o.position + glm::vec3(
-                lmin.x * o.scale.x,
-                (lmin.y + yoff) * o.scale.y,
-                lmin.z * o.scale.z);
-            aabb_max = o.position + glm::vec3(
-                lmax.x * o.scale.x,
-                (lmax.y + yoff) * o.scale.y,
-                lmax.z * o.scale.z);
-        } 
+            glm::vec3 smin = { lmin.x * o.scale.x, (lmin.y + yoff) * o.scale.y, lmin.z * o.scale.z };
+            glm::vec3 smax = { lmax.x * o.scale.x, (lmax.y + yoff) * o.scale.y, lmax.z * o.scale.z };
+            float c = std::cos(yaw), s = std::sin(yaw);
+            aabb_min = glm::vec3( 1e9f);
+            aabb_max = glm::vec3(-1e9f);
+            for (int k = 0; k < 8; k++){
+                glm::vec3 corner = {
+                    (k & 1) ? smax.x : smin.x,
+                    (k & 2) ? smax.y : smin.y,
+                    (k & 4) ? smax.z : smin.z,
+                };
+                glm::vec3 world = o.position + glm::vec3(
+                    c * corner.x - s * corner.z, corner.y, s * corner.x + c * corner.z);
+                aabb_min = glm::min(aabb_min, world);
+                aabb_max = glm::max(aabb_max, world);
+            }
+        }
         else {
             glm::vec3 half = o.scale * 0.5f;
             aabb_min = o.position + glm::vec3(-half.x, 0.0f, -half.z);
-            aabb_max = o.position + glm::vec3( half.x, o.scale.y,  half.z);
+            aabb_max = o.position + glm::vec3( half.x, o.scale.y, half.z);
         }
 
         float tmin = 0.0f, tmax = 1e9f;
@@ -247,20 +257,12 @@ int editor_raycast_objects (double mx, double my, const glm::mat4& view, const g
         }
 
         if (prefer_small){
-            // ctrl held: pick smallest AABB volume among all ray hits
-            glm::vec3 sz = aabb_max - aabb_min;
+            glm::vec3 sz  = aabb_max - aabb_min;
             float vol = sz.x * sz.y * sz.z;
-            if (vol < smallest_vol){
-                smallest_vol = vol;
-                hit_id = o.id;
-            }
-        } 
+            if (vol < smallest_vol){ smallest_vol = vol; hit_id = o.id; }
+        }
         else {
-            // normal: pick closest to camera
-            if (tmin < closest_t){
-                closest_t = tmin;
-                hit_id = o.id;
-            }
+            if (tmin < closest_t){ closest_t = tmin; hit_id = o.id; }
         }
 
         next_object:;
