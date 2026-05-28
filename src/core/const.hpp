@@ -5,7 +5,7 @@ namespace Const{
     inline constexpr int WINDOW_WIDTH = 1920;
     inline constexpr int WINDOW_HEIGHT= 1080;
     inline constexpr const char* WINDOW_TITLE="tricycle sim";
-    inline constexpr bool VSYNC = true;
+    inline constexpr bool VSYNC = false;
 
     // render
     inline constexpr float CLEAR_R = 0.12f;

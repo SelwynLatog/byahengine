@@ -315,9 +315,37 @@ void scene_draw(
     // green=trike, 
     // yellow=obstacles
     if (show_hitboxes){
-        draw_wire_aabb(scene.gizmo_shader, trike.aabb, {0.0f,1.0f,0.3f}, view, proj);
+        std::vector<float> wire_verts;
+        auto push_aabb = [&](const Aabb& box, glm::vec3 col){
+            glm::vec3 lo = box.min, hi = box.max;
+            glm::vec3 c[8] = {
+                {lo.x,lo.y,lo.z},{hi.x,lo.y,lo.z},
+                {hi.x,lo.y,hi.z},{lo.x,lo.y,hi.z},
+                {lo.x,hi.y,lo.z},{hi.x,hi.y,lo.z},
+                {hi.x,hi.y,hi.z},{lo.x,hi.y,hi.z},
+            };
+            int e[24] = { 0,1,1,2,2,3,3,0, 4,5,5,6,6,7,7,4, 0,4,1,5,2,6,3,7 };
+            for (int i = 0; i < 24; i++){
+                glm::vec3 p = c[e[i]];
+                wire_verts.insert(wire_verts.end(),
+                    {p.x,p.y,p.z, col.r,col.g,col.b});
+            }
+        };
+
+        push_aabb(trike.aabb, {0.0f,1.0f,0.3f});
         for (const auto& obs : obstacles)
-            draw_wire_aabb(scene.gizmo_shader, obs.aabb, {1.0f,0.9f,0.0f}, view, proj);
+            push_aabb(obs.aabb, {1.0f,0.9f,0.0f});
+
+        Mesh wire;
+        mesh_init(wire, wire_verts);
+        shader_bind(scene.gizmo_shader);
+        set_mat4(scene.gizmo_shader, "u_view", view);
+        set_mat4(scene.gizmo_shader, "u_proj", proj);
+        set_mat4(scene.gizmo_shader, "u_model", glm::mat4(1.0f));
+        glBindVertexArray(wire.vao);
+        glDrawArrays(GL_LINES, 0, wire.count);
+        glBindVertexArray(0);
+        mesh_destroy(wire);
     }
 
     shader_bind(scene.shader);
