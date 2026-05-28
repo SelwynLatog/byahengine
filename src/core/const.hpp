@@ -226,6 +226,11 @@ namespace Const{
     inline constexpr float DYN_FRUIT_RESTITUTION = 0.70f;
     inline constexpr float DYN_FRUIT_FRICTION = 0.60f;
 
+    // basketball
+    inline constexpr float DYN_BBALL_MASS = 0.62f;
+    inline constexpr float DYN_BBALL_RESTITUTION = 0.85f;
+    inline constexpr float DYN_BBALL_FRICTION = 0.60f;
+
     // fallback
     inline constexpr float DYN_DEFAULT_MASS = 8.0f;
     inline constexpr float DYN_DEFAULT_RESTITUTION = 0.55f;
