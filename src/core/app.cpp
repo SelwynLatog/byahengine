@@ -175,8 +175,8 @@ void app_init(App& app){
     // try to load existing map
     world_map_load(app.map, Const::MAP_SAVE_PATH);
 
-    for (auto& r : app.map.roads)
-        road_spline_build_mesh(r, &app.map.terrain);
+    for (auto& r : app.map.roads) road_spline_build_mesh(r, &app.map.terrain);
+    for (auto& z : app.map.oceans) ocean_build_mesh(z);
     
     // build collision obstacles from loaded map
     // call prop bounds first to trigger loads via editor_renderer
@@ -264,7 +264,7 @@ void app_run(App& app){
             scene_draw(app.scene, app.trike, app.obstacles, view, proj, app.editor.show_hitboxes);
 
              // solid terrain surface
-            editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj);
+            editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj, app.map.oceans);
 
             // terrain wireframe
             if (app.editor.mode == MODE_TERRAIN || app.editor.mode == MODE_ROAD)
@@ -273,6 +273,7 @@ void app_run(App& app){
 
             // road splines
             editor_renderer_draw_roads(app.editor_renderer, app.map.roads, view, proj);
+            editor_renderer_draw_ocean(app.editor_renderer, app.map.oceans, view, proj, dt);
 
             // draw editor overlays:
             // grid, ghost, selection highlight
@@ -718,8 +719,9 @@ void app_run(App& app){
             if (sim.hit_timer > 0.0f)
                 flash_map[id] = sim.hit_timer;
 
-        editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj);
+        editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj, app.map.oceans);
         editor_renderer_draw_roads(app.editor_renderer, app.map.roads, view, proj);
+        editor_renderer_draw_ocean(app.editor_renderer, app.map.oceans, view, proj, dt);
         editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims);
         hud_draw(app.hud, app.trike);
         window_swap_buffers(app.window);

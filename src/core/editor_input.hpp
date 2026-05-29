@@ -2,6 +2,7 @@
 #include "editor_state.hpp"
 #include "../world/world_map.hpp"
 #include "../world/height_field.hpp"
+#include "../world/ocean.hpp"
 #include "../renderer/editor_renderer.hpp"
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>

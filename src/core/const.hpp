@@ -236,4 +236,15 @@ namespace Const{
     inline constexpr float DYN_DEFAULT_RESTITUTION = 0.55f;
     inline constexpr float DYN_DEFAULT_FRICTION = 0.75f;
 
+    // ocean
+    inline constexpr float OCEAN_Y_LEVEL = -0.4f; // world Y of water surface
+    inline constexpr float OCEAN_GRID_SPACING = 2.0f; // metres between wave verts
+    inline constexpr float OCEAN_WAVE_AMP = 0.22f; // metres, peak displacement
+    inline constexpr float OCEAN_WAVE_FREQ = 0.18f; // spatial frequency
+    inline constexpr float OCEAN_WAVE_SPEED = 0.9f; // time multiplier
+    inline constexpr float OCEAN_WAVE_AMP2 = 0.12f; // second wave layer
+    inline constexpr float OCEAN_WAVE_FREQ2 = 0.27f; // second layer spatial freq
+    inline constexpr float OCEAN_WAVE_SPEED2 = 1.3f; // second layer time mult
+    inline constexpr float OCEAN_SHALLOW_DIST = 12.0f; // metres from shore edge for teal tint
+
 }

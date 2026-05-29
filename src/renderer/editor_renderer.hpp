@@ -7,6 +7,7 @@
 #include "../world/world_map.hpp"
 #include "../world/height_field.hpp"
 #include "../world/road_spline.hpp"
+#include "../world/ocean.hpp"
 #include <glm/glm.hpp>
 #include <map>
 #include <string>
@@ -53,6 +54,10 @@ struct EditorRenderer{
 
     // road spline shader
     Shader road_shader;
+
+    // ocean wave shader + time accumulator
+    Shader ocean_shader;
+    float ocean_time = 0.0f;
 };
 
 // builds the static grid mesh and compiles the flat shader
@@ -86,7 +91,10 @@ void editor_renderer_build_terrain_mesh(EditorRenderer& er, const HeightField& h
 void editor_renderer_draw_terrain(EditorRenderer& er, const HeightField& hf, const glm::mat4& view, const glm::mat4& proj,
     const glm::vec3& brush_pos, float brush_radius, bool placement_valid);
 
-void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField& hf);
-void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField& hf, const glm::mat4& view, const glm::mat4& proj);
+void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField& hf, const std::vector<OceanZone>& oceans);
+void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField& hf,
+    const glm::mat4& view, const glm::mat4& proj, const std::vector<OceanZone>& oceans);
 
 void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline>& roads, const glm::mat4& view, const glm::mat4& proj);
+
+void editor_renderer_draw_ocean(EditorRenderer& er, const std::vector<OceanZone>& zones, const glm::mat4& view, const glm::mat4& proj, float dt);

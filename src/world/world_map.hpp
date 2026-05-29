@@ -2,6 +2,7 @@
 #include "world_object.hpp"
 #include "height_field.hpp"
 #include "road_spline.hpp"
+#include "ocean.hpp"
 #include <vector>
 #include <string>
 
@@ -11,6 +12,8 @@ struct WorldMap{
     std::vector<RoadSpline> roads;
     int next_id = 0;
     int next_road_id = 0;
+    int next_ocean_id = 0;
+    std::vector<OceanZone> oceans;
 };
 
 // add object to map

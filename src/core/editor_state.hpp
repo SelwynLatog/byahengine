@@ -17,7 +17,8 @@ enum EditorTool{
 enum EditorMode{
     MODE_OBJECT, // default - place/select/move props
     MODE_TERRAIN, // sculpt heightfield
-    MODE_ROAD // place/edit road spline control points
+    MODE_ROAD, // place/edit road spline control points
+    MODE_OCEAN // place/resize ocean zones
 };
 
 // editor mode state lives in App
@@ -67,5 +68,11 @@ struct EditorState{
     int selected_point_idx = -1;
     bool road_placing = false;
     bool show_hitboxes = false;
+
+    // ocean placement drag state
+    // LMB down = anchor, drag to define XZ rect, release = place zone
+    bool ocean_dragging = false;
+    glm::vec3 ocean_drag_start = glm::vec3(0.0f);
+    int selected_ocean_id = -1;
     
 };

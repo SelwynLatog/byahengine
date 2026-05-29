@@ -3,6 +3,7 @@
 #include "obj_mesh.hpp"
 #include "../core/const.hpp"
 #include "../world/world_object.hpp"
+#include "../world/ocean.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -206,10 +207,58 @@ void main(){
 }
 )";
 
+// ocean shader
+// vertex: two sine waves animate Y, preserves vertex color depth hint
+// fragment: blends deep/shallow color, adds specular shimmer
+static const char* ER_OCEAN_VERT = R"(
+#version 330 core
+layout(location = 0) in vec3 a_pos;
+layout(location = 1) in vec3 a_color;
+uniform mat4 u_model;
+uniform mat4 u_view;
+uniform mat4 u_proj;
+uniform float u_time;
+uniform float u_amp;
+uniform float u_freq;
+uniform float u_speed;
+uniform float u_amp2;
+uniform float u_freq2;
+uniform float u_speed2;
+out vec3 v_color;
+out vec3 v_world_pos;
+void main(){
+    vec3 p = a_pos;
+    float w1 = sin(p.x * u_freq  + p.z * u_freq  * 0.62 + u_time * u_speed)  * u_amp;
+    float w2 = sin(p.x * u_freq2 * 0.71 + p.z * u_freq2 + u_time * u_speed2) * u_amp2;
+    p.y += w1 + w2;
+    gl_Position = u_proj * u_view * u_model * vec4(p, 1.0);
+    v_color = a_color;
+    v_world_pos = p;
+}
+)";
+
+static const char* ER_OCEAN_FRAG = R"(
+#version 330 core
+in vec3 v_color;
+in vec3 v_world_pos;
+out vec4 frag_color;
+uniform vec3 u_light_dir;
+void main(){
+    // fake specular shimmer using world pos derivatives
+    // gives moving highlight bands without real normals
+    float shimmer = pow(max(0.0, sin(v_world_pos.x * 1.8 + v_world_pos.z * 1.2)), 6.0) * 0.18;
+    vec3 col = v_color + shimmer;
+    // slight darkening at edges from ambient
+    float amb = 0.65;
+    frag_color = vec4(col * amb, 0.88);
+}
+)";
+
 void editor_renderer_init(EditorRenderer& er){
-    shader_init(er.shader,     ER_VERT,     ER_FRAG);
+    shader_init(er.shader, ER_VERT, ER_FRAG);
     shader_init(er.obj_shader, ER_LIT_VERT, ER_LIT_FRAG);
     shader_init(er.road_shader, ER_ROAD_VERT, ER_ROAD_FRAG);
+    shader_init(er.ocean_shader, ER_OCEAN_VERT, ER_OCEAN_FRAG);
     font_init(er.font, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
 
     // buid the snap grid as a static mesh
@@ -396,6 +445,35 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
             snprintf(buf, sizeof(buf), "TYPE: %s   (no active spline)",
                 ROAD_TYPE_NAMES[glm::clamp((int)editor.active_road_id, 0, (int)ROAD_COUNT - 1)]);
             font_draw(er.font, buf, 220, 60, 2, 0.50f, 0.50f, 0.50f);
+        }
+    }
+
+    if (editor.mode == MODE_OCEAN){
+        font_draw(er.font, "[ OCEAN MODE ]", 180, 16, 3, 0.10f, 0.55f, 0.90f);
+        font_draw(er.font, "LMB drag=place zone  DEL=delete  PgUp/Dn=y level  O=exit",
+            220, 40, 2, 0.10f, 0.55f, 0.90f);
+
+        if (editor.ocean_dragging){
+            // preview the drag rectangle as a wire box
+            glm::vec3 a = editor.ocean_drag_start;
+            glm::vec3 b = editor.ghost_pos;
+            glm::vec3 mn = { std::min(a.x,b.x), Const::OCEAN_Y_LEVEL - 0.1f, std::min(a.z,b.z) };
+            glm::vec3 mx = { std::max(a.x,b.x), Const::OCEAN_Y_LEVEL + 0.1f, std::max(a.z,b.z) };
+            draw_wire_box(er.shader, mn, mx, view, proj, {0.10f, 0.55f, 0.90f});
+        }
+
+        // highlight selected zone
+        if (editor.selected_ocean_id != -1){
+            for (const auto& z : map.oceans){
+                if (z.id != editor.selected_ocean_id) continue;
+                glm::vec3 mn = { z.x_min, z.y_level - 0.1f, z.z_min };
+                glm::vec3 mx = { z.x_max, z.y_level + 0.1f, z.z_max };
+                draw_wire_box(er.shader, mn, mx, view, proj, {1.0f, 0.80f, 0.10f});
+                char buf[64];
+                snprintf(buf, sizeof(buf), "OCEAN Y: %.2f  [PgUp/Dn] nudge", z.y_level);
+                font_draw(er.font, buf, 220, 60, 2, 1.0f, 0.80f, 0.10f);
+                break;
+            }
         }
     }
     
@@ -899,7 +977,46 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField& hf){
+void editor_renderer_draw_ocean(EditorRenderer& er, const std::vector<OceanZone>& zones,
+    const glm::mat4& view, const glm::mat4& proj, float dt){
+    if (zones.empty()) return;
+
+    er.ocean_time += dt;
+
+    static const glm::vec3 LIGHT_DIR = glm::normalize(
+        glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
+
+    shader_bind(er.ocean_shader);
+    set_mat4(er.ocean_shader, "u_model", glm::mat4(1.0f));
+    set_mat4(er.ocean_shader, "u_view",  view);
+    set_mat4(er.ocean_shader, "u_proj",  proj);
+
+    glUniform1f(glGetUniformLocation(er.ocean_shader.id, "u_time"), er.ocean_time);
+    glUniform1f(glGetUniformLocation(er.ocean_shader.id, "u_amp"), Const::OCEAN_WAVE_AMP);
+    glUniform1f(glGetUniformLocation(er.ocean_shader.id, "u_freq"), Const::OCEAN_WAVE_FREQ);
+    glUniform1f(glGetUniformLocation(er.ocean_shader.id, "u_speed"), Const::OCEAN_WAVE_SPEED);
+    glUniform1f(glGetUniformLocation(er.ocean_shader.id, "u_amp2"), Const::OCEAN_WAVE_AMP2);
+    glUniform1f(glGetUniformLocation(er.ocean_shader.id, "u_freq2"), Const::OCEAN_WAVE_FREQ2);
+    glUniform1f(glGetUniformLocation(er.ocean_shader.id, "u_speed2"), Const::OCEAN_WAVE_SPEED2);
+    glUniform3f(glGetUniformLocation(er.ocean_shader.id, "u_light_dir"),
+        LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE); // transparent surface — don't write depth
+
+    for (const auto& z : zones){
+        if (!z.mesh.vao || z.mesh.count == 0) continue;
+        glBindVertexArray(z.mesh.vao);
+        glDrawElements(GL_TRIANGLES, z.mesh.count, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+    }
+
+    glDepthMask(GL_TRUE);
+    glDisable(GL_BLEND);
+}
+
+void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField& hf, const std::vector<OceanZone>& oceans){
     if (hf.rows < 2 || hf.cols < 2) return;
 
     // flat colors per surface type used when texture is missing
@@ -933,9 +1050,21 @@ void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField
 
     for (int r = 0; r < hf.rows - 1; r++){
         for (int c = 0; c < hf.cols - 1; c++){
-            glm::vec3 p00 = get_pos(r,   c  );
-            glm::vec3 p10 = get_pos(r+1, c  );
-            glm::vec3 p01 = get_pos(r,   c+1);
+            // skip quads that fall inside any ocean zone
+            float cx = hf.origin.x + (c + 0.5f) * hf.cell_size;
+            float cz = hf.origin.z + (r + 0.5f) * hf.cell_size;
+            bool in_ocean = false;
+            for (const auto& z : oceans){
+                if (cx >= z.x_min && cx <= z.x_max && cz >= z.z_min && cz <= z.z_max){
+                    in_ocean = true;
+                    break;
+                }
+            }
+            if (in_ocean) continue;
+
+            glm::vec3 p00 = get_pos(r, c);
+            glm::vec3 p10 = get_pos(r+1, c);
+            glm::vec3 p01 = get_pos(r,c+1);
             glm::vec3 p11 = get_pos(r+1, c+1);
 
             int si = cell_surface(r, c);
@@ -1008,9 +1137,9 @@ void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField
 }
 
 void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField& hf,
-    const glm::mat4& view, const glm::mat4& proj){
+    const glm::mat4& view, const glm::mat4& proj, const std::vector<OceanZone>& oceans){
     if (er.terrain_surface_dirty)
-        editor_renderer_build_terrain_surface(er, hf);
+        editor_renderer_build_terrain_surface(er, hf, oceans);
     if (!er.terrain_surface_mesh.vao) return;
 
     static const glm::vec3 LIGHT_DIR = glm::normalize(
@@ -1087,6 +1216,7 @@ void editor_renderer_destroy(EditorRenderer& er){
     shader_destroy(er.shader);
     shader_destroy(er.obj_shader);
     shader_destroy(er.road_shader);
+    shader_destroy(er.ocean_shader);
     mesh_destroy(er.grid);
     if (er.terrain_mesh.vao) mesh_destroy(er.terrain_mesh);
     if (er.terrain_surface_mesh.vao) mesh_destroy(er.terrain_surface_mesh);
