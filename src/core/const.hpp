@@ -16,7 +16,7 @@ namespace Const{
 
     // day cycle
     // 10 real minutes = 1 full in-game day
-    inline constexpr float DAY_DURATION_SECONDS = 60.0f;//600.0f;
+    inline constexpr float DAY_DURATION_SECONDS = 9999.0f;//600.0f;
     inline constexpr float DAY_START_TIME = 7.0f; // start at 7am
 
     // time ranges (0-24)
@@ -38,7 +38,7 @@ namespace Const{
     inline constexpr float LIGHT_AFTERNOON_G = 0.55f;
     inline constexpr float LIGHT_AFTERNOON_B = 0.20f;
     inline constexpr float LIGHT_AFTERNOON_AMBIENT = 0.40f;
-    inline constexpr float LIGHT_AFTERNOON_DIFF    = 0.90f;
+    inline constexpr float LIGHT_AFTERNOON_DIFF = 0.90f;
 
     // night: dim cool blue
     inline constexpr float LIGHT_NIGHT_R = 0.10f;
