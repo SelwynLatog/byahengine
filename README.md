@@ -30,7 +30,6 @@ https://sketchfab.com/3d-models/lowpoly-traysikeltricycle-08cb15a0c57748f793e0ea
 - environmental fx (waves/beaches, rain, wet roads)
 
 May-22-2026
-Basically environment is done. a lot of midnight hours spent on map building. I'd say pretty decent for a psx style game. Assets not mine. All free models you can find from sketchfab. 
 
 <img width="1885" height="1162" alt="image" src="https://github.com/user-attachments/assets/cfa2621e-df2f-4e19-9e9d-ce52be652988" />
 
@@ -41,6 +40,8 @@ Basically environment is done. a lot of midnight hours spent on map building. I'
 <img width="1868" height="1145" alt="image" src="https://github.com/user-attachments/assets/ae8e4b1f-5f21-40af-b8e7-659e8c42fec3" />
 
 May-30-2026
+Basically environment is done. a lot of midnight hours spent on map building. I'd say pretty decent for a psx style game. Assets not mine. All free models you can find from sketchfab. 
+
 <img width="1919" height="1084" alt="image" src="https://github.com/user-attachments/assets/972b4976-fc23-4b69-a6de-24f4bd63a494" />
 
 no light system yet
