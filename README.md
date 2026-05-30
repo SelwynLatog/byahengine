@@ -50,6 +50,4 @@ no light system yet
 
 <img width="1919" height="1082" alt="image" src="https://github.com/user-attachments/assets/6058f0fa-f02a-4dfe-8e2b-9c460b0d1cac" />
 
-<img width="1919" height="1082" alt="image" src="https://github.com/user-attachments/assets/60aa36c1-1426-4b27-ae77-7bf6bf8f4392" />
-
 <img width="1919" height="1072" alt="image" src="https://github.com/user-attachments/assets/9059bd96-9a73-46cf-84b1-4417078eaec0" />
