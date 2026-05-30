@@ -28,15 +28,18 @@ uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_proj;
 uniform mat3 u_normal_mat;
+uniform mat4 u_light_space;
 out vec3 v_world_normal;
 out vec3 v_world_pos;
 out vec2 v_uv;
+out vec4 v_light_space_pos;
 void main(){
     vec4 world = u_model * vec4(a_pos, 1.0);
     gl_Position = u_proj * u_view * world;
     v_world_normal = normalize(u_normal_mat * a_normal);
     v_world_pos = world.xyz;
     v_uv = a_uv;
+    v_light_space_pos = u_light_space * world;
 }
 )";
 
@@ -45,17 +48,46 @@ static const char* ER_LIT_FRAG = R"(
 in vec3 v_world_normal;
 in vec3 v_world_pos;
 in vec2 v_uv;
+in vec4 v_light_space_pos;
 out vec4 frag_color;
 uniform vec3      u_kd;
 uniform vec3      u_light_dir;
 uniform sampler2D u_tex;
+uniform sampler2D u_shadow_map;
 uniform int       u_use_texture;
+uniform float     u_shadow_bias;
+
+float shadow_pcf(vec4 lsp, vec3 normal, vec3 ldir){
+    // perspective divide -> NDC
+    vec3 proj = lsp.xyz / lsp.w;
+    // remap [-1,1] to [0,1] for texture lookup
+    proj = proj * 0.5 + 0.5;
+    // outside shadow frustum = fully lit
+    if (proj.z > 1.0) return 0.0;
+    float current_depth = proj.z;
+    float bias = max(u_shadow_bias * (1.0 - dot(normal, ldir)), u_shadow_bias * 0.1);
+    // PCF: 3x3 filter
+    float shadow = 0.0;
+    vec2 texel = 1.0 / textureSize(u_shadow_map, 0);
+    for (int x = -1; x <= 1; x++){
+        for (int y = -1; y <= 1; y++){
+            float pcf_depth = texture(u_shadow_map, proj.xy + vec2(x,y) * texel).r;
+            shadow += (current_depth - bias > pcf_depth) ? 1.0 : 0.0;
+        }
+    }
+    return shadow / 9.0;
+}
+
 void main(){
-    float diff = max(dot(normalize(v_world_normal), u_light_dir), 0.0);
+    vec3 n = normalize(v_world_normal);
+    vec3 ldir = normalize(u_light_dir);
+    float diff = max(dot(n, ldir), 0.0);
     float ambient = 0.55;
     vec4 tex_sample = (u_use_texture == 1) ? texture(u_tex, v_uv) : vec4(u_kd, 1.0);
     if (u_use_texture == 1 && tex_sample.a < 0.5) discard;
-    vec3 lit = tex_sample.rgb * (ambient + diff * 0.85);
+    float shadow = shadow_pcf(v_light_space_pos, n, ldir);
+    // shadow reduces diffuse but not ambient
+    vec3 lit = tex_sample.rgb * (ambient + diff * 0.85 * (1.0 - shadow));
     frag_color = vec4(lit, 1.0);
 }
 )";
@@ -180,12 +212,16 @@ uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_proj;
 uniform mat3 u_normal_mat;
+uniform mat4 u_light_space;
 out vec3 v_world_normal;
 out vec2 v_uv;
+out vec4 v_light_space_pos;
 void main(){
-    gl_Position = u_proj * u_view * u_model * vec4(a_pos, 1.0);
+    vec4 world = u_model * vec4(a_pos, 1.0);
+    gl_Position = u_proj * u_view * world;
     v_world_normal = normalize(u_normal_mat * a_normal);
     v_uv = a_uv;
+    v_light_space_pos = u_light_space * world;
 }
 )";
 
@@ -193,19 +229,44 @@ static const char* ER_ROAD_FRAG = R"(
 #version 330 core
 in vec3 v_world_normal;
 in vec2 v_uv;
+in vec4 v_light_space_pos;
 out vec4 frag_color;
 uniform vec3      u_kd;
 uniform vec3      u_light_dir;
 uniform sampler2D u_tex;
+uniform sampler2D u_shadow_map;
 uniform int       u_use_texture;
+uniform float     u_shadow_bias;
+
+float shadow_pcf(vec4 lsp, vec3 normal, vec3 ldir){
+    vec3 proj = lsp.xyz / lsp.w;
+    proj = proj * 0.5 + 0.5;
+    if (proj.z > 1.0) return 0.0;
+    float bias = max(u_shadow_bias * (1.0 - dot(normal, ldir)), u_shadow_bias * 0.1);
+    float shadow = 0.0;
+    vec2 texel = 1.0 / textureSize(u_shadow_map, 0);
+    for (int x = -1; x <= 1; x++){
+        for (int y = -1; y <= 1; y++){
+            float pcf_depth = texture(u_shadow_map, proj.xy + vec2(x,y) * texel).r;
+            shadow += (proj.z - bias > pcf_depth) ? 1.0 : 0.0;
+        }
+    }
+    return shadow / 9.0;
+}
+
 void main(){
-    float diff    = max(dot(normalize(v_world_normal), u_light_dir), 0.0);
+    vec3 n = normalize(v_world_normal);
+    vec3 ldir = normalize(u_light_dir);
+    float diff = max(dot(n, ldir), 0.0);
     float ambient = 0.55;
-    vec4 tex_col  = (u_use_texture == 1) ? texture(u_tex, v_uv) : vec4(u_kd, 1.0);
-    vec3 lit      = tex_col.rgb * (ambient + diff * 0.85);
-    frag_color    = vec4(lit, 1.0);
+    vec4 tex_col = (u_use_texture == 1) ? texture(u_tex, v_uv) : vec4(u_kd, 1.0);
+    float shadow = shadow_pcf(v_light_space_pos, n, ldir);
+    vec3 lit = tex_col.rgb * (ambient + diff * 0.85 * (1.0 - shadow));
+    frag_color = vec4(lit, 1.0);
 }
 )";
+
+
 
 // ocean shader
 // vertex: two sine waves animate Y, preserves vertex color depth hint
@@ -254,12 +315,28 @@ void main(){
 }
 )";
 
+static const char* ER_DEPTH_VERT = R"(
+#version 330 core
+layout(location = 0) in vec3 a_pos;
+uniform mat4 u_light_space;
+uniform mat4 u_model;
+void main(){
+    gl_Position = u_light_space * u_model * vec4(a_pos, 1.0);
+}
+)";
+
+static const char* ER_DEPTH_FRAG = R"(
+#version 330 core
+void main(){}
+)";
+
 void editor_renderer_init(EditorRenderer& er){
     shader_init(er.shader, ER_VERT, ER_FRAG);
     shader_init(er.obj_shader, ER_LIT_VERT, ER_LIT_FRAG);
     shader_init(er.road_shader, ER_ROAD_VERT, ER_ROAD_FRAG);
     shader_init(er.ocean_shader, ER_OCEAN_VERT, ER_OCEAN_FRAG);
     font_init(er.font, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
+    shader_init(er.depth_shader, ER_DEPTH_VERT, ER_DEPTH_FRAG);
 
     // buid the snap grid as a static mesh
     // two sets parallel one along x, one along z
@@ -707,6 +784,48 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
     }
 }
 
+void editor_renderer_shadow_pass(EditorRenderer& er, const WorldMap& map,
+    const glm::mat4& light_space_mat,
+    const std::unordered_map<int, DynamicSim>& dynamic_sims){
+    shader_bind(er.depth_shader);
+    glUniformMatrix4fv(glGetUniformLocation(er.depth_shader.id, "u_light_space"),
+        1, GL_FALSE, glm::value_ptr(light_space_mat));
+
+    for (auto& o : map.objects){
+        if (o.model_path.empty()) continue;
+        ObjMesh& mesh = get_prop_mesh(er, o.model_path);
+        if (mesh.data.vertices.empty()) continue;
+
+        glm::mat4 model = glm::mat4(1.0f);
+        auto dit = dynamic_sims.find(o.id);
+        if (o.behavior == DYNAMIC && dit != dynamic_sims.end()){
+            const DynamicSim& sim = dit->second;
+            model = glm::translate(model, sim.position);
+            model = glm::rotate(model, sim.yaw + o.rotation.y, glm::vec3(0,1,0));
+            model = glm::rotate(model, sim.pitch, glm::vec3(1,0,0));
+            model = glm::rotate(model, sim.roll, glm::vec3(0,0,1));
+            model = glm::translate(model, glm::vec3(0.0f, o.y_floor_offset, 0.0f));
+            model = glm::scale(model, o.scale);
+        } 
+        else {
+            model = glm::translate(model, o.position);
+            model = glm::rotate(model, o.rotation.y, glm::vec3(0,1,0));
+            model = glm::translate(model, glm::vec3(0.0f, o.y_floor_offset, 0.0f));
+            model = glm::scale(model, o.scale);
+        }
+
+        glUniformMatrix4fv(glGetUniformLocation(er.depth_shader.id, "u_model"),
+            1, GL_FALSE, glm::value_ptr(model));
+
+        // draw all groups 
+        // depth only, no material needed
+        glBindVertexArray(mesh.vao);
+        glDrawArrays(GL_TRIANGLES, 0, mesh.data.vertices.size() / 8);
+        glBindVertexArray(0);
+    }
+}
+
+
 void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj,
     const std::map<int,float>& flash_map,
@@ -722,6 +841,14 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glUniform3f(glGetUniformLocation(er.obj_shader.id, "u_light_dir"),
         LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
+    glUniformMatrix4fv(glGetUniformLocation(er.obj_shader.id, "u_light_space"),
+        1, GL_FALSE, glm::value_ptr(er.light_space_mat));
+    glUniform1f(glGetUniformLocation(er.obj_shader.id, "u_shadow_bias"), Const::SHADOW_BIAS);
+    // bind shadow map to texture unit 1
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, er.shadow_depth_tex);
+    glUniform1i(glGetUniformLocation(er.obj_shader.id, "u_shadow_map"), 1);
+    glActiveTexture(GL_TEXTURE0);
 
     for (auto& o : map.objects){
         if (o.model_path.empty()) continue;
@@ -922,9 +1049,15 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
     glm::mat3 nm = glm::mat3(1.0f);
     glUniformMatrix3fv(glGetUniformLocation(er.road_shader.id, "u_normal_mat"),
         1, GL_FALSE, glm::value_ptr(nm));
-    glUniform3f(glGetUniformLocation(er.road_shader.id, "u_light_dir"),
+     glUniform3f(glGetUniformLocation(er.road_shader.id, "u_light_dir"),
         LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
-
+    glUniformMatrix4fv(glGetUniformLocation(er.road_shader.id, "u_light_space"),
+        1, GL_FALSE, glm::value_ptr(er.light_space_mat));
+    glUniform1f(glGetUniformLocation(er.road_shader.id, "u_shadow_bias"), Const::SHADOW_BIAS);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, er.shadow_depth_tex);
+    glUniform1i(glGetUniformLocation(er.road_shader.id, "u_shadow_map"), 1);
+    glActiveTexture(GL_TEXTURE0);
     glActiveTexture(GL_TEXTURE0);
     glUniform1i(glGetUniformLocation(er.road_shader.id, "u_tex"), 0);
 
@@ -1163,6 +1296,13 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
         1, GL_FALSE, glm::value_ptr(nm));
     glUniform3f(glGetUniformLocation(er.road_shader.id, "u_light_dir"),
         LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
+    glUniformMatrix4fv(glGetUniformLocation(er.road_shader.id, "u_light_space"),
+        1, GL_FALSE, glm::value_ptr(er.light_space_mat));
+    glUniform1f(glGetUniformLocation(er.road_shader.id, "u_shadow_bias"), Const::SHADOW_BIAS);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, er.shadow_depth_tex);
+    glUniform1i(glGetUniformLocation(er.road_shader.id, "u_shadow_map"), 1);
+    glActiveTexture(GL_TEXTURE0);
 
     glBindVertexArray(er.terrain_surface_mesh.vao);
 
@@ -1200,6 +1340,7 @@ void editor_renderer_destroy(EditorRenderer& er){
     shader_destroy(er.obj_shader);
     shader_destroy(er.road_shader);
     shader_destroy(er.ocean_shader);
+    shader_destroy(er.depth_shader);
     mesh_destroy(er.grid);
     if (er.terrain_mesh.vao) mesh_destroy(er.terrain_mesh);
     if (er.terrain_surface_mesh.vao) mesh_destroy(er.terrain_surface_mesh);

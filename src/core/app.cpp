@@ -158,6 +158,9 @@ void app_init(App& app){
         Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, Const::WINDOW_TITLE);
 
     glEnable(GL_DEPTH_TEST);
+    int fb_w, fb_h;
+    glfwGetFramebufferSize(app.window.handle, &fb_w, &fb_h);
+    glViewport(0, 0, fb_w, fb_h);
 
     scene_init(app.scene);
     editor_renderer_init(app.editor_renderer);
@@ -256,6 +259,28 @@ void app_run(App& app){
             // render
             glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+
+            // shadow pass
+            // render all props into depth buffer from sun POV
+            scene_shadow_pass(app.scene, app.obstacles, app.editor.cam_pos);
+            glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
+            glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_FRONT);
+            editor_renderer_shadow_pass(app.editor_renderer, app.map,
+                app.scene.light_space_mat, app.dynamic_sims);
+            glCullFace(GL_BACK);
+            glDisable(GL_CULL_FACE);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
+
+            // copy light data to editor_renderer for shadow sampling in draw_props
+            app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
+            app.editor_renderer.light_space_mat = app.scene.light_space_mat;
+
+
 
             scene_draw_sky(app.scene, view, proj);
 
@@ -714,6 +739,28 @@ void app_run(App& app){
         glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
+        
+        // shadow pass
+        // render all props into depth buffer from sun POV
+        scene_shadow_pass(app.scene, app.obstacles, app.editor.cam_pos);
+        glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
+        glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_FRONT);
+        editor_renderer_shadow_pass(app.editor_renderer, app.map,
+                app.scene.light_space_mat, app.dynamic_sims);
+        glCullFace(GL_BACK);
+        glDisable(GL_CULL_FACE);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
+
+        // copy light data to editor_renderer for shadow sampling in draw_props
+        app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
+        app.editor_renderer.light_space_mat = app.scene.light_space_mat;
+
+
+
         scene_draw_sky(app.scene, view, proj);
 
         // entire render pass in one call

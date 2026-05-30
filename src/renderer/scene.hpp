@@ -31,6 +31,12 @@ struct SceneState {
     Shader sky_shader;
     Mesh sky_quad;
     GLuint sky_tex = 0;
+
+    // shadow map
+    Shader shadow_shader;
+    GLuint shadow_fbo = 0;
+    GLuint shadow_depth_tex = 0;
+    glm::mat4 light_space_mat = glm::mat4(1.0f);
 };
 
 void scene_init(SceneState& scene);
@@ -48,3 +54,5 @@ void scene_draw(
 );
 
 void scene_draw_sky(SceneState& scene, const glm::mat4& view, const glm::mat4& proj);
+
+void scene_shadow_pass(SceneState& scene, const std::vector<Obstacle>& obstacles, glm::vec3 center);

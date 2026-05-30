@@ -105,6 +105,13 @@ namespace Const{
     inline constexpr float LIGHT_AMBIENT= 0.55f;
     inline constexpr float LIGHT_DIFF= 0.85f;
 
+    // shadow
+    inline constexpr int SHADOW_MAP_SIZE  = 4096;   // depth tex resolution, higher = sharper shadows
+    inline constexpr float SHADOW_ORTHO_SIZE = 120.0f; // world units covered by shadow frustum
+    inline constexpr float SHADOW_NEAR = 1.0f;
+    inline constexpr float SHADOW_FAR  = 300.0f;
+    inline constexpr float SHADOW_BIAS = 0.0015f;    
+
     // ground & terrain
     inline constexpr float GROUND_HALF_EXTENT= 200.0f;
     inline constexpr float GROUND_Y_OFFSET= -0.002f;

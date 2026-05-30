@@ -58,6 +58,14 @@ struct EditorRenderer{
     // ocean wave shader + time accumulator
     Shader ocean_shader;
     float ocean_time = 0.0f;
+
+    // shadow map recevied from scene
+    GLuint shadow_depth_tex = 0;
+    glm::mat4 light_space_mat = glm::mat4(1.0f);
+
+    // depth shader for casting shadows from props
+    Shader depth_shader;
+
 };
 
 // builds the static grid mesh and compiles the flat shader
@@ -81,6 +89,11 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj,
     const std::map<int,float>& flash_map = {},
     const std::unordered_map<int, DynamicSim>& dynamic_sims = {});
+
+void editor_renderer_shadow_pass(EditorRenderer& er, const WorldMap& map,
+    const glm::mat4& light_space_mat,
+    const std::unordered_map<int, DynamicSim>& dynamic_sims = {});
+    
 
 void editor_renderer_destroy(EditorRenderer& er);
 
