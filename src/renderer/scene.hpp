@@ -26,6 +26,11 @@ struct SceneState {
     glm::vec3 model_center = glm::vec3(0.0f);
     float model_scale = 1.0f;
     float model_half_height = 1.0f;
+
+    // skybox
+    Shader sky_shader;
+    Mesh sky_quad;
+    GLuint sky_tex = 0;
 };
 
 void scene_init(SceneState& scene);
@@ -41,3 +46,5 @@ void scene_draw(
     const glm::mat4& proj,
     bool show_hitboxes = false
 );
+
+void scene_draw_sky(SceneState& scene, const glm::mat4& view, const glm::mat4& proj);

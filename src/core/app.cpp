@@ -257,6 +257,8 @@ void app_run(App& app){
             glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+            scene_draw_sky(app.scene, view, proj);
+
             // draw world scene:
             // ground, gizmo
             // trike parked where it stopped last
@@ -712,6 +714,8 @@ void app_run(App& app){
         glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
+        scene_draw_sky(app.scene, view, proj);
+
         // entire render pass in one call
         // ground, gizmo, trike, obstacles, wireframes
         scene_draw(app.scene, app.trike, app.obstacles, view, proj, app.editor.show_hitboxes);

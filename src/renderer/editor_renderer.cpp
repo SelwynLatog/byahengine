@@ -394,9 +394,11 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
 
     // 1. draw snap grid
     // static mesh
-    glBindVertexArray(er.grid.vao);
-    glDrawArrays(GL_LINES, 0, er.grid.count);
-    glBindVertexArray(0);
+    if (editor.mode == MODE_OBJECT){
+        glBindVertexArray(er.grid.vao);
+        glDrawArrays(GL_LINES, 0, er.grid.count);
+        glBindVertexArray(0);
+    }
 
     if (editor.mode == MODE_TERRAIN){
         if (!editor.paint_mode){

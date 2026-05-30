@@ -9,6 +9,7 @@
 #include <glm/gtc/constants.hpp>
 #include <iostream>
 #include <cmath>
+#include "../../vendor/stb/stb_image.h"
 
 // shader sources
 static const char* VERT_SRC = R"(
@@ -73,6 +74,32 @@ in  vec3 v_color;
 out vec4 frag_color;
 void main(){
     frag_color = vec4(v_color, 1.0);
+}
+)";
+
+static const char* SKY_VERT_SRC = R"(
+#version 330 core
+layout(location = 0) in vec2 a_pos;
+out vec2 v_ndc;
+void main(){
+    v_ndc = a_pos;
+    gl_Position = vec4(a_pos, 0.9999, 1.0);
+}
+)";
+
+static const char* SKY_FRAG_SRC = R"(
+#version 330 core
+in vec2 v_ndc;
+out vec4 frag_color;
+uniform mat4 u_inv_view_proj;
+uniform sampler2D u_sky_tex;
+const float PI = 3.14159265;
+void main(){
+    vec4 world = u_inv_view_proj * vec4(v_ndc, 1.0, 1.0);
+    vec3 dir = normalize(world.xyz / world.w);
+    float u = (atan(dir.z, dir.x) / (2.0 * PI)) + 0.5;
+    float v = 1.0 - (asin(clamp(dir.y, -1.0, 1.0)) / PI + 0.5);
+    frag_color = texture(u_sky_tex, vec2(u, v));
 }
 )";
 
@@ -160,6 +187,48 @@ void scene_init(SceneState& scene){
     shader_init(scene.shader, VERT_SRC, FRAG_SRC);
     shader_init(scene.gizmo_shader, GIZMO_VERT_SRC, GIZMO_FRAG_SRC);
 
+    // skybox
+    shader_init(scene.sky_shader, SKY_VERT_SRC, SKY_FRAG_SRC);
+    {
+        // fullscreen triangle-pair quad, NDC coords only, no normals needed
+        std::vector<float> sq = {
+            -1,-1,  1,-1,  1, 1,
+            -1,-1,  1, 1, -1, 1
+        };
+        GLuint vao, vbo;
+        glGenVertexArrays(1, &vao);
+        glGenBuffers(1, &vbo);
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, sq.size()*sizeof(float), sq.data(), GL_STATIC_DRAW);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2*sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        glBindVertexArray(0);
+        scene.sky_quad.vao = vao;
+        scene.sky_quad.vbo = vbo;
+        scene.sky_quad.count = 6;
+    }
+
+    // load sky texture
+    if (Const::SKY_IMAGE_PATH[0] != '\0'){
+        stbi_set_flip_vertically_on_load(0); // equirectangular: no flip
+        int w, h, ch;
+        unsigned char* px = stbi_load(Const::SKY_IMAGE_PATH, &w, &h, &ch, 3);
+        if (px){
+            glGenTextures(1, &scene.sky_tex);
+            glBindTexture(GL_TEXTURE_2D, scene.sky_tex);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, px);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            stbi_image_free(px);
+            std::cout << "[sky] loaded " << w << "x" << h << " " << Const::SKY_IMAGE_PATH << "\n";
+        } else {
+            std::cerr << "[sky] failed to load: " << Const::SKY_IMAGE_PATH << "\n";
+        }
+    }
+
     // toggle between using proc mesh or a OBJ model
     // I'll use it for debugging purposes
     // I want to get the physics close to "realistic" because
@@ -209,6 +278,31 @@ void scene_init(SceneState& scene){
     mesh_init(scene.gizmo, av);
 }
 
+void scene_draw_sky(SceneState& scene, const glm::mat4& view, const glm::mat4& proj){
+    if (!scene.sky_tex) return;
+
+    glm::mat4 rot_only = glm::mat4(glm::mat3(view));
+    glm::mat4 inv_vp = glm::inverse(proj * rot_only);
+
+    shader_bind(scene.sky_shader);
+    glUniformMatrix4fv(glGetUniformLocation(scene.sky_shader.id, "u_inv_view_proj"),
+        1, GL_FALSE, glm::value_ptr(inv_vp));
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, scene.sky_tex);
+    glUniform1i(glGetUniformLocation(scene.sky_shader.id, "u_sky_tex"), 0);
+
+    glDepthMask(GL_FALSE);
+    glDisable(GL_DEPTH_TEST);
+    glBindVertexArray(scene.sky_quad.vao);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_DEPTH_TEST);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+
 void scene_draw(
     SceneState& scene,
     const TrikeState& trike,
@@ -241,13 +335,13 @@ void scene_draw(
     glUniform1i(glGetUniformLocation(scene.shader.id, "u_use_checker"), 0);
 
     // axis gizmo
-    shader_bind(scene.gizmo_shader);
+    /*shader_bind(scene.gizmo_shader);
     set_mat4(scene.gizmo_shader, "u_view", view);
     set_mat4(scene.gizmo_shader, "u_proj", proj);
     set_mat4(scene.gizmo_shader, "u_model", glm::mat4(1.0f));
     glBindVertexArray(scene.gizmo.vao);
     glDrawArrays(GL_LINES, 0, scene.gizmo.count);
-    glBindVertexArray(0);
+    glBindVertexArray(0);*/
 
     // trike 
     glm::vec3 render_pos = trike.position;
@@ -354,6 +448,9 @@ void scene_draw(
 }
 
 void scene_destroy(SceneState& scene){
+    if (scene.sky_tex) glDeleteTextures(1, &scene.sky_tex);
+    shader_destroy(scene.sky_shader);
+    mesh_destroy(scene.sky_quad);
     trike_model_destroy(scene.trike_model);
     obj_mesh_destroy(scene.trike_mesh);
     mesh_destroy(scene.proc_mesh);

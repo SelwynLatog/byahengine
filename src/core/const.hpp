@@ -12,6 +12,8 @@ namespace Const{
     inline constexpr float CLEAR_G = 0.12f;
     inline constexpr float CLEAR_B = 0.12f;
 
+    inline constexpr const char* SKY_IMAGE_PATH = "../assets/sky.jpg";
+
     // physics
     inline constexpr float GRAVITY= 9.81f; // m/s2
     inline constexpr float FIXED_TIMESTEP= 1.0f/ 120.0f; // physics ticks at 120hz
