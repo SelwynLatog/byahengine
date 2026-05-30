@@ -450,31 +450,13 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
 
     if (editor.mode == MODE_OCEAN){
         font_draw(er.font, "[ OCEAN MODE ]", 180, 16, 3, 0.10f, 0.55f, 0.90f);
-        font_draw(er.font, "LMB drag=place zone  DEL=delete  PgUp/Dn=y level  O=exit",
+        font_draw(er.font, "PgUp/Dn=y level  E=toggle on/off  [/]=rebuild  O=exit",
             220, 40, 2, 0.10f, 0.55f, 0.90f);
 
-        if (editor.ocean_dragging){
-            // preview the drag rectangle as a wire box
-            glm::vec3 a = editor.ocean_drag_start;
-            glm::vec3 b = editor.ghost_pos;
-            glm::vec3 mn = { std::min(a.x,b.x), Const::OCEAN_Y_LEVEL - 0.1f, std::min(a.z,b.z) };
-            glm::vec3 mx = { std::max(a.x,b.x), Const::OCEAN_Y_LEVEL + 0.1f, std::max(a.z,b.z) };
-            draw_wire_box(er.shader, mn, mx, view, proj, {0.10f, 0.55f, 0.90f});
-        }
-
-        // highlight selected zone
-        if (editor.selected_ocean_id != -1){
-            for (const auto& z : map.oceans){
-                if (z.id != editor.selected_ocean_id) continue;
-                glm::vec3 mn = { z.x_min, z.y_level - 0.1f, z.z_min };
-                glm::vec3 mx = { z.x_max, z.y_level + 0.1f, z.z_max };
-                draw_wire_box(er.shader, mn, mx, view, proj, {1.0f, 0.80f, 0.10f});
-                char buf[64];
-                snprintf(buf, sizeof(buf), "OCEAN Y: %.2f  [PgUp/Dn] nudge", z.y_level);
-                font_draw(er.font, buf, 220, 60, 2, 1.0f, 0.80f, 0.10f);
-                break;
-            }
-        }
+        char buf[64];
+        snprintf(buf, sizeof(buf), "OCEAN Y: %.2f  [PgUp/Dn] nudge  [E] toggle %s",
+            map.ocean.y_level, map.ocean.enabled ? "ON" : "OFF");
+        font_draw(er.font, buf, 220, 60, 2, 1.0f, 0.80f, 0.10f);
     }
     
     // 2. wireframe box colored by behavior
@@ -854,7 +836,6 @@ void editor_renderer_build_terrain_mesh(EditorRenderer& er, const HeightField& h
     }
 
     if (er.terrain_mesh.vao) mesh_destroy(er.terrain_mesh);
-    if (er.terrain_surface_mesh.vao) mesh_destroy(er.terrain_surface_mesh);
     mesh_init(er.terrain_mesh, lines);
     er.terrain_mesh_dirty = false;
 }
@@ -977,9 +958,12 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void editor_renderer_draw_ocean(EditorRenderer& er, const std::vector<OceanZone>& zones,
-    const glm::mat4& view, const glm::mat4& proj, float dt){
-    if (zones.empty()) return;
+void editor_renderer_draw_ocean(EditorRenderer& er, Ocean& ocean,
+    const glm::mat4& view, const glm::mat4& proj, float dt,
+    float terrain_x_min, float terrain_x_max, float terrain_z_min, float terrain_z_max){
+    if (!ocean.enabled) return;
+    if (ocean.mesh_dirty)
+        ocean_build_mesh(ocean, terrain_x_min, terrain_x_max, terrain_z_min, terrain_z_max);
 
     er.ocean_time += dt;
 
@@ -1005,10 +989,9 @@ void editor_renderer_draw_ocean(EditorRenderer& er, const std::vector<OceanZone>
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_FALSE); // transparent surface — don't write depth
 
-    for (const auto& z : zones){
-        if (!z.mesh.vao || z.mesh.count == 0) continue;
-        glBindVertexArray(z.mesh.vao);
-        glDrawElements(GL_TRIANGLES, z.mesh.count, GL_UNSIGNED_INT, 0);
+    if (ocean.mesh.vao && ocean.mesh.count > 0){
+        glBindVertexArray(ocean.mesh.vao);
+        glDrawElements(GL_TRIANGLES, ocean.mesh.count, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
     }
 
@@ -1016,7 +999,7 @@ void editor_renderer_draw_ocean(EditorRenderer& er, const std::vector<OceanZone>
     glDisable(GL_BLEND);
 }
 
-void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField& hf, const std::vector<OceanZone>& oceans){
+void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField& hf, const Ocean& ocean){
     if (hf.rows < 2 || hf.cols < 2) return;
 
     // flat colors per surface type used when texture is missing
@@ -1047,20 +1030,18 @@ void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField
     auto cell_surface = [&](int r, int c) -> int {
         return (int)hf.surface[r * hf.cols + c];
     };
-
+    int skipped = 0;
     for (int r = 0; r < hf.rows - 1; r++){
         for (int c = 0; c < hf.cols - 1; c++){
             // skip quads that fall inside any ocean zone
             float cx = hf.origin.x + (c + 0.5f) * hf.cell_size;
             float cz = hf.origin.z + (r + 0.5f) * hf.cell_size;
-            bool in_ocean = false;
-            for (const auto& z : oceans){
-                if (cx >= z.x_min && cx <= z.x_max && cz >= z.z_min && cz <= z.z_max){
-                    in_ocean = true;
-                    break;
-                }
-            }
-            if (in_ocean) continue;
+            bool in_ocean = ocean.enabled
+                && hf.heights[r * hf.cols + c] < ocean.y_level
+                && hf.heights[(r+1) * hf.cols + c] < ocean.y_level
+                && hf.heights[r * hf.cols + (c+1)] < ocean.y_level
+                && hf.heights[(r+1) * hf.cols + (c+1)] < ocean.y_level;
+            if (in_ocean){ skipped++; continue; }
 
             glm::vec3 p00 = get_pos(r, c);
             glm::vec3 p10 = get_pos(r+1, c);
@@ -1070,7 +1051,7 @@ void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField
             int si = cell_surface(r, c);
             auto& bucket = buckets[si];
 
-            float u0 = (float)c,     v0 = (float)r;
+            float u0 = (float)c, v0 = (float)r;
             float u1 = (float)(c+1), v1 = (float)(r+1);
 
             auto push_tri = [&](glm::vec3 a, glm::vec3 b, glm::vec3 cc,
@@ -1137,9 +1118,9 @@ void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField
 }
 
 void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField& hf,
-    const glm::mat4& view, const glm::mat4& proj, const std::vector<OceanZone>& oceans){
+    const glm::mat4& view, const glm::mat4& proj, const Ocean& ocean){
     if (er.terrain_surface_dirty)
-        editor_renderer_build_terrain_surface(er, hf, oceans);
+        editor_renderer_build_terrain_surface(er, hf, ocean);
     if (!er.terrain_surface_mesh.vao) return;
 
     static const glm::vec3 LIGHT_DIR = glm::normalize(

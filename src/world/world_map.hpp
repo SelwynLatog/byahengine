@@ -12,8 +12,7 @@ struct WorldMap{
     std::vector<RoadSpline> roads;
     int next_id = 0;
     int next_road_id = 0;
-    int next_ocean_id = 0;
-    std::vector<OceanZone> oceans;
+    Ocean ocean;
 };
 
 // add object to map

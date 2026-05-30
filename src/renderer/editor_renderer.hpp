@@ -91,10 +91,10 @@ void editor_renderer_build_terrain_mesh(EditorRenderer& er, const HeightField& h
 void editor_renderer_draw_terrain(EditorRenderer& er, const HeightField& hf, const glm::mat4& view, const glm::mat4& proj,
     const glm::vec3& brush_pos, float brush_radius, bool placement_valid);
 
-void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField& hf, const std::vector<OceanZone>& oceans);
+void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField& hf, const Ocean& ocean);
 void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField& hf,
-    const glm::mat4& view, const glm::mat4& proj, const std::vector<OceanZone>& oceans);
+    const glm::mat4& view, const glm::mat4& proj, const Ocean& ocean);
 
 void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline>& roads, const glm::mat4& view, const glm::mat4& proj);
 
-void editor_renderer_draw_ocean(EditorRenderer& er, const std::vector<OceanZone>& zones, const glm::mat4& view, const glm::mat4& proj, float dt);
+void editor_renderer_draw_ocean(EditorRenderer& er, Ocean& ocean, const glm::mat4& view, const glm::mat4& proj, float dt, float terrain_x_min, float terrain_x_max, float terrain_z_min, float terrain_z_max);

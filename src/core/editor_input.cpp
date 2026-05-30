@@ -319,12 +319,11 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     }
     s_m_last = m_down;
 
-    // O to toggle ocean placement mode
+    // O to toggle ocean mode
     static bool s_o_last = false;
     bool o_down = glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS;
     if (o_down && !s_o_last){
         editor.mode = (editor.mode == MODE_OCEAN) ? MODE_OBJECT : MODE_OCEAN;
-        editor.ocean_dragging = false;
         std::cout << "[editor] mode -> " << (editor.mode == MODE_OCEAN ? "OCEAN" : "OBJECT") << "\n";
     }
     s_o_last = o_down;
@@ -569,76 +568,39 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     // OCEAN MODE
     // *******************************
     if (editor.mode == MODE_OCEAN){
-        bool lmb = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+        bool shift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
         bool ctrl = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+        float step = shift ? 0.05f : 0.25f;
 
-        if (lmb && !s_lmb_last && editor.placement_valid){
-            // start drag
-            editor.ocean_dragging = true;
-            editor.ocean_drag_start = editor.ghost_pos;
-        }
-
-        if (!lmb && s_lmb_last && editor.ocean_dragging){
-            // release: commit zone if rect is large enough
-            glm::vec3 a = editor.ocean_drag_start;
-            glm::vec3 b = editor.ghost_pos;
-            float x_min = std::min(a.x, b.x);
-            float x_max = std::max(a.x, b.x);
-            float z_min = std::min(a.z, b.z);
-            float z_max = std::max(a.z, b.z);
-            if ((x_max - x_min) > 2.0f && (z_max - z_min) > 2.0f){
-                OceanZone zone;
-                zone.id      = map.next_ocean_id++;
-                zone.x_min   = x_min;
-                zone.x_max   = x_max;
-                zone.z_min   = z_min;
-                zone.z_max   = z_max;
-                zone.y_level = Const::OCEAN_Y_LEVEL;
-                ocean_build_mesh(zone);
-                map.oceans.push_back(std::move(zone));
-                map_dirty = true;
-                er.terrain_surface_dirty = true;
-                std::cout << "[ocean] placed zone id=" << map.oceans.back().id
-                          << " " << x_min << "-" << x_max << " x "
-                          << z_min << "-" << z_max << "\n";
-            }
-            editor.ocean_dragging = false;
-        }
-
-        // DEL removes selected ocean zone
-        bool del = glfwGetKey(window, GLFW_KEY_DELETE) == GLFW_PRESS;
-        if (del && !s_del_last && editor.selected_ocean_id != -1){
-            auto& ov = map.oceans;
-            ov.erase(std::remove_if(ov.begin(), ov.end(),
-                [&](const OceanZone& z){ return z.id == editor.selected_ocean_id; }),
-                ov.end());
-            editor.selected_ocean_id = -1;
-            map_dirty = true;
+        // PgUp/PgDn nudge global ocean Y level
+        bool pgup = glfwGetKey(window, GLFW_KEY_PAGE_UP)   == GLFW_PRESS;
+        bool pgdn = glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS;
+        if (pgup && !s_pgup_last){
+            map.ocean.y_level += step;
+            map.ocean.mesh_dirty = true;
             er.terrain_surface_dirty = true;
-            std::cout << "[ocean] deleted zone\n";
         }
-        s_del_last = del;
+        if (pgdn && !s_pgdn_last){
+            map.ocean.y_level -= step;
+            map.ocean.mesh_dirty = true;
+            er.terrain_surface_dirty = true;
+        }
+        s_pgup_last = pgup;
+        s_pgdn_last = pgdn;
 
-        // PgUp/PgDn nudge y_level of selected zone
-        if (editor.selected_ocean_id != -1){
-            bool shift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
-            float step = shift ? 0.05f : 0.25f;
-            for (auto& z : map.oceans){
-                if (z.id != editor.selected_ocean_id) continue;
-                bool pgup = glfwGetKey(window, GLFW_KEY_PAGE_UP) == GLFW_PRESS;
-                bool pgdn = glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS;
-                if (pgup && !s_pgup_last){ z.y_level += step; ocean_build_mesh(z); }
-                if (pgdn && !s_pgdn_last){ z.y_level -= step; ocean_build_mesh(z); }
-                s_pgup_last = pgup;
-                s_pgdn_last = pgdn;
-                break;
-            }
+        // E toggles ocean on/off
+        static bool s_e_last = false;
+        bool e_down = glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
+        if (e_down && !s_e_last){
+            map.ocean.enabled = !map.ocean.enabled;
+            er.terrain_surface_dirty = true;
+            std::cout << "[ocean] " << (map.ocean.enabled ? "enabled" : "disabled") << "\n";
         }
+        s_e_last = e_down;
 
         if (ctrl && glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
             world_map_save(map, Const::MAP_SAVE_PATH);
 
-        s_lmb_last = lmb;
         return;
     }
 

@@ -49,7 +49,7 @@ void world_map_save(const WorldMap& map, const std::string& path){
     heightfield_save(map.terrain, terrain_path);
     road_splines_save(map.roads, roads_path);
     std::string ocean_path = (base.parent_path() / (base.stem().string() + "_ocean.oc")).string();
-    ocean_zones_save(map.oceans, ocean_path);
+    ocean_save(map.ocean, ocean_path);
 }
 
 bool world_map_load(WorldMap& map, const std::string& path){
@@ -97,6 +97,6 @@ bool world_map_load(WorldMap& map, const std::string& path){
         road_splines_load(map.roads, roads_path);
     std::string ocean_path = (base.parent_path() / (base.stem().string() + "_ocean.oc")).string();
     if (std::filesystem::exists(ocean_path))
-        ocean_zones_load(map.oceans, ocean_path);
+        ocean_load(map.ocean, ocean_path);
     return true;
 }

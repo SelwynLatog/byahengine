@@ -233,9 +233,11 @@ void scene_draw(
     glUniform1f(glGetUniformLocation(scene.shader.id, "u_checker_scale"),
         1.0f / Const::GROUND_GRID_TILE_SIZE);
     glUniform1i(glGetUniformLocation(scene.shader.id, "u_use_checker"), 1);
-    glBindVertexArray(scene.ground.vao);
-    glDrawArrays(GL_TRIANGLES, 0, scene.ground.count);
-    glBindVertexArray(0);
+
+    // remove as comment line to enable checker grids
+    //glBindVertexArray(scene.ground.vao);
+    //glDrawArrays(GL_TRIANGLES, 0, scene.ground.count);
+    //glBindVertexArray(0);
     glUniform1i(glGetUniformLocation(scene.shader.id, "u_use_checker"), 0);
 
     // axis gizmo

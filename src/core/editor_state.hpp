@@ -69,10 +69,4 @@ struct EditorState{
     bool road_placing = false;
     bool show_hitboxes = false;
 
-    // ocean placement drag state
-    // LMB down = anchor, drag to define XZ rect, release = place zone
-    bool ocean_dragging = false;
-    glm::vec3 ocean_drag_start = glm::vec3(0.0f);
-    int selected_ocean_id = -1;
-    
 };
