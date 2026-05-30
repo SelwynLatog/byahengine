@@ -20,36 +20,64 @@ uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_proj;
 uniform mat3 u_normal_mat;
+uniform mat4 u_light_space;
 out vec3 v_world_normal;
 out vec3 v_world_pos;
+out vec4 v_light_space_pos;
 void main(){
     vec4 world = u_model * vec4(a_pos, 1.0);
     gl_Position = u_proj * u_view * world;
     v_world_normal = normalize(u_normal_mat * a_normal);
     v_world_pos = world.xyz;
+    v_light_space_pos = u_light_space * world;
 }
 )";
 
 static const char* FRAG_SRC = R"(
 #version 330 core
-in  vec3 v_world_normal;
-in  vec3 v_world_pos;
+in vec3 v_world_normal;
+in vec3 v_world_pos;
+in vec4 v_light_space_pos;
 out vec4 frag_color;
-uniform vec3  u_kd;
-uniform vec3  u_kd_alt;
-uniform vec3  u_light_dir;
-uniform float u_checker_scale;
-uniform int   u_use_checker;
+uniform vec3      u_kd;
+uniform vec3      u_kd_alt;
+uniform vec3      u_light_dir;
+uniform vec3      u_light_color;
+uniform float     u_checker_scale;
+uniform int       u_use_checker;
+uniform float     u_ambient;
+uniform float     u_diff_intensity;
+uniform sampler2D u_shadow_map;
+uniform float     u_shadow_bias;
+
+float shadow_pcf(vec4 lsp, vec3 normal, vec3 ldir){
+    vec3 proj = lsp.xyz / lsp.w;
+    proj = proj * 0.5 + 0.5;
+    if (proj.z > 1.0) return 0.0;
+    float bias = max(u_shadow_bias * (1.0 - dot(normal, ldir)), u_shadow_bias * 0.1);
+    float shadow = 0.0;
+    vec2 texel = 1.0 / textureSize(u_shadow_map, 0);
+    for (int x = -1; x <= 1; x++){
+        for (int y = -1; y <= 1; y++){
+            float pcf_depth = texture(u_shadow_map, proj.xy + vec2(x,y) * texel).r;
+            shadow += (proj.z - bias > pcf_depth) ? 1.0 : 0.0;
+        }
+    }
+    return shadow / 9.0;
+}
+
 void main(){
-    float diff = max(dot(normalize(v_world_normal), u_light_dir), 0.0);
-    float ambient = 0.55;
-    vec3 lit = u_kd * (ambient + diff * 0.85);
+    vec3 n = normalize(v_world_normal);
+    vec3 ldir = normalize(u_light_dir);
+    float diff = max(dot(n, ldir), 0.0);
+    float shadow = shadow_pcf(v_light_space_pos, n, ldir);
+    vec3 kd = u_kd;
     if (u_use_checker == 1){
         vec2 tile = floor(v_world_pos.xz * u_checker_scale);
         float parity = mod(tile.x + tile.y, 2.0);
-        vec3  kd = mix(u_kd, u_kd_alt, parity);
-        lit = kd * (ambient + diff * 0.85);
+        kd = mix(u_kd, u_kd_alt, parity);
     }
+    vec3 lit = kd * u_light_color * (u_ambient + diff * u_diff_intensity * (1.0 - shadow));
     frag_color = vec4(lit, 1.0);
 }
 )";
@@ -91,15 +119,31 @@ static const char* SKY_FRAG_SRC = R"(
 #version 330 core
 in vec2 v_ndc;
 out vec4 frag_color;
-uniform mat4 u_inv_view_proj;
-uniform sampler2D u_sky_tex;
+uniform mat4      u_inv_view_proj;
+uniform sampler2D u_sky_tex;       // day tex
+uniform sampler2D u_sky_night_tex; // night tex
+uniform vec3      u_tint_a;
+uniform vec3      u_tint_b;
+uniform int       u_flip_a;
+uniform int       u_flip_b;
+uniform int       u_use_night_b;   // 1 = sample night tex for B side
+uniform float     u_blend;
+uniform float     u_uv_offset;
 const float PI = 3.14159265;
 void main(){
     vec4 world = u_inv_view_proj * vec4(v_ndc, 1.0, 1.0);
     vec3 dir = normalize(world.xyz / world.w);
-    float u = (atan(dir.z, dir.x) / (2.0 * PI)) + 0.5;
+    float base_u = (atan(dir.z, dir.x) / (2.0 * PI)) + 0.5 + u_uv_offset;
     float v = 1.0 - (asin(clamp(dir.y, -1.0, 1.0)) / PI + 0.5);
-    frag_color = texture(u_sky_tex, vec2(u, v));
+
+    float u_a = (u_flip_a == 1) ? (1.0 - base_u) : base_u;
+    float u_b = (u_flip_b == 1) ? (1.0 - base_u) : base_u;
+
+    vec3 col_a = texture(u_sky_tex, vec2(u_a, v)).rgb * u_tint_a;
+    vec3 col_b = (u_use_night_b == 1)
+        ? texture(u_sky_night_tex, vec2(u_b, v)).rgb * u_tint_b
+        : texture(u_sky_tex, vec2(u_b, v)).rgb * u_tint_b;
+    frag_color = vec4(mix(col_a, col_b, u_blend), 1.0);
 }
 )";
 
@@ -120,8 +164,6 @@ void main(){}
 
 
 // internal helpers
-static const glm::vec3 LIGHT_DIR = glm::normalize(
-    glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
 
 static void set_vec3(const Shader& s, const char* n, glm::vec3 v){
     glUniform3f(glGetUniformLocation(s.id, n), v.x, v.y, v.z);
@@ -246,6 +288,26 @@ void scene_init(SceneState& scene){
     }
 
 
+     // load night sky
+    {
+        const char* night_path = "../assets/sky_night.jpg";
+        stbi_set_flip_vertically_on_load(0);
+        int w, h, ch;
+        unsigned char* px = stbi_load(night_path, &w, &h, &ch, 3);
+        if (px){
+            glGenTextures(1, &scene.sky_night_tex);
+            glBindTexture(GL_TEXTURE_2D, scene.sky_night_tex);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, px);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            stbi_image_free(px);
+            std::cout << "[sky] loaded night " << w << "x" << h << "\n";
+        }
+    }
+
+
     // shadow map FBO
     shader_init(scene.shadow_shader, DEPTH_VERT_SRC, DEPTH_FRAG_SRC);
     glGenFramebuffers(1, &scene.shadow_fbo);
@@ -321,8 +383,7 @@ void scene_init(SceneState& scene){
 void scene_shadow_pass(SceneState& scene, const std::vector<Obstacle>& obstacles, glm::vec3 center){
     // build light space matrix from sun dir
     // orthographic projection looking from sun toward scene center
-    glm::vec3 light_dir = glm::normalize(
-        glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
+    glm::vec3 light_dir = scene.sun_dir;
 
     glm::vec3 light_pos = center + light_dir * 150.0f;
     glm::mat4 light_view = glm::lookAt(light_pos, center, glm::vec3(0,1,0));
@@ -368,6 +429,131 @@ void scene_shadow_pass(SceneState& scene, const std::vector<Obstacle>& obstacles
     glViewport(0, 0, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
 }
 
+void scene_update_daytime(SceneState& scene, float dt){
+    // advance time — 10 real minutes = 24 in-game hours
+    float time_scale = 24.0f / Const::DAY_DURATION_SECONDS;
+    scene.day_time += dt * time_scale;
+    if (scene.day_time >= 24.0f) scene.day_time -= 24.0f;
+
+    float t = scene.day_time;
+
+    // sun elevation: rises at 5am, peaks at noon, sets at 19:00
+    // map t=5 -> 0 deg, t=12 -> 90 deg, t=19 -> 0 deg
+    // use a sine over the day window
+    float day_frac = glm::clamp((t - 5.0f) / 14.0f, 0.0f, 1.0f); // 0 at 5am, 1 at 7pm
+    float elevation = glm::pi<float>() * day_frac; // 0 -> pi
+    float sun_y = std::sin(elevation);
+    // azimuth rotates east(morning) to west(evening)
+    float azimuth = glm::pi<float>() * day_frac; // east at dawn, west at dusk
+    float sun_x = std::cos(azimuth);
+    float sun_z = 0.3f; // slight south offset for our lat
+
+    // at night use a dim moon direction
+    bool is_night = (t < 5.0f || t >= 19.0f);
+    if (is_night){
+        scene.sun_dir = glm::normalize(glm::vec3(0.3f, 0.5f, 0.2f));
+    } 
+    else {
+        scene.sun_dir = glm::normalize(glm::vec3(sun_x, sun_y, sun_z));
+    }
+
+    // determine which two periods we're blending between
+    // period A = current, period B = next, blend = 0->1 over FADE_DURATION hours
+    glm::vec3 col_morning = {Const::LIGHT_MORNING_R,   Const::LIGHT_MORNING_G,   Const::LIGHT_MORNING_B};
+    glm::vec3 col_afternoon = {Const::LIGHT_AFTERNOON_R, Const::LIGHT_AFTERNOON_G, Const::LIGHT_AFTERNOON_B};
+    glm::vec3 col_night = {Const::LIGHT_NIGHT_R,     Const::LIGHT_NIGHT_G,     Const::LIGHT_NIGHT_B};
+
+    float amb_morning = Const::LIGHT_MORNING_AMBIENT;
+    float amb_afternoon = Const::LIGHT_AFTERNOON_AMBIENT;
+    float amb_night = Const::LIGHT_NIGHT_AMBIENT;
+    float diff_morning = Const::LIGHT_MORNING_DIFF;
+    float diff_afternoon= Const::LIGHT_AFTERNOON_DIFF;
+    float diff_night = Const::LIGHT_NIGHT_DIFF;
+
+    float fade = Const::DAY_FADE_DURATION;
+
+    auto blend_f = [](float edge, float t, float fade) -> float {
+        return glm::clamp((t - edge) / fade, 0.0f, 1.0f);
+    };
+
+    if (t >= Const::DAY_MORNING_START && t < Const::DAY_AFTERNOON_START){
+        float b = glm::clamp((t - Const::DAY_MORNING_START) /
+            (Const::DAY_AFTERNOON_START - Const::DAY_MORNING_START), 0.0f, 1.0f);
+        scene.sky_uv_offset = glm::mix(0.0f, 0.25f, b); // slowly drifts east to south
+    } 
+    else if (t >= Const::DAY_AFTERNOON_START && t < Const::DAY_NIGHT_START){
+        float b = glm::clamp((t - Const::DAY_AFTERNOON_START) /
+            (Const::DAY_NIGHT_START - Const::DAY_AFTERNOON_START), 0.0f, 1.0f);
+        scene.sky_uv_offset = glm::mix(0.25f, 0.50f, b); // south to west
+    } 
+    else {
+        scene.sky_uv_offset = 0.0f;
+    }
+
+    if (t >= Const::DAY_NIGHT_START){
+        // afternoon -> night: day flipped+orange fades to sky_night
+        float b = blend_f(Const::DAY_NIGHT_START, t, fade);
+        scene.light_color = glm::mix(col_afternoon, col_night, b);
+        scene.ambient = glm::mix(amb_afternoon, amb_night, b);
+        scene.diff_intensity = glm::mix(diff_afternoon, diff_night, b);
+        scene.sky_tint_a = glm::vec3(1.0f, 0.55f, 0.25f); // golden afternoon
+        scene.sky_tint_b = glm::vec3(1.0f);
+        scene.sky_flip_a = 1;
+        scene.sky_flip_b = 0;
+        scene.sky_use_night_b = 1;
+        scene.sky_blend = b;
+    }
+    else if (t >= Const::DAY_AFTERNOON_START){
+        // morning -> afternoon: day normal fades to day flipped+orange
+        float b = blend_f(Const::DAY_AFTERNOON_START, t, fade);
+        scene.light_color = glm::mix(col_morning, col_afternoon, b);
+        scene.ambient = glm::mix(amb_morning, amb_afternoon, b);
+        scene.diff_intensity = glm::mix(diff_morning, diff_afternoon, b);
+        scene.sky_tint_a = glm::vec3(1.0f); // normal day
+        scene.sky_tint_b = glm::vec3(1.0f, 0.55f, 0.25f); // golden tint
+        scene.sky_flip_a = 0;
+        scene.sky_flip_b = 1;
+        scene.sky_use_night_b = 0;
+        scene.sky_blend = b;
+    }
+    else if (t >= Const::DAY_MORNING_START){
+        // night -> morning: sky_night fades to day
+        float b = blend_f(Const::DAY_MORNING_START, t, fade);
+        scene.light_color = glm::mix(col_night, col_morning, b);
+        scene.ambient = glm::mix(amb_night, amb_morning, b);
+        scene.diff_intensity = glm::mix(diff_night, diff_morning, b);
+        scene.sky_tint_a = glm::vec3(1.0f); // night tex as-is
+        scene.sky_tint_b = glm::vec3(1.0f); // day tex
+        scene.sky_flip_a = 0;
+        scene.sky_flip_b = 0;
+        scene.sky_use_night_b = 0; // A=night B=day, but A uses night tex
+        scene.sky_use_night_b = 0;
+        scene.sky_tint_a = glm::vec3(1.0f); // day
+        scene.sky_tint_b = glm::vec3(1.0f); // night
+        scene.sky_flip_a = 0;
+        scene.sky_flip_b = 0;
+        scene.sky_use_night_b = 1; // B=night, blend goes 1->0 (night fades out)
+        scene.sky_blend = 1.0f - b; // inverted: starts at night, fades to day
+    }
+    else {
+        // deep night
+        scene.light_color = col_night;
+        scene.ambient = amb_night;
+        scene.diff_intensity = diff_night;
+        scene.sky_tint_a = glm::vec3(1.0f);
+        scene.sky_tint_b = glm::vec3(1.0f);
+        scene.sky_flip_a = 0;
+        scene.sky_flip_b = 0;
+        scene.sky_use_night_b = 1;
+        scene.sky_blend = 1.0f; // fully night
+    }
+
+
+
+}
+
+
+
 void scene_draw_sky(SceneState& scene, const glm::mat4& view, const glm::mat4& proj){
     if (!scene.sky_tex) return;
 
@@ -380,7 +566,20 @@ void scene_draw_sky(SceneState& scene, const glm::mat4& view, const glm::mat4& p
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, scene.sky_tex);
     glUniform1i(glGetUniformLocation(scene.sky_shader.id, "u_sky_tex"), 0);
-
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, scene.sky_night_tex ? scene.sky_night_tex : scene.sky_tex);
+    glUniform1i(glGetUniformLocation(scene.sky_shader.id, "u_sky_night_tex"), 1);
+    glActiveTexture(GL_TEXTURE0);
+    glUniform3f(glGetUniformLocation(scene.sky_shader.id, "u_tint_a"),
+        scene.sky_tint_a.r, scene.sky_tint_a.g, scene.sky_tint_a.b);
+    glUniform3f(glGetUniformLocation(scene.sky_shader.id, "u_tint_b"),
+        scene.sky_tint_b.r, scene.sky_tint_b.g, scene.sky_tint_b.b);
+    glUniform1i(glGetUniformLocation(scene.sky_shader.id, "u_flip_a"), scene.sky_flip_a);
+    glUniform1i(glGetUniformLocation(scene.sky_shader.id, "u_flip_b"), scene.sky_flip_b);
+    glUniform1f(glGetUniformLocation(scene.sky_shader.id, "u_blend"), scene.sky_blend);
+    glUniform1f(glGetUniformLocation(scene.sky_shader.id, "u_uv_offset"), scene.sky_uv_offset);
+    glUniform1i(glGetUniformLocation(scene.sky_shader.id, "u_use_night_b"), scene.sky_use_night_b);
+    
     glDepthMask(GL_FALSE);
     glDisable(GL_DEPTH_TEST);
     glBindVertexArray(scene.sky_quad.vao);
@@ -388,10 +587,8 @@ void scene_draw_sky(SceneState& scene, const glm::mat4& view, const glm::mat4& p
     glBindVertexArray(0);
     glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
-
     glBindTexture(GL_TEXTURE_2D, 0);
 }
-
 
 void scene_draw(
     SceneState& scene,
@@ -408,7 +605,17 @@ void scene_draw(
     shader_bind(scene.shader);
     set_mat4(scene.shader, "u_view", view);
     set_mat4(scene.shader, "u_proj", proj);
-    set_vec3(scene.shader, "u_light_dir", LIGHT_DIR);
+    set_vec3(scene.shader, "u_light_dir", scene.sun_dir);
+    set_mat4(scene.shader, "u_light_space", scene.light_space_mat);
+    glUniform3f(glGetUniformLocation(scene.shader.id, "u_light_color"),
+        scene.light_color.r, scene.light_color.g, scene.light_color.b);
+    glUniform1f(glGetUniformLocation(scene.shader.id, "u_ambient"), scene.ambient);
+    glUniform1f(glGetUniformLocation(scene.shader.id, "u_diff_intensity"), scene.diff_intensity);
+    glUniform1f(glGetUniformLocation(scene.shader.id, "u_shadow_bias"), Const::SHADOW_BIAS);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, scene.shadow_depth_tex);
+    glUniform1i(glGetUniformLocation(scene.shader.id, "u_shadow_map"), 1);
+    glActiveTexture(GL_TEXTURE0);
     set_mat4(scene.shader, "u_model", gm);
     set_mat3(scene.shader, "u_normal_mat", gnm);
     set_vec3(scene.shader, "u_kd", glm::vec3(Const::GROUND_KD));
@@ -539,6 +746,7 @@ void scene_draw(
 
 void scene_destroy(SceneState& scene){
     if (scene.sky_tex) glDeleteTextures(1, &scene.sky_tex);
+    if (scene.sky_night_tex) glDeleteTextures(1, &scene.sky_night_tex);
     shader_destroy(scene.sky_shader);
     mesh_destroy(scene.sky_quad);
     shader_destroy(scene.shadow_shader);

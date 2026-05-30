@@ -12,7 +12,40 @@ namespace Const{
     inline constexpr float CLEAR_G = 0.12f;
     inline constexpr float CLEAR_B = 0.12f;
 
-    inline constexpr const char* SKY_IMAGE_PATH = "../assets/sky.jpg";
+    inline constexpr const char* SKY_IMAGE_PATH = "../assets/sky_day.jpg";
+
+    // day cycle
+    // 10 real minutes = 1 full in-game day
+    inline constexpr float DAY_DURATION_SECONDS = 60.0f;//600.0f;
+    inline constexpr float DAY_START_TIME = 7.0f; // start at 7am
+
+    // time ranges (0-24)
+    inline constexpr float DAY_MORNING_START = 5.0f;
+    inline constexpr float DAY_AFTERNOON_START = 14.0f;
+    inline constexpr float DAY_NIGHT_START = 19.0f;
+    inline constexpr float DAY_FADE_DURATION = 1.5f; // hours to crossfade between periods
+
+    // light color keyframes per period
+    // morning: warm white sun
+    inline constexpr float LIGHT_MORNING_R = 1.00f;
+    inline constexpr float LIGHT_MORNING_G = 0.95f;
+    inline constexpr float LIGHT_MORNING_B = 0.85f;
+    inline constexpr float LIGHT_MORNING_AMBIENT = 0.50f;
+    inline constexpr float LIGHT_MORNING_DIFF = 0.85f;
+
+    // afternoon/golden hour: deep orange
+    inline constexpr float LIGHT_AFTERNOON_R = 1.00f;
+    inline constexpr float LIGHT_AFTERNOON_G = 0.55f;
+    inline constexpr float LIGHT_AFTERNOON_B = 0.20f;
+    inline constexpr float LIGHT_AFTERNOON_AMBIENT = 0.40f;
+    inline constexpr float LIGHT_AFTERNOON_DIFF    = 0.90f;
+
+    // night: dim cool blue
+    inline constexpr float LIGHT_NIGHT_R = 0.10f;
+    inline constexpr float LIGHT_NIGHT_G = 0.15f;
+    inline constexpr float LIGHT_NIGHT_B = 0.40f;
+    inline constexpr float LIGHT_NIGHT_AMBIENT = 0.45f;
+    inline constexpr float LIGHT_NIGHT_DIFF = 0.20f;
 
     // physics
     inline constexpr float GRAVITY= 9.81f; // m/s2

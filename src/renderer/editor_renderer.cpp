@@ -56,6 +56,9 @@ uniform sampler2D u_tex;
 uniform sampler2D u_shadow_map;
 uniform int       u_use_texture;
 uniform float     u_shadow_bias;
+uniform float     u_ambient;
+uniform float     u_diff_intensity;
+uniform vec3      u_light_color;
 
 float shadow_pcf(vec4 lsp, vec3 normal, vec3 ldir){
     // perspective divide -> NDC
@@ -82,12 +85,12 @@ void main(){
     vec3 n = normalize(v_world_normal);
     vec3 ldir = normalize(u_light_dir);
     float diff = max(dot(n, ldir), 0.0);
-    float ambient = 0.55;
+    float ambient = u_ambient;
     vec4 tex_sample = (u_use_texture == 1) ? texture(u_tex, v_uv) : vec4(u_kd, 1.0);
     if (u_use_texture == 1 && tex_sample.a < 0.5) discard;
     float shadow = shadow_pcf(v_light_space_pos, n, ldir);
     // shadow reduces diffuse but not ambient
-    vec3 lit = tex_sample.rgb * (ambient + diff * 0.85 * (1.0 - shadow));
+    vec3 lit = tex_sample.rgb * u_light_color * (ambient + diff * u_diff_intensity * (1.0 - shadow));
     frag_color = vec4(lit, 1.0);
 }
 )";
@@ -237,6 +240,9 @@ uniform sampler2D u_tex;
 uniform sampler2D u_shadow_map;
 uniform int       u_use_texture;
 uniform float     u_shadow_bias;
+uniform float     u_ambient;
+uniform float     u_diff_intensity;
+uniform vec3      u_light_color;
 
 float shadow_pcf(vec4 lsp, vec3 normal, vec3 ldir){
     vec3 proj = lsp.xyz / lsp.w;
@@ -258,10 +264,10 @@ void main(){
     vec3 n = normalize(v_world_normal);
     vec3 ldir = normalize(u_light_dir);
     float diff = max(dot(n, ldir), 0.0);
-    float ambient = 0.55;
+    float ambient = u_ambient;
     vec4 tex_col = (u_use_texture == 1) ? texture(u_tex, v_uv) : vec4(u_kd, 1.0);
     float shadow = shadow_pcf(v_light_space_pos, n, ldir);
-    vec3 lit = tex_col.rgb * (ambient + diff * 0.85 * (1.0 - shadow));
+    vec3 lit = tex_col.rgb * u_light_color * (ambient + diff * u_diff_intensity * (1.0 - shadow));
     frag_color = vec4(lit, 1.0);
 }
 )";
@@ -458,8 +464,7 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
     const glm::mat4& view, const glm::mat4& proj, bool show_hitboxes){
 
     // light dir which matches scene.cpp
-    static const glm::vec3 LIGHT_DIR = glm::normalize(
-        glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
+    glm::vec3 LIGHT_DIR = glm::normalize(er.sun_dir);
 
     // bind shader and set shared uniforms once
     // model is identity for grid
@@ -831,8 +836,7 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     const std::map<int,float>& flash_map,
     const std::unordered_map<int, DynamicSim>& dynamic_sims){
 
-    static const glm::vec3 LIGHT_DIR = glm::normalize(
-        glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
+    glm::vec3 LIGHT_DIR = glm::normalize(er.sun_dir);
 
     shader_bind(er.obj_shader);
     set_mat4(er.obj_shader, "u_view", view);
@@ -844,6 +848,10 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     glUniformMatrix4fv(glGetUniformLocation(er.obj_shader.id, "u_light_space"),
         1, GL_FALSE, glm::value_ptr(er.light_space_mat));
     glUniform1f(glGetUniformLocation(er.obj_shader.id, "u_shadow_bias"), Const::SHADOW_BIAS);
+    glUniform1f(glGetUniformLocation(er.obj_shader.id, "u_ambient"), er.ambient);
+    glUniform1f(glGetUniformLocation(er.obj_shader.id, "u_diff_intensity"), er.diff_intensity);
+    glUniform3f(glGetUniformLocation(er.obj_shader.id, "u_light_color"),
+        er.light_color.r, er.light_color.g, er.light_color.b);
     // bind shadow map to texture unit 1
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, er.shadow_depth_tex);
@@ -1012,8 +1020,7 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
     const glm::mat4& view, const glm::mat4& proj){
     if (roads.empty()) return;
 
-    static const glm::vec3 LIGHT_DIR = glm::normalize(
-        glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
+    glm::vec3 LIGHT_DIR = glm::normalize(er.sun_dir);
 
     // road type colors
     // used when no texture is present
@@ -1054,10 +1061,13 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
     glUniformMatrix4fv(glGetUniformLocation(er.road_shader.id, "u_light_space"),
         1, GL_FALSE, glm::value_ptr(er.light_space_mat));
     glUniform1f(glGetUniformLocation(er.road_shader.id, "u_shadow_bias"), Const::SHADOW_BIAS);
+    glUniform1f(glGetUniformLocation(er.road_shader.id, "u_ambient"), er.ambient);
+    glUniform1f(glGetUniformLocation(er.road_shader.id, "u_diff_intensity"), er.diff_intensity);
+    glUniform3f(glGetUniformLocation(er.road_shader.id, "u_light_color"),
+        er.light_color.r, er.light_color.g, er.light_color.b);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, er.shadow_depth_tex);
     glUniform1i(glGetUniformLocation(er.road_shader.id, "u_shadow_map"), 1);
-    glActiveTexture(GL_TEXTURE0);
     glActiveTexture(GL_TEXTURE0);
     glUniform1i(glGetUniformLocation(er.road_shader.id, "u_tex"), 0);
 
@@ -1102,9 +1112,7 @@ void editor_renderer_draw_ocean(EditorRenderer& er, Ocean& ocean,
 
     er.ocean_time += dt;
 
-    static const glm::vec3 LIGHT_DIR = glm::normalize(
-        glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
-
+    glm::vec3 LIGHT_DIR = glm::normalize(er.sun_dir);
     shader_bind(er.ocean_shader);
     set_mat4(er.ocean_shader, "u_model", glm::mat4(1.0f));
     set_mat4(er.ocean_shader, "u_view",  view);
@@ -1258,9 +1266,7 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
         editor_renderer_build_terrain_surface(er, hf, ocean);
     if (!er.terrain_surface_mesh.vao) return;
 
-    static const glm::vec3 LIGHT_DIR = glm::normalize(
-        glm::vec3(Const::LIGHT_DIR_X, Const::LIGHT_DIR_Y, Const::LIGHT_DIR_Z));
-
+    glm::vec3 LIGHT_DIR = glm::normalize(er.sun_dir);
     static const glm::vec3 SURF_COLORS[(int)SURFACE_COUNT] = {
         {0.00f, 0.00f, 0.00f}, // none
         {0.20f, 0.20f, 0.20f}, // asphalt
@@ -1299,6 +1305,10 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
     glUniformMatrix4fv(glGetUniformLocation(er.road_shader.id, "u_light_space"),
         1, GL_FALSE, glm::value_ptr(er.light_space_mat));
     glUniform1f(glGetUniformLocation(er.road_shader.id, "u_shadow_bias"), Const::SHADOW_BIAS);
+    glUniform1f(glGetUniformLocation(er.road_shader.id, "u_ambient"), er.ambient);
+    glUniform1f(glGetUniformLocation(er.road_shader.id, "u_diff_intensity"), er.diff_intensity);
+    glUniform3f(glGetUniformLocation(er.road_shader.id, "u_light_color"),
+        er.light_color.r, er.light_color.g, er.light_color.b);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, er.shadow_depth_tex);
     glUniform1i(glGetUniformLocation(er.road_shader.id, "u_shadow_map"), 1);

@@ -263,6 +263,11 @@ void app_run(App& app){
 
             // shadow pass
             // render all props into depth buffer from sun POV
+            scene_update_daytime(app.scene, dt);
+            app.editor_renderer.sun_dir = app.scene.sun_dir;
+            app.editor_renderer.light_color = app.scene.light_color;
+            app.editor_renderer.ambient = app.scene.ambient;
+            app.editor_renderer.diff_intensity = app.scene.diff_intensity;
             scene_shadow_pass(app.scene, app.obstacles, app.editor.cam_pos);
             glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
             glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
@@ -742,6 +747,12 @@ void app_run(App& app){
         
         // shadow pass
         // render all props into depth buffer from sun POV
+        scene_update_daytime(app.scene, dt);
+            app.editor_renderer.sun_dir = app.scene.sun_dir;
+            app.editor_renderer.light_color = app.scene.light_color;
+            app.editor_renderer.ambient = app.scene.ambient;
+            app.editor_renderer.diff_intensity = app.scene.diff_intensity;
+
         scene_shadow_pass(app.scene, app.obstacles, app.editor.cam_pos);
         glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
         glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);

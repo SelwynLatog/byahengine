@@ -1,6 +1,7 @@
 #pragma once
 #include "shader.hpp"
 #include "mesh.hpp"
+#include "../core/const.hpp"
 #include "obj_mesh.hpp"
 #include "../physics/trike_state.hpp"
 #include "../physics/obstacle.hpp"
@@ -31,7 +32,22 @@ struct SceneState {
     Shader sky_shader;
     Mesh sky_quad;
     GLuint sky_tex = 0;
+    GLuint sky_night_tex = 0;
 
+    float day_time = Const::DAY_START_TIME;
+    glm::vec3 sun_dir = glm::vec3(1,2,1);
+    glm::vec3 light_color = glm::vec3(1,1,1);
+    float ambient = 0.50f;
+    float diff_intensity = 0.85f;
+
+    // sky tint + flip for current and next period
+    glm::vec3 sky_tint_a  = glm::vec3(1,1,1);
+    glm::vec3 sky_tint_b  = glm::vec3(1,1,1);
+    int sky_flip_a = 0;
+    int sky_flip_b = 0;
+    float sky_blend = 0.0f;
+    int sky_use_night_b = 0;
+    float sky_uv_offset = 0.0f;
     // shadow map
     Shader shadow_shader;
     GLuint shadow_fbo = 0;
@@ -54,5 +70,7 @@ void scene_draw(
 );
 
 void scene_draw_sky(SceneState& scene, const glm::mat4& view, const glm::mat4& proj);
+
+void scene_update_daytime(SceneState& scene, float dt);
 
 void scene_shadow_pass(SceneState& scene, const std::vector<Obstacle>& obstacles, glm::vec3 center);

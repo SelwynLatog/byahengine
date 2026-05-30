@@ -63,6 +63,12 @@ struct EditorRenderer{
     GLuint shadow_depth_tex = 0;
     glm::mat4 light_space_mat = glm::mat4(1.0f);
 
+    // lighting set each frame from scene_update_daytime output
+    glm::vec3 sun_dir = glm::vec3(1,2,1);
+    glm::vec3 light_color = glm::vec3(1,1,1);
+    float ambient = 0.50f;
+    float diff_intensity = 0.85f;
+
     // depth shader for casting shadows from props
     Shader depth_shader;
 
