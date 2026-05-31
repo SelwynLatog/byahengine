@@ -72,6 +72,30 @@ struct EditorRenderer{
     // depth shader for casting shadows from props
     Shader depth_shader;
 
+    // cached uniform locations
+    // obj_shader (draw_props)
+    struct {
+        GLint view, proj, model, normal_mat;
+        GLint light_dir, light_space, shadow_bias;
+        GLint ambient, diff_intensity, light_color;
+        GLint shadow_map, tex, use_texture, kd;
+    } obj_loc;
+
+    // road_shader (draw_roads + draw_terrain_surface)
+    struct {
+        GLint view, proj, model, normal_mat;
+        GLint light_dir, light_space, shadow_bias;
+        GLint ambient, diff_intensity, light_color;
+        GLint shadow_map, tex, use_texture, kd;
+    } road_loc;
+
+    // depth_shader (shadow pass)
+    struct {
+        GLint light_space, model;
+    } depth_loc;
+
+    Mesh line_batch;
+    std::vector<float> line_verts;
 };
 
 // builds the static grid mesh and compiles the flat shader

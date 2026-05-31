@@ -378,6 +378,58 @@ void scene_init(SceneState& scene){
     std::vector<float> av;
     push_axis_gizmo(av, Const::GIZMO_LENGTH);
     mesh_init(scene.gizmo, av);
+
+    // CACHE UNIFORMS FOR LOC ONCE
+    {
+        GLuint id = scene.shader.id;
+        auto& L = scene.shader_loc;
+        L.view = glGetUniformLocation(id, "u_view");
+        L.proj = glGetUniformLocation(id, "u_proj");
+        L.model = glGetUniformLocation(id, "u_model");
+        L.normal_mat = glGetUniformLocation(id, "u_normal_mat");
+        L.light_dir = glGetUniformLocation(id, "u_light_dir");
+        L.light_color = glGetUniformLocation(id, "u_light_color");
+        L.light_space = glGetUniformLocation(id, "u_light_space");
+        L.ambient = glGetUniformLocation(id, "u_ambient");
+        L.diff_intensity = glGetUniformLocation(id, "u_diff_intensity");
+        L.shadow_bias = glGetUniformLocation(id, "u_shadow_bias");
+        L.shadow_map = glGetUniformLocation(id, "u_shadow_map");
+        L.kd = glGetUniformLocation(id, "u_kd");
+        L.kd_alt = glGetUniformLocation(id, "u_kd_alt");
+        L.checker_scale = glGetUniformLocation(id, "u_checker_scale");
+        L.use_checker = glGetUniformLocation(id, "u_use_checker");
+    }
+    {
+        GLuint id = scene.gizmo_shader.id;
+        auto& L = scene.gizmo_loc;
+        L.view  = glGetUniformLocation(id, "u_view");
+        L.proj  = glGetUniformLocation(id, "u_proj");
+        L.model = glGetUniformLocation(id, "u_model");
+    }
+    {
+        GLuint id = scene.sky_shader.id;
+        auto& L = scene.sky_loc;
+        L.inv_view_proj = glGetUniformLocation(id, "u_inv_view_proj");
+        L.sky_tex = glGetUniformLocation(id, "u_sky_tex");
+        L.sky_night_tex = glGetUniformLocation(id, "u_sky_night_tex");
+        L.tint_a = glGetUniformLocation(id, "u_tint_a");
+        L.tint_b = glGetUniformLocation(id, "u_tint_b");
+        L.flip_a = glGetUniformLocation(id, "u_flip_a");
+        L.flip_b = glGetUniformLocation(id, "u_flip_b");
+        L.blend = glGetUniformLocation(id, "u_blend");
+        L.uv_offset = glGetUniformLocation(id, "u_uv_offset");
+        L.use_night_b = glGetUniformLocation(id, "u_use_night_b");
+    }
+    {
+        GLuint id = scene.shadow_shader.id;
+        scene.shadow_loc.light_space = glGetUniformLocation(id, "u_light_space");
+        scene.shadow_loc.model = glGetUniformLocation(id, "u_model");
+    }
+
+    // persistent line batch for hitbox wireframes
+    std::vector<float> empty(6, 0.0f);
+    mesh_init(scene.line_batch, empty);
+    scene.line_verts.reserve(128 * 24 * 6);
 }
 
 void scene_shadow_pass(SceneState& scene, const std::vector<Obstacle>& obstacles, glm::vec3 center){
@@ -403,24 +455,18 @@ void scene_shadow_pass(SceneState& scene, const std::vector<Obstacle>& obstacles
     glEnable(GL_CULL_FACE);
 
     shader_bind(scene.shadow_shader);
-    glUniformMatrix4fv(glGetUniformLocation(scene.shadow_shader.id, "u_light_space"),
-        1, GL_FALSE, glm::value_ptr(scene.light_space_mat));
+    glUniformMatrix4fv(scene.shadow_loc.light_space, 1, GL_FALSE, glm::value_ptr(scene.light_space_mat));
 
-    // render trike into shadow map
     glm::mat4 identity = glm::mat4(1.0f);
-    glUniformMatrix4fv(glGetUniformLocation(scene.shadow_shader.id, "u_model"),
-        1, GL_FALSE, glm::value_ptr(identity));
+    glUniformMatrix4fv(scene.shadow_loc.model, 1, GL_FALSE, glm::value_ptr(identity));
 
-    // obstacles (static world geometry) cast shadows too
-    // just need pos+layout attrib 0, depth shader ignores normals/uvs
     for (const auto& obs : obstacles){
         glm::vec3 cb = glm::vec3(
             (obs.aabb.min.x + obs.aabb.max.x) * 0.5f,
              obs.aabb.min.y,
             (obs.aabb.min.z + obs.aabb.max.z) * 0.5f);
         glm::mat4 m = glm::translate(glm::mat4(1.0f), cb);
-        glUniformMatrix4fv(glGetUniformLocation(scene.shadow_shader.id, "u_model"),
-            1, GL_FALSE, glm::value_ptr(m));
+        glUniformMatrix4fv(scene.shadow_loc.model, 1, GL_FALSE, glm::value_ptr(m));
     }
 
     glCullFace(GL_BACK);
@@ -560,25 +606,23 @@ void scene_draw_sky(SceneState& scene, const glm::mat4& view, const glm::mat4& p
     glm::mat4 rot_only = glm::mat4(glm::mat3(view));
     glm::mat4 inv_vp = glm::inverse(proj * rot_only);
 
+    auto& SL = scene.sky_loc;
     shader_bind(scene.sky_shader);
-    glUniformMatrix4fv(glGetUniformLocation(scene.sky_shader.id, "u_inv_view_proj"),
-        1, GL_FALSE, glm::value_ptr(inv_vp));
+    glUniformMatrix4fv(SL.inv_view_proj, 1, GL_FALSE, glm::value_ptr(inv_vp));
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, scene.sky_tex);
-    glUniform1i(glGetUniformLocation(scene.sky_shader.id, "u_sky_tex"), 0);
+    glUniform1i(SL.sky_tex, 0);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, scene.sky_night_tex ? scene.sky_night_tex : scene.sky_tex);
-    glUniform1i(glGetUniformLocation(scene.sky_shader.id, "u_sky_night_tex"), 1);
+    glUniform1i(SL.sky_night_tex, 1);
     glActiveTexture(GL_TEXTURE0);
-    glUniform3f(glGetUniformLocation(scene.sky_shader.id, "u_tint_a"),
-        scene.sky_tint_a.r, scene.sky_tint_a.g, scene.sky_tint_a.b);
-    glUniform3f(glGetUniformLocation(scene.sky_shader.id, "u_tint_b"),
-        scene.sky_tint_b.r, scene.sky_tint_b.g, scene.sky_tint_b.b);
-    glUniform1i(glGetUniformLocation(scene.sky_shader.id, "u_flip_a"), scene.sky_flip_a);
-    glUniform1i(glGetUniformLocation(scene.sky_shader.id, "u_flip_b"), scene.sky_flip_b);
-    glUniform1f(glGetUniformLocation(scene.sky_shader.id, "u_blend"), scene.sky_blend);
-    glUniform1f(glGetUniformLocation(scene.sky_shader.id, "u_uv_offset"), scene.sky_uv_offset);
-    glUniform1i(glGetUniformLocation(scene.sky_shader.id, "u_use_night_b"), scene.sky_use_night_b);
+    glUniform3f(SL.tint_a, scene.sky_tint_a.r, scene.sky_tint_a.g, scene.sky_tint_a.b);
+    glUniform3f(SL.tint_b, scene.sky_tint_b.r, scene.sky_tint_b.g, scene.sky_tint_b.b);
+    glUniform1i(SL.flip_a, scene.sky_flip_a);
+    glUniform1i(SL.flip_b, scene.sky_flip_b);
+    glUniform1f(SL.blend, scene.sky_blend);
+    glUniform1f(SL.uv_offset, scene.sky_uv_offset);
+    glUniform1i(SL.use_night_b, scene.sky_use_night_b);
     
     glDepthMask(GL_FALSE);
     glDisable(GL_DEPTH_TEST);
@@ -602,34 +646,26 @@ void scene_draw(
     glm::mat4 gm = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, Const::GROUND_Y_OFFSET, 0.0f));
     glm::mat3 gnm = glm::mat3(1.0f);
 
+     auto& L = scene.shader_loc;
     shader_bind(scene.shader);
-    set_mat4(scene.shader, "u_view", view);
-    set_mat4(scene.shader, "u_proj", proj);
-    set_vec3(scene.shader, "u_light_dir", scene.sun_dir);
-    set_mat4(scene.shader, "u_light_space", scene.light_space_mat);
-    glUniform3f(glGetUniformLocation(scene.shader.id, "u_light_color"),
-        scene.light_color.r, scene.light_color.g, scene.light_color.b);
-    glUniform1f(glGetUniformLocation(scene.shader.id, "u_ambient"), scene.ambient);
-    glUniform1f(glGetUniformLocation(scene.shader.id, "u_diff_intensity"), scene.diff_intensity);
-    glUniform1f(glGetUniformLocation(scene.shader.id, "u_shadow_bias"), Const::SHADOW_BIAS);
+    glUniformMatrix4fv(L.view,  1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(L.proj,  1, GL_FALSE, glm::value_ptr(proj));
+    glUniform3f(L.light_dir,    scene.sun_dir.x, scene.sun_dir.y, scene.sun_dir.z);
+    glUniformMatrix4fv(L.light_space, 1, GL_FALSE, glm::value_ptr(scene.light_space_mat));
+    glUniform3f(L.light_color, scene.light_color.r, scene.light_color.g, scene.light_color.b);
+    glUniform1f(L.ambient, scene.ambient);
+    glUniform1f(L.diff_intensity, scene.diff_intensity);
+    glUniform1f(L.shadow_bias,  Const::SHADOW_BIAS);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, scene.shadow_depth_tex);
-    glUniform1i(glGetUniformLocation(scene.shader.id, "u_shadow_map"), 1);
+    glUniform1i(L.shadow_map, 1);
     glActiveTexture(GL_TEXTURE0);
-    set_mat4(scene.shader, "u_model", gm);
-    set_mat3(scene.shader, "u_normal_mat", gnm);
-    set_vec3(scene.shader, "u_kd", glm::vec3(Const::GROUND_KD));
-    glUniform3f(glGetUniformLocation(scene.shader.id, "u_kd_alt"),
-        Const::GROUND_KD_ALT, Const::GROUND_KD_ALT, Const::GROUND_KD_ALT);
-    glUniform1f(glGetUniformLocation(scene.shader.id, "u_checker_scale"),
-        1.0f / Const::GROUND_GRID_TILE_SIZE);
-    glUniform1i(glGetUniformLocation(scene.shader.id, "u_use_checker"), 1);
-
-    // remove as comment line to enable checker grids
-    //glBindVertexArray(scene.ground.vao);
-    //glDrawArrays(GL_TRIANGLES, 0, scene.ground.count);
-    //glBindVertexArray(0);
-    glUniform1i(glGetUniformLocation(scene.shader.id, "u_use_checker"), 0);
+    glUniformMatrix4fv(L.model, 1, GL_FALSE, glm::value_ptr(gm));
+    glUniformMatrix3fv(L.normal_mat, 1, GL_FALSE, glm::value_ptr(gnm));
+    glUniform3f(L.kd, Const::GROUND_KD, Const::GROUND_KD, Const::GROUND_KD);
+    glUniform3f(L.kd_alt, Const::GROUND_KD_ALT, Const::GROUND_KD_ALT, Const::GROUND_KD_ALT);
+    glUniform1f(L.checker_scale, 1.0f / Const::GROUND_GRID_TILE_SIZE);
+    glUniform1i(L.use_checker, 0);
 
     // axis gizmo
     /*shader_bind(scene.gizmo_shader);
@@ -655,20 +691,21 @@ void scene_draw(
         * glm::translate(glm::mat4(1.0f), -sc)
         * glm::scale(glm::mat4(1.0f), glm::vec3(scene.model_scale));
 
-    glm::mat3 tnm = glm::mat3(glm::transpose(glm::inverse(tm)));
+    glm::mat3 tnm = glm::mat3(tm);
 
     shader_bind(scene.shader);
-    set_mat4(scene.shader, "u_model", tm);
-    set_mat3(scene.shader, "u_normal_mat", tnm);
+    glUniformMatrix4fv(L.model, 1, GL_FALSE, glm::value_ptr(tm));
+    glUniformMatrix3fv(L.normal_mat,1, GL_FALSE, glm::value_ptr(tnm));
 
     if constexpr (Const::USE_PROC_MESH){
         // proc mesh uses rgb color layout not normals 
         // for now I'll draw with gizmo shader
         // lighting won't apply but colors are baked per face in mesh_builder
+        
         shader_bind(scene.gizmo_shader);
-        set_mat4(scene.gizmo_shader, "u_view", view);
-        set_mat4(scene.gizmo_shader, "u_proj", proj);
-        set_mat4(scene.gizmo_shader, "u_model", tm);
+        glUniformMatrix4fv(scene.gizmo_loc.view, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(scene.gizmo_loc.proj, 1, GL_FALSE, glm::value_ptr(proj));
+        glUniformMatrix4fv(scene.gizmo_loc.model,1, GL_FALSE, glm::value_ptr(tm));
         glBindVertexArray(scene.proc_mesh.vao);
         glDrawArrays(GL_TRIANGLES, 0, scene.proc_mesh.count);
         glBindVertexArray(0);
@@ -708,7 +745,7 @@ void scene_draw(
     // green=trike, 
     // yellow=obstacles
     if (show_hitboxes){
-        std::vector<float> wire_verts;
+        scene.line_verts.clear();
         auto push_aabb = [&](const Aabb& box, glm::vec3 col){
             glm::vec3 lo = box.min, hi = box.max;
             glm::vec3 c[8] = {
@@ -720,7 +757,7 @@ void scene_draw(
             int e[24] = { 0,1,1,2,2,3,3,0, 4,5,5,6,6,7,7,4, 0,4,1,5,2,6,3,7 };
             for (int i = 0; i < 24; i++){
                 glm::vec3 p = c[e[i]];
-                wire_verts.insert(wire_verts.end(),
+                scene.line_verts.insert(scene.line_verts.end(),
                     {p.x,p.y,p.z, col.r,col.g,col.b});
             }
         };
@@ -729,16 +766,20 @@ void scene_draw(
         for (const auto& obs : obstacles)
             push_aabb(obs.aabb, {1.0f,0.9f,0.0f});
 
-        Mesh wire;
-        mesh_init(wire, wire_verts);
+        glBindBuffer(GL_ARRAY_BUFFER, scene.line_batch.vbo);
+        glBufferData(GL_ARRAY_BUFFER,
+            scene.line_verts.size() * sizeof(float),
+            scene.line_verts.data(), GL_DYNAMIC_DRAW);
+        scene.line_batch.count = (int)scene.line_verts.size() / 6;
+
+        glm::mat4 identity = glm::mat4(1.0f);
         shader_bind(scene.gizmo_shader);
-        set_mat4(scene.gizmo_shader, "u_view", view);
-        set_mat4(scene.gizmo_shader, "u_proj", proj);
-        set_mat4(scene.gizmo_shader, "u_model", glm::mat4(1.0f));
-        glBindVertexArray(wire.vao);
-        glDrawArrays(GL_LINES, 0, wire.count);
+        glUniformMatrix4fv(scene.gizmo_loc.view, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(scene.gizmo_loc.proj, 1, GL_FALSE, glm::value_ptr(proj));
+        glUniformMatrix4fv(scene.gizmo_loc.model, 1, GL_FALSE, glm::value_ptr(identity));
+        glBindVertexArray(scene.line_batch.vao);
+        glDrawArrays(GL_LINES, 0, scene.line_batch.count);
         glBindVertexArray(0);
-        mesh_destroy(wire);
     }
 
     shader_bind(scene.shader);

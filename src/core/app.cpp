@@ -59,13 +59,6 @@ void world_map_to_obstacles(App& app){
             world_min = glm::vec3( 1e9f);
             world_max = glm::vec3(-1e9f);
 
-            std::cout << "[obs_local] id=" << o.id
-                << " lmin=(" << lmin.x << "," << lmin.y << "," << lmin.z << ")"
-                << " lmax=(" << lmax.x << "," << lmax.y << "," << lmax.z << ")"
-                << " yoff=" << yoff
-                << " smin=(" << smin.x << "," << smin.y << "," << smin.z << ")"
-                << " smax=(" << smax.x << "," << smax.y << "," << smax.z << ")\n";
-
             for (int k = 0; k < 8; k++){
                 glm::vec3 corner = {
                     (k & 1) ? smax.x : smin.x,
@@ -93,17 +86,9 @@ void world_map_to_obstacles(App& app){
         obs.half_extents = half;
         obs.aabb.min = world_min;
         obs.aabb.max = world_max;
-        std::cout << "[obs] id=" << o.id << " model=" << o.model_path
-            << " scale=(" << o.scale.x << "," << o.scale.y << "," << o.scale.z << ")"
-            << " wmin=(" << world_min.x << "," << world_min.y << "," << world_min.z << ")"
-            << " wmax=(" << world_max.x << "," << world_max.y << "," << world_max.z << ")"
-            << " lmin=(" << 0 << ") pos=(" << o.position.x << "," << o.position.y << "," << o.position.z << ")\n";
         obs.world_id = o.id;
         app.obstacles.push_back(obs);
 
-
-        std::cout << "[collision] STATIC id=" << o.id << " model=" << o.model_path
-            << " half=(" << half.x << "," << half.y << "," << half.z << ")\n";
     }
      std::cout << "[collision] rebuilt " << app.obstacles.size()
         << " obstacles from world map\n";
@@ -189,6 +174,12 @@ void app_init(App& app){
     world_map_to_obstacles(app);
     init_dynamic_sims(app);
 
+    // build id->object lookup so dynamic sim loop is O(1) not O(n)
+    app.wo_by_id.clear();
+    for (const auto& o : app.map.objects)
+        app.wo_by_id[o.id] = &o;
+
+
     // pre editor hardcoded static objs
     // kept for now in case I fuck up my world_map_to_obstacles
     /*
@@ -241,6 +232,9 @@ void app_run(App& app){
                 if (app.obstacles_dirty){
                     world_map_to_obstacles(app);
                     init_dynamic_sims(app);
+                    app.wo_by_id.clear();
+                    for (const auto& o : app.map.objects)
+                        app.wo_by_id[o.id] = &o;
                 }
             }
         }
@@ -507,11 +501,9 @@ void app_run(App& app){
 
         // DYNAMIC object integration + collision
         for (auto& [id, sim] : app.dynamic_sims){
-            // find the world object for mass/restitution/friction
-            const WorldObject* wo = nullptr;
-            for (const auto& o : app.map.objects)
-                if (o.id == id) { wo = &o; break; }
-            if (!wo) continue;
+            auto wit = app.wo_by_id.find(id);
+            if (wit == app.wo_by_id.end()) continue;
+            const WorldObject* wo = wit->second;
 
             // rebuild AABB from current sim position
             // only awake objects need this every frame
@@ -647,14 +639,11 @@ void app_run(App& app){
                 if (id_a >= id_b) continue; // skip self and already-checked pairs
                 if (!aabb_overlap(sim_a.aabb, sim_b.aabb)) continue;
 
-                const WorldObject* wo_a = nullptr;
-                const WorldObject* wo_b = nullptr;
-                for (const auto& o : app.map.objects){
-                    if (o.id == id_a) wo_a = &o;
-                    if (o.id == id_b) wo_b = &o;
-                }
-                if (!wo_a || !wo_b) continue;
-
+                auto wa = app.wo_by_id.find(id_a);
+                auto wb = app.wo_by_id.find(id_b);
+                if (wa == app.wo_by_id.end() || wb == app.wo_by_id.end()) continue;
+                const WorldObject* wo_a = wa->second;
+                const WorldObject* wo_b = wb->second;
                 sim_b.sleeping = false;
 
                 glm::vec3 mtv = aabb_mtv(sim_a.aabb, sim_b.aabb);
@@ -744,32 +733,31 @@ void app_run(App& app){
         glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
-        
         // shadow pass
-        // render all props into depth buffer from sun POV
         scene_update_daytime(app.scene, dt);
-            app.editor_renderer.sun_dir = app.scene.sun_dir;
-            app.editor_renderer.light_color = app.scene.light_color;
-            app.editor_renderer.ambient = app.scene.ambient;
-            app.editor_renderer.diff_intensity = app.scene.diff_intensity;
+        app.editor_renderer.sun_dir = app.scene.sun_dir;
+        app.editor_renderer.light_color = app.scene.light_color;
+        app.editor_renderer.ambient = app.scene.ambient;
+        app.editor_renderer.diff_intensity= app.scene.diff_intensity;
 
-        scene_shadow_pass(app.scene, app.obstacles, app.editor.cam_pos);
-        glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
-        glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
-        glClear(GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_FRONT);
-        editor_renderer_shadow_pass(app.editor_renderer, app.map,
+        app.scene.shadow_frame_counter++;
+        if (app.scene.shadow_frame_counter >= 3){
+            app.scene.shadow_frame_counter = 0;
+            scene_shadow_pass(app.scene, app.obstacles, app.trike.position);
+            glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
+            glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_FRONT);
+            editor_renderer_shadow_pass(app.editor_renderer, app.map,
                 app.scene.light_space_mat, app.dynamic_sims);
-        glCullFace(GL_BACK);
-        glDisable(GL_CULL_FACE);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glViewport(0, 0, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
-
-        // copy light data to editor_renderer for shadow sampling in draw_props
-        app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
-        app.editor_renderer.light_space_mat = app.scene.light_space_mat;
-
+            glCullFace(GL_BACK);
+            glDisable(GL_CULL_FACE);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
+            app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
+            app.editor_renderer.light_space_mat  = app.scene.light_space_mat;
+        }
 
 
         scene_draw_sky(app.scene, view, proj);

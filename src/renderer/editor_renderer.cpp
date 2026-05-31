@@ -164,46 +164,40 @@ static GLuint load_texture(EditorRenderer& er, const std::string& path){
 // then uplaods a throwawau vao.vbo each call & destroys after drawing
 // not meant for high frequency draws
 // purposely for editor only
-static void draw_wire_box(
-    const Shader& shader,
+static void push_wire_box(
+    std::vector<float>& verts,
     const glm::vec3& mn, const glm::vec3& mx,
-    const glm::mat4& view, const glm::mat4& proj,
-    glm::vec3 color)
-{
-    // 8 corners of the box
+    glm::vec3 color){
     glm::vec3 c[8] = {
         {mn.x,mn.y,mn.z},{mx.x,mn.y,mn.z},
         {mx.x,mn.y,mx.z},{mn.x,mn.y,mx.z},
         {mn.x,mx.y,mn.z},{mx.x,mx.y,mn.z},
         {mx.x,mx.y,mx.z},{mn.x,mx.y,mx.z},
     };
-
-    // 12 edges as index pairs
-    // bottom ring, top ring, 4 vertical pillars
     int e[24] = { 0,1,1,2,2,3,3,0, 4,5,5,6,6,7,7,4, 0,4,1,5,2,6,3,7 };
-
-    // expand into flat pos+rgb buffer for mesh_init
-    std::vector<float> verts;
     for (int i = 0; i < 24; i++){
         glm::vec3 p = c[e[i]];
-        verts.insert(verts.end(), {
-            p.x, p.y, p.z,
-            color.r, color.g, color.b
-        });
+        verts.insert(verts.end(), { p.x,p.y,p.z, color.r,color.g,color.b });
     }
+}
 
-    // throwaway mesh
-    // upload, draw, destroy
-    Mesh wire;
-    mesh_init(wire, verts);
+// flushes er.line_verts to the persistent line_batch and draws it
+static void flush_line_batch(EditorRenderer& er, const Shader& shader,
+    const glm::mat4& view, const glm::mat4& proj){
+    if (er.line_verts.empty()) return;
+    glBindBuffer(GL_ARRAY_BUFFER, er.line_batch.vbo);
+    glBufferData(GL_ARRAY_BUFFER,
+        er.line_verts.size() * sizeof(float),
+        er.line_verts.data(), GL_DYNAMIC_DRAW);
+    er.line_batch.count = (int)er.line_verts.size() / 6;
     shader_bind(shader);
     set_mat4(shader, "u_model", glm::mat4(1.0f));
     set_mat4(shader, "u_view",  view);
     set_mat4(shader, "u_proj",  proj);
-    glBindVertexArray(wire.vao);
-    glDrawArrays(GL_LINES, 0, wire.count);
+    glBindVertexArray(er.line_batch.vao);
+    glDrawArrays(GL_LINES, 0, er.line_batch.count);
     glBindVertexArray(0);
-    mesh_destroy(wire);
+    er.line_verts.clear();
 }
 
 static const char* ER_ROAD_VERT = R"(
@@ -363,6 +357,58 @@ void editor_renderer_init(EditorRenderer& er){
     }
 
     mesh_init(er.grid, lines);
+
+
+    // CACHED UNIFORMS FOR ALL LOCS ONCE
+    auto cache_obj = [&](){
+        auto& L = er.obj_loc;
+        GLuint id = er.obj_shader.id;
+        L.view = glGetUniformLocation(id, "u_view");
+        L.proj = glGetUniformLocation(id, "u_proj");
+        L.model = glGetUniformLocation(id, "u_model");
+        L.normal_mat = glGetUniformLocation(id, "u_normal_mat");
+        L.light_dir = glGetUniformLocation(id, "u_light_dir");
+        L.light_space = glGetUniformLocation(id, "u_light_space");
+        L.shadow_bias = glGetUniformLocation(id, "u_shadow_bias");
+        L.ambient = glGetUniformLocation(id, "u_ambient");
+        L.diff_intensity = glGetUniformLocation(id, "u_diff_intensity");
+        L.light_color = glGetUniformLocation(id, "u_light_color");
+        L.shadow_map = glGetUniformLocation(id, "u_shadow_map");
+        L.tex = glGetUniformLocation(id, "u_tex");
+        L.use_texture = glGetUniformLocation(id, "u_use_texture");
+        L.kd = glGetUniformLocation(id, "u_kd");
+    };
+    auto cache_road = [&](){
+        auto& L = er.road_loc;
+        GLuint id = er.road_shader.id;
+        L.view = glGetUniformLocation(id, "u_view");
+        L.proj = glGetUniformLocation(id, "u_proj");
+        L.model = glGetUniformLocation(id, "u_model");
+        L.normal_mat = glGetUniformLocation(id, "u_normal_mat");
+        L.light_dir = glGetUniformLocation(id, "u_light_dir");
+        L.light_space = glGetUniformLocation(id, "u_light_space");
+        L.shadow_bias = glGetUniformLocation(id, "u_shadow_bias");
+        L.ambient = glGetUniformLocation(id, "u_ambient");
+        L.diff_intensity = glGetUniformLocation(id, "u_diff_intensity");
+        L.light_color = glGetUniformLocation(id, "u_light_color");
+        L.shadow_map = glGetUniformLocation(id, "u_shadow_map");
+        L.tex = glGetUniformLocation(id, "u_tex");
+        L.use_texture = glGetUniformLocation(id, "u_use_texture");
+        L.kd = glGetUniformLocation(id, "u_kd");
+    };
+    cache_obj();
+    cache_road();
+    er.depth_loc.light_space = glGetUniformLocation(er.depth_shader.id, "u_light_space");
+    er.depth_loc.model = glGetUniformLocation(er.depth_shader.id, "u_model");
+
+    // init persistent line batch with empty buffer
+    // sized for worst case: 200 wire boxes * 24 verts each
+    er.line_verts.reserve(200 * 24 * 6);
+    std::vector<float> empty(6, 0.0f);
+    mesh_init(er.line_batch, empty);
+
+
+
 }
 // returns a ref to the cached ObjMesh for this filename
 // loads from assets/ on first call then returns cached entry after
@@ -546,34 +592,29 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
     // 2. wireframe box colored by behavior
     // gives visual feedback for every placed object even before OBJ meshes load
     if (!show_hitboxes) goto skip_wireframes;
+    er.line_verts.clear();
     for (const auto& o : map.objects){
-
-        // skip selected
-        // it has its own highlight color below
         if (o.id == editor.selected_id) continue;
-
         auto bit = er.prop_bounds.find(o.model_path);
         if (bit != er.prop_bounds.end()){
-            // scale local min/max by object scale and offset by position
-            // y is also shifted by y_floor_offset to match the model matrix
             float yoff = er.prop_y_offset.count(o.model_path)
                 ? er.prop_y_offset[o.model_path] : 0.0f;
-            glm::vec3 lmin = bit->second.local_min;
-            glm::vec3 lmax = bit->second.local_max;
             glm::vec3 wmin, wmax;
-            rotated_world_bounds(lmin, lmax, o.position, o.rotation.y, o.scale, yoff, wmin, wmax);
-            draw_wire_box(er.shader, wmin, wmax, view, proj, behavior_color(o.behavior));
-        } 
+            rotated_world_bounds(bit->second.local_min, bit->second.local_max,
+                o.position, o.rotation.y, o.scale, yoff, wmin, wmax);
+            push_wire_box(er.line_verts, wmin, wmax, behavior_color(o.behavior));
+        }
         else {
-            // fallback to a unit cube until mesh is cached
             glm::vec3 half = o.scale * 0.5f;
-            draw_wire_box(er.shader,
+            push_wire_box(er.line_verts,
                 o.position + glm::vec3(-half.x, 0.0f, -half.z),
                 o.position + glm::vec3( half.x, o.scale.y, half.z),
-                view, proj, behavior_color(o.behavior));
+                behavior_color(o.behavior));
         }
     }
+    flush_line_batch(er, er.shader, view, proj);
     skip_wireframes:
+
     // draw placed object meshes
     editor_renderer_draw_props(er, map, view, proj);
 
@@ -581,41 +622,40 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
     // only drawn when cursor is over valid ground and a model is selected
     if (editor.placement_valid && !editor.selected_model.empty()){
         glm::vec3 gp = editor.ghost_pos;
-        // for now hardcoded to 0.5 x 1.0 x 0.5
-        // dont have actual model dimensions at placement time yet
-        // have to download assets first then I change this to pull real model bounds
-        draw_wire_box(er.shader,
+        er.line_verts.clear();
+        push_wire_box(er.line_verts,
             gp + glm::vec3(-0.5f, 0.0f, -0.5f),
             gp + glm::vec3( 0.5f, 1.0f,  0.5f),
-            view, proj,
             {0.0f, 1.0f, 1.0f});
+        flush_line_batch(er, er.shader, view, proj);
     }
 
     // 4. selection highlight
     // wraps curr selected placed obj
     // walks the object list to find the selected id
     if (editor.selected_id != -1){
+        er.line_verts.clear();
         for (const auto& o : map.objects){
             if (o.id != editor.selected_id) continue;
             auto bit = er.prop_bounds.find(o.model_path);
             if (bit != er.prop_bounds.end()){
                 float yoff = er.prop_y_offset.count(o.model_path)
                     ? er.prop_y_offset[o.model_path] : 0.0f;
-                glm::vec3 lmin = bit->second.local_min;
-                glm::vec3 lmax = bit->second.local_max;
                 glm::vec3 wmin, wmax;
-                rotated_world_bounds(lmin, lmax, o.position, o.rotation.y, o.scale, yoff, wmin, wmax);
-                draw_wire_box(er.shader, wmin, wmax, view, proj, {1.0f, 0.55f, 0.0f});
-            } 
+                rotated_world_bounds(bit->second.local_min, bit->second.local_max,
+                    o.position, o.rotation.y, o.scale, yoff, wmin, wmax);
+                push_wire_box(er.line_verts, wmin, wmax, {1.0f, 0.55f, 0.0f});
+            }
             else {
                 glm::vec3 half = o.scale * 0.5f;
-                draw_wire_box(er.shader,
+                push_wire_box(er.line_verts,
                     o.position + glm::vec3(-half.x, 0.0f, -half.z),
                     o.position + glm::vec3( half.x, o.scale.y, half.z),
-                    view, proj, {1.0f, 0.55f, 0.0f});
+                    {1.0f, 0.55f, 0.0f});
             }
             break;
         }
+        flush_line_batch(er, er.shader, view, proj);
     }
 
     // 5. prop palette HUD
@@ -793,9 +833,7 @@ void editor_renderer_shadow_pass(EditorRenderer& er, const WorldMap& map,
     const glm::mat4& light_space_mat,
     const std::unordered_map<int, DynamicSim>& dynamic_sims){
     shader_bind(er.depth_shader);
-    glUniformMatrix4fv(glGetUniformLocation(er.depth_shader.id, "u_light_space"),
-        1, GL_FALSE, glm::value_ptr(light_space_mat));
-
+    glUniformMatrix4fv(er.depth_loc.light_space, 1, GL_FALSE, glm::value_ptr(light_space_mat));
     for (auto& o : map.objects){
         if (o.model_path.empty()) continue;
         ObjMesh& mesh = get_prop_mesh(er, o.model_path);
@@ -819,8 +857,7 @@ void editor_renderer_shadow_pass(EditorRenderer& er, const WorldMap& map,
             model = glm::scale(model, o.scale);
         }
 
-        glUniformMatrix4fv(glGetUniformLocation(er.depth_shader.id, "u_model"),
-            1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix4fv(er.depth_loc.model, 1, GL_FALSE, glm::value_ptr(model));
 
         // draw all groups 
         // depth only, no material needed
@@ -838,24 +875,21 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
 
     glm::vec3 LIGHT_DIR = glm::normalize(er.sun_dir);
 
+    auto& OL = er.obj_loc;
     shader_bind(er.obj_shader);
-    set_mat4(er.obj_shader, "u_view", view);
-    set_mat4(er.obj_shader, "u_proj", proj);
+    glUniformMatrix4fv(OL.view,  1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(OL.proj,  1, GL_FALSE, glm::value_ptr(proj));
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glUniform3f(glGetUniformLocation(er.obj_shader.id, "u_light_dir"),
-        LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
-    glUniformMatrix4fv(glGetUniformLocation(er.obj_shader.id, "u_light_space"),
-        1, GL_FALSE, glm::value_ptr(er.light_space_mat));
-    glUniform1f(glGetUniformLocation(er.obj_shader.id, "u_shadow_bias"), Const::SHADOW_BIAS);
-    glUniform1f(glGetUniformLocation(er.obj_shader.id, "u_ambient"), er.ambient);
-    glUniform1f(glGetUniformLocation(er.obj_shader.id, "u_diff_intensity"), er.diff_intensity);
-    glUniform3f(glGetUniformLocation(er.obj_shader.id, "u_light_color"),
-        er.light_color.r, er.light_color.g, er.light_color.b);
-    // bind shadow map to texture unit 1
+    glUniform3f(OL.light_dir,        LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
+    glUniformMatrix4fv(OL.light_space, 1, GL_FALSE, glm::value_ptr(er.light_space_mat));
+    glUniform1f(OL.shadow_bias,      Const::SHADOW_BIAS);
+    glUniform1f(OL.ambient,          er.ambient);
+    glUniform1f(OL.diff_intensity,   er.diff_intensity);
+    glUniform3f(OL.light_color,      er.light_color.r, er.light_color.g, er.light_color.b);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, er.shadow_depth_tex);
-    glUniform1i(glGetUniformLocation(er.obj_shader.id, "u_shadow_map"), 1);
+    glUniform1i(OL.shadow_map, 1);
     glActiveTexture(GL_TEXTURE0);
 
     for (auto& o : map.objects){
@@ -885,11 +919,12 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
             model = glm::scale(model, o.scale);
         }
 
-        glm::mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
+        // upper-left 3x3 of model is correct normal mat for uniform scale
+        // skips the expensive inverse+transpose
+        glm::mat3 normal_mat = glm::mat3(model);
 
-        set_mat4(er.obj_shader, "u_model", model);
-        glUniformMatrix3fv(glGetUniformLocation(er.obj_shader.id, "u_normal_mat"),
-            1, GL_FALSE, glm::value_ptr(normal_mat));
+        glUniformMatrix4fv(OL.model,      1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix3fv(OL.normal_mat, 1, GL_FALSE, glm::value_ptr(normal_mat));
 
         // check if this object is flashing from a hit
         float flash = 0.0f;
@@ -904,8 +939,7 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
             glm::vec3 kd = mat ? mat->kd : glm::vec3(0.8f);
             glm::vec3 hit_color = {0.9f, 0.15f, 0.10f};
             kd = glm::mix(kd, hit_color, flash);
-            glUniform3f(glGetUniformLocation(er.obj_shader.id, "u_kd"),
-                kd.r, kd.g, kd.b);
+            glUniform3f(OL.kd, kd.r, kd.g, kd.b);
 
             // bind texture if material has one, else flat color
             GLuint tex = (mat && !mat->tex_path.empty())
@@ -913,11 +947,11 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
             if (tex){
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, tex);
-                glUniform1i(glGetUniformLocation(er.obj_shader.id, "u_tex"), 0);
-                glUniform1i(glGetUniformLocation(er.obj_shader.id, "u_use_texture"), 1);
+                glUniform1i(OL.tex, 0);
+                glUniform1i(OL.use_texture, 1);
             } 
             else {
-                glUniform1i(glGetUniformLocation(er.obj_shader.id, "u_use_texture"), 0);
+                glUniform1i(OL.use_texture, 0);
             }
 
             obj_mesh_draw_group(mesh, i);
@@ -966,9 +1000,9 @@ void editor_renderer_build_terrain_mesh(EditorRenderer& er, const HeightField& h
         for (int c = 0; c < hf.cols; c++){
             glm::vec3 p = get_pos(r, c);
             // horizontal edge (along X)
-            if (c < hf.cols - 1) push_line(p, get_pos(r,     c + 1));
+            if (c < hf.cols - 1) push_line(p, get_pos(r, c + 1));
             // vertical edge (along Z)
-            if (r < hf.rows - 1) push_line(p, get_pos(r + 1, c    ));
+            if (r < hf.rows - 1) push_line(p, get_pos(r + 1, c));
         }
     }
 
@@ -994,10 +1028,10 @@ void editor_renderer_draw_terrain(EditorRenderer& er, const HeightField& hf,
 
     if (!placement_valid) return;
     static const int SEGS = 48;
-    std::vector<float> ring;
-    ring.reserve(SEGS * 12);
+    er.line_verts.clear();
+    er.line_verts.reserve(SEGS * 12);
     for (int i = 0; i < SEGS; i++){
-        float a0 = (float)i / SEGS * 2.0f * 3.14159265f;
+        float a0 = (float)i       / SEGS * 2.0f * 3.14159265f;
         float a1 = (float)(i + 1) / SEGS * 2.0f * 3.14159265f;
         float x0 = brush_pos.x + std::cos(a0) * brush_radius;
         float z0 = brush_pos.z + std::sin(a0) * brush_radius;
@@ -1005,15 +1039,10 @@ void editor_renderer_draw_terrain(EditorRenderer& er, const HeightField& hf,
         float z1 = brush_pos.z + std::sin(a1) * brush_radius;
         float y0 = heightfield_sample(hf, x0, z0) + 0.1f;
         float y1 = heightfield_sample(hf, x1, z1) + 0.1f;
-        ring.insert(ring.end(), { x0, y0, z0,  1.0f, 1.0f, 0.0f });
-        ring.insert(ring.end(), { x1, y1, z1,  1.0f, 1.0f, 0.0f });
+        er.line_verts.insert(er.line_verts.end(), { x0,y0,z0, 1.0f,1.0f,0.0f });
+        er.line_verts.insert(er.line_verts.end(), { x1,y1,z1, 1.0f,1.0f,0.0f });
     }
-    Mesh circle;
-    mesh_init(circle, ring);
-    glBindVertexArray(circle.vao);
-    glDrawArrays(GL_LINES, 0, circle.count);
-    glBindVertexArray(0);
-    mesh_destroy(circle);
+    flush_line_batch(er, er.shader, view, proj);
 }
 
 void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline>& roads,
@@ -1049,27 +1078,25 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
         "road_lines.jpg",
     };
 
-    shader_bind(er.road_shader);
-    set_mat4(er.road_shader, "u_model", glm::mat4(1.0f));
-    set_mat4(er.road_shader, "u_view",  view);
-    set_mat4(er.road_shader, "u_proj",  proj);
+    auto& RL = er.road_loc;
+    glm::mat4 identity = glm::mat4(1.0f);
     glm::mat3 nm = glm::mat3(1.0f);
-    glUniformMatrix3fv(glGetUniformLocation(er.road_shader.id, "u_normal_mat"),
-        1, GL_FALSE, glm::value_ptr(nm));
-     glUniform3f(glGetUniformLocation(er.road_shader.id, "u_light_dir"),
-        LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
-    glUniformMatrix4fv(glGetUniformLocation(er.road_shader.id, "u_light_space"),
-        1, GL_FALSE, glm::value_ptr(er.light_space_mat));
-    glUniform1f(glGetUniformLocation(er.road_shader.id, "u_shadow_bias"), Const::SHADOW_BIAS);
-    glUniform1f(glGetUniformLocation(er.road_shader.id, "u_ambient"), er.ambient);
-    glUniform1f(glGetUniformLocation(er.road_shader.id, "u_diff_intensity"), er.diff_intensity);
-    glUniform3f(glGetUniformLocation(er.road_shader.id, "u_light_color"),
-        er.light_color.r, er.light_color.g, er.light_color.b);
+    shader_bind(er.road_shader);
+    glUniformMatrix4fv(RL.model, 1, GL_FALSE, glm::value_ptr(identity));
+    glUniformMatrix4fv(RL.view, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(RL.proj, 1, GL_FALSE, glm::value_ptr(proj));
+    glUniformMatrix3fv(RL.normal_mat, 1, GL_FALSE, glm::value_ptr(nm));
+    glUniform3f(RL.light_dir, LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
+    glUniformMatrix4fv(RL.light_space, 1, GL_FALSE, glm::value_ptr(er.light_space_mat));
+    glUniform1f(RL.shadow_bias, Const::SHADOW_BIAS);
+    glUniform1f(RL.ambient, er.ambient);
+    glUniform1f(RL.diff_intensity, er.diff_intensity);
+    glUniform3f(RL.light_color, er.light_color.r, er.light_color.g, er.light_color.b);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, er.shadow_depth_tex);
-    glUniform1i(glGetUniformLocation(er.road_shader.id, "u_shadow_map"), 1);
+    glUniform1i(RL.shadow_map, 1);
     glActiveTexture(GL_TEXTURE0);
-    glUniform1i(glGetUniformLocation(er.road_shader.id, "u_tex"), 0);
+    glUniform1i(RL.tex, 0);
 
     for (const auto& road : roads){
         if (road.vao == 0 || road.index_count == 0) continue;
@@ -1081,14 +1108,13 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
 
         if (tex){
             glBindTexture(GL_TEXTURE_2D, tex);
-            glUniform1i(glGetUniformLocation(er.road_shader.id, "u_use_texture"), 1);
+            glUniform1i(RL.use_texture, 1);
         }
         else {
             glBindTexture(GL_TEXTURE_2D, 0);
-            glUniform1i(glGetUniformLocation(er.road_shader.id, "u_use_texture"), 0);
+            glUniform1i(RL.use_texture, 0);
             glm::vec3 kd = ROAD_COLORS[type_idx];
-            glUniform3f(glGetUniformLocation(er.road_shader.id, "u_kd"),
-                kd.r, kd.g, kd.b);
+            glUniform3f(RL.kd, kd.r, kd.g, kd.b);
         }
 
         glEnable(GL_POLYGON_OFFSET_FILL);
@@ -1130,7 +1156,7 @@ void editor_renderer_draw_ocean(EditorRenderer& er, Ocean& ocean,
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDepthMask(GL_FALSE); // transparent surface — don't write depth
+    glDepthMask(GL_FALSE);
 
     if (ocean.mesh.vao && ocean.mesh.count > 0){
         glBindVertexArray(ocean.mesh.vao);
@@ -1293,25 +1319,23 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
         "rock.jpg",
     };
 
-    shader_bind(er.road_shader);
-    set_mat4(er.road_shader, "u_model", glm::mat4(1.0f));
-    set_mat4(er.road_shader, "u_view",  view);
-    set_mat4(er.road_shader, "u_proj",  proj);
+     auto& RL = er.road_loc;
+    glm::mat4 identity = glm::mat4(1.0f);
     glm::mat3 nm = glm::mat3(1.0f);
-    glUniformMatrix3fv(glGetUniformLocation(er.road_shader.id, "u_normal_mat"),
-        1, GL_FALSE, glm::value_ptr(nm));
-    glUniform3f(glGetUniformLocation(er.road_shader.id, "u_light_dir"),
-        LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
-    glUniformMatrix4fv(glGetUniformLocation(er.road_shader.id, "u_light_space"),
-        1, GL_FALSE, glm::value_ptr(er.light_space_mat));
-    glUniform1f(glGetUniformLocation(er.road_shader.id, "u_shadow_bias"), Const::SHADOW_BIAS);
-    glUniform1f(glGetUniformLocation(er.road_shader.id, "u_ambient"), er.ambient);
-    glUniform1f(glGetUniformLocation(er.road_shader.id, "u_diff_intensity"), er.diff_intensity);
-    glUniform3f(glGetUniformLocation(er.road_shader.id, "u_light_color"),
-        er.light_color.r, er.light_color.g, er.light_color.b);
+    shader_bind(er.road_shader);
+    glUniformMatrix4fv(RL.model, 1, GL_FALSE, glm::value_ptr(identity));
+    glUniformMatrix4fv(RL.view, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(RL.proj, 1, GL_FALSE, glm::value_ptr(proj));
+    glUniformMatrix3fv(RL.normal_mat, 1, GL_FALSE, glm::value_ptr(nm));
+    glUniform3f(RL.light_dir, LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
+    glUniformMatrix4fv(RL.light_space, 1, GL_FALSE, glm::value_ptr(er.light_space_mat));
+    glUniform1f(RL.shadow_bias, Const::SHADOW_BIAS);
+    glUniform1f(RL.ambient, er.ambient);
+    glUniform1f(RL.diff_intensity, er.diff_intensity);
+    glUniform3f(RL.light_color, er.light_color.r, er.light_color.g, er.light_color.b);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, er.shadow_depth_tex);
-    glUniform1i(glGetUniformLocation(er.road_shader.id, "u_shadow_map"), 1);
+    glUniform1i(RL.shadow_map, 1);
     glActiveTexture(GL_TEXTURE0);
 
     glBindVertexArray(er.terrain_surface_mesh.vao);
@@ -1325,14 +1349,13 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
         if (tex){
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, tex);
-            glUniform1i(glGetUniformLocation(er.road_shader.id, "u_tex"), 0);
-            glUniform1i(glGetUniformLocation(er.road_shader.id, "u_use_texture"), 1);
-        } 
+            glUniform1i(RL.tex, 0);
+            glUniform1i(RL.use_texture, 1);
+        }
         else {
-            glUniform1i(glGetUniformLocation(er.road_shader.id, "u_use_texture"), 0);
+            glUniform1i(RL.use_texture, 0);
             glm::vec3 kd = SURF_COLORS[i];
-            glUniform3f(glGetUniformLocation(er.road_shader.id, "u_kd"),
-                kd.r, kd.g, kd.b);
+            glUniform3f(RL.kd, kd.r, kd.g, kd.b);
         }
 
         glDrawArrays(GL_TRIANGLES,

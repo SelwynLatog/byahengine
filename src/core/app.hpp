@@ -8,6 +8,7 @@
 #include "../renderer/scene.hpp"
 #include "../renderer/editor_renderer.hpp"
 #include "../world/world_map.hpp"
+#include "../world/world_object.hpp"
 #include <vector>
 #include <unordered_map>
 #include "../physics/dynamic_sim.hpp"
@@ -29,6 +30,7 @@ struct App {
     EditorRenderer editor_renderer;
 
     std::unordered_map<int, DynamicSim> dynamic_sims;
+    std::unordered_map<int, const WorldObject*> wo_by_id;
     bool obstacles_dirty = true;
 };
 

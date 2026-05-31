@@ -1,5 +1,6 @@
 #include "hud.hpp"
 #include <glad/glad.h>
+#include <GLFW/glfw3.h>
 #include "../../src/core/const.hpp"
 #include <glm/glm.hpp>
 #include <cstdio>
@@ -45,6 +46,21 @@ void hud_draw(const Hud& h, const TrikeState& trike){
     const int LEFT= 20;  // left margin px
     const int TOP= 20;  // top margin px
     const int LINE_H= 20;  // px between lines
+
+    // fps counter
+    static float frame_times[60] = {};
+    static int ft_idx = 0;
+    static float ft_last = 0.0f;
+    float now = (float)glfwGetTime();
+    frame_times[ft_idx % 60] = now - ft_last;
+    ft_last = now;
+    ft_idx++;
+    float avg_dt = 0.0f;
+    for (int i = 0; i < 60; i++) avg_dt += frame_times[i];
+    avg_dt /= 60.0f;
+    float fps = avg_dt > 0.0f ? 1.0f / avg_dt : 0.0f;
+    font_draw(h.font, std::string("FPS ") + std::to_string((int)fps),
+        Const::WINDOW_WIDTH - 120, 20, SCALE, 0.4f, 1.0f, 0.4f);
 
     // speed in km/h
     float kmh = trike.speed * 3.6f;

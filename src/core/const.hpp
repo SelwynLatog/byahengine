@@ -16,7 +16,7 @@ namespace Const{
 
     // day cycle
     // 10 real minutes = 1 full in-game day
-    inline constexpr float DAY_DURATION_SECONDS = 9999.0f;//600.0f;
+    inline constexpr float DAY_DURATION_SECONDS = 600.0f;
     inline constexpr float DAY_START_TIME = 7.0f; // start at 7am
 
     // time ranges (0-24)
@@ -139,7 +139,7 @@ namespace Const{
     inline constexpr float LIGHT_DIFF= 0.85f;
 
     // shadow
-    inline constexpr int SHADOW_MAP_SIZE  = 4096;   // depth tex resolution, higher = sharper shadows
+    inline constexpr int SHADOW_MAP_SIZE = 4096;   // depth tex resolution, higher = sharper shadows
     inline constexpr float SHADOW_ORTHO_SIZE = 120.0f; // world units covered by shadow frustum
     inline constexpr float SHADOW_NEAR = 1.0f;
     inline constexpr float SHADOW_FAR  = 300.0f;

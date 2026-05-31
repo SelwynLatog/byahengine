@@ -41,8 +41,8 @@ struct SceneState {
     float diff_intensity = 0.85f;
 
     // sky tint + flip for current and next period
-    glm::vec3 sky_tint_a  = glm::vec3(1,1,1);
-    glm::vec3 sky_tint_b  = glm::vec3(1,1,1);
+    glm::vec3 sky_tint_a = glm::vec3(1,1,1);
+    glm::vec3 sky_tint_b = glm::vec3(1,1,1);
     int sky_flip_a = 0;
     int sky_flip_b = 0;
     float sky_blend = 0.0f;
@@ -53,6 +53,37 @@ struct SceneState {
     GLuint shadow_fbo = 0;
     GLuint shadow_depth_tex = 0;
     glm::mat4 light_space_mat = glm::mat4(1.0f);
+
+     // shadow throttle
+    int shadow_frame_counter = 0;
+
+    // cached uniform locations
+    struct {
+        GLint view, proj, model, normal_mat;
+        GLint light_dir, light_color, light_space;
+        GLint ambient, diff_intensity, shadow_bias;
+        GLint shadow_map, kd, kd_alt;
+        GLint checker_scale, use_checker;
+    } shader_loc;
+
+    struct {
+        GLint view, proj, model;
+    } gizmo_loc;
+
+    struct {
+        GLint inv_view_proj, sky_tex, sky_night_tex;
+        GLint tint_a, tint_b, flip_a, flip_b;
+        GLint blend, uv_offset, use_night_b;
+    } sky_loc;
+
+    struct {
+        GLint light_space, model;
+    } shadow_loc;
+
+    // persistent line batch for hitbox wireframes
+    Mesh line_batch;
+    std::vector<float> line_verts;
+
 };
 
 void scene_init(SceneState& scene);
