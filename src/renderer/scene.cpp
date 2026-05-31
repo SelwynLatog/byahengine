@@ -431,52 +431,16 @@ void scene_init(SceneState& scene){
 }
 
 void scene_shadow_pass(SceneState& scene, const std::vector<Obstacle>& obstacles, glm::vec3 center){
-    // build light space matrix from sun dir
-    // orthographic projection looking from sun toward scene center
-    glm::vec3 light_dir = scene.sun_dir;
-
     float texel_size = (2.0f * Const::SHADOW_ORTHO_SIZE) / (float)Const::SHADOW_MAP_SIZE;
     glm::vec3 snapped = glm::vec3(
         std::floor(center.x / texel_size) * texel_size,
         center.y,
         std::floor(center.z / texel_size) * texel_size);
 
-    glm::vec3 light_pos = snapped + light_dir * 150.0f;
+    glm::vec3 light_pos = snapped + scene.sun_dir * 150.0f;
     glm::mat4 light_view = glm::lookAt(light_pos, snapped, glm::vec3(0,1,0));
-
     float s = Const::SHADOW_ORTHO_SIZE;
-    glm::mat4 light_proj = glm::ortho(-s, s, -s, s, Const::SHADOW_NEAR, Const::SHADOW_FAR);
-    scene.light_space_mat = light_proj * light_view;
-
-
-    glBindFramebuffer(GL_FRAMEBUFFER, scene.shadow_fbo);
-    glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
-    glClear(GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
-
-    // front-face culling during shadow pass eliminates peter-panning on back faces
-    glCullFace(GL_FRONT);
-    glEnable(GL_CULL_FACE);
-
-    shader_bind(scene.shadow_shader);
-    glUniformMatrix4fv(scene.shadow_loc.light_space, 1, GL_FALSE, glm::value_ptr(scene.light_space_mat));
-
-    glm::mat4 identity = glm::mat4(1.0f);
-    glUniformMatrix4fv(scene.shadow_loc.model, 1, GL_FALSE, glm::value_ptr(identity));
-
-    for (const auto& obs : obstacles){
-        glm::vec3 cb = glm::vec3(
-            (obs.aabb.min.x + obs.aabb.max.x) * 0.5f,
-             obs.aabb.min.y,
-            (obs.aabb.min.z + obs.aabb.max.z) * 0.5f);
-        glm::mat4 m = glm::translate(glm::mat4(1.0f), cb);
-        glUniformMatrix4fv(scene.shadow_loc.model, 1, GL_FALSE, glm::value_ptr(m));
-    }
-
-    glCullFace(GL_BACK);
-    glDisable(GL_CULL_FACE);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
+    scene.light_space_mat = glm::ortho(-s, s, -s, s, Const::SHADOW_NEAR, Const::SHADOW_FAR) * light_view;
 }
 
 void scene_trike_shadow_draw(SceneState& scene, const TrikeState& trike){
