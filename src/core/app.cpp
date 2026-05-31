@@ -276,7 +276,9 @@ void app_run(App& app){
             glCullFace(GL_BACK);
             glDisable(GL_CULL_FACE);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            glViewport(0, 0, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
+            int fb_w, fb_h;
+            glfwGetFramebufferSize(app.window.handle, &fb_w, &fb_h);
+            glViewport(0, 0, fb_w, fb_h);
 
             // copy light data to editor_renderer for shadow sampling in draw_props
             app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
@@ -758,7 +760,9 @@ void app_run(App& app){
             glCullFace(GL_BACK);
             glDisable(GL_CULL_FACE);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            glViewport(0, 0, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
+            int fb_w, fb_h;
+            glfwGetFramebufferSize(app.window.handle, &fb_w, &fb_h);
+            glViewport(0, 0, fb_w, fb_h);
             app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
             app.editor_renderer.light_space_mat  = app.scene.light_space_mat;
         }

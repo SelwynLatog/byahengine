@@ -203,8 +203,9 @@ void font_init(Font& f, int window_width, int window_height){
     glGenBuffers(1, &f.vbo);
     glBindVertexArray(f.vao);
     glBindBuffer(GL_ARRAY_BUFFER, f.vbo);
-    // allocate for max 256 chars per draw call
-    glBufferData(GL_ARRAY_BUFFER, 256 * 6 * 4 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
+    // allocate for max 1024 chars per draw call
+    glBufferData(GL_ARRAY_BUFFER, 1024 * 6 * 4 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
+    
     // pos
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -269,6 +270,9 @@ void font_draw(const Font& f, const std::string& text, int x, int y,
     }
 
     if (verts.empty()) return;
+    const int MAX_VERTS = 1024 * 6;
+    if ((int)verts.size() / 4 > MAX_VERTS)
+        verts.resize(MAX_VERTS * 4);
 
     // upload and draw
     glUseProgram(f.shader);
