@@ -94,9 +94,21 @@ struct EditorRenderer{
         GLint light_space, model;
     } depth_loc;
 
+    // obj_shader point light locations
+    struct {
+        GLint count;
+        GLint pos[Const::MAX_POINT_LIGHTS];
+        GLint color[Const::MAX_POINT_LIGHTS];
+        GLint radius[Const::MAX_POINT_LIGHTS];
+        GLint intensity[Const::MAX_POINT_LIGHTS];
+    } pt_light_loc;
+
     Mesh line_batch;
     std::vector<float> line_verts;
     glm::vec3 shadow_cull_center = glm::vec3(0.0f);
+
+    std::vector<LightSource> last_lights;
+    float night_factor = 1.0f;
 };
 
 // builds the static grid mesh and compiles the flat shader
@@ -110,7 +122,8 @@ void editor_renderer_init(EditorRenderer& er);
 // 5. prop palette panel (left side)
 // 6. status HUD (bottom left)
 void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const WorldMap& map,
-    const glm::mat4& view, const glm::mat4& proj, bool show_hitboxes = false);
+    const glm::mat4& view, const glm::mat4& proj, bool show_hitboxes = false,
+    const std::vector<LightSource>& lights = {});
 
 // draws only placed obj meshes
 // called both in editor and drive mode
@@ -119,7 +132,8 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
 void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj,
     const std::map<int,float>& flash_map = {},
-    const std::unordered_map<int, DynamicSim>& dynamic_sims = {});
+    const std::unordered_map<int, DynamicSim>& dynamic_sims = {},
+    const std::vector<LightSource>& lights = {});
 
 void editor_renderer_shadow_pass(EditorRenderer& er, const WorldMap& map,
     const glm::mat4& light_space_mat,

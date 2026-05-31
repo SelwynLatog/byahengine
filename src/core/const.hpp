@@ -16,8 +16,8 @@ namespace Const{
 
     // day cycle
     // 10 real minutes = 1 full in-game day
-    inline constexpr float DAY_DURATION_SECONDS = 600.0f;
-    inline constexpr float DAY_START_TIME = 7.0f; // start at 7am
+    inline constexpr float DAY_DURATION_SECONDS = 99999.0f;//600.0f;
+    inline constexpr float DAY_START_TIME = 21.0f;//7.0f; // start at 7am
 
     // time ranges (0-24)
     inline constexpr float DAY_MORNING_START = 5.0f;
@@ -44,7 +44,7 @@ namespace Const{
     inline constexpr float LIGHT_NIGHT_R = 0.10f;
     inline constexpr float LIGHT_NIGHT_G = 0.15f;
     inline constexpr float LIGHT_NIGHT_B = 0.40f;
-    inline constexpr float LIGHT_NIGHT_AMBIENT = 0.45f;
+    inline constexpr float LIGHT_NIGHT_AMBIENT = 0.90f;
     inline constexpr float LIGHT_NIGHT_DIFF = 0.20f;
 
     // physics
@@ -137,6 +137,16 @@ namespace Const{
     inline constexpr float LIGHT_DIR_Z= 1.0f;
     inline constexpr float LIGHT_AMBIENT= 0.55f;
     inline constexpr float LIGHT_DIFF= 0.85f;
+
+    // point lights
+    inline constexpr int MAX_POINT_LIGHTS = 32;
+    inline constexpr float LIGHT_DEFAULT_RADIUS = 20.0f;
+    inline constexpr float LIGHT_DEFAULT_INTENSITY = 4.5f;
+
+    // streetlight warm yellow
+    inline constexpr float LIGHT_DEFAULT_R = 1.00f;
+    inline constexpr float LIGHT_DEFAULT_G = 0.85f;
+    inline constexpr float LIGHT_DEFAULT_B = 0.50f;
 
     // shadow
     inline constexpr int SHADOW_MAP_SIZE = 4096;   // depth tex resolution, higher = sharper shadows

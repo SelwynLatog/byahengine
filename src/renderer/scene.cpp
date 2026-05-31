@@ -50,6 +50,13 @@ uniform float     u_diff_intensity;
 uniform sampler2D u_shadow_map;
 uniform float     u_shadow_bias;
 
+#define MAX_LIGHTS 32
+uniform int   u_light_count;
+uniform vec3  u_light_pos[MAX_LIGHTS];
+uniform vec3  u_light_color_pt[MAX_LIGHTS];
+uniform float u_light_radius[MAX_LIGHTS];
+uniform float u_light_intensity[MAX_LIGHTS];
+
 float shadow_pcf(vec4 lsp, vec3 normal, vec3 ldir){
     vec3 proj = lsp.xyz / lsp.w;
     proj = proj * 0.5 + 0.5;
@@ -78,6 +85,18 @@ void main(){
         kd = mix(u_kd, u_kd_alt, parity);
     }
     vec3 lit = kd * u_light_color * (u_ambient + diff * u_diff_intensity * (1.0 - shadow));
+
+    // point lights accumulated on top of sun pass
+    for (int i = 0; i < u_light_count; i++){
+        float dist = length(u_light_pos[i] - v_world_pos);
+        if (dist >= u_light_radius[i]) continue;
+        float atten = 1.0 - (dist / u_light_radius[i]);
+        atten *= atten; // quadratic falloff
+        vec3 l = normalize(u_light_pos[i] - v_world_pos);
+        float ndotl = max(dot(n, l), 0.0);
+        lit += kd * u_light_color_pt[i] * ndotl * atten * u_light_intensity[i];
+    }
+
     frag_color = vec4(lit, 1.0);
 }
 )";
@@ -423,6 +442,22 @@ void scene_init(SceneState& scene){
         scene.shadow_loc.light_space = glGetUniformLocation(id, "u_light_space");
         scene.shadow_loc.model = glGetUniformLocation(id, "u_model");
     }
+    {
+        GLuint id = scene.shader.id;
+        auto& LL = scene.light_loc;
+        LL.count = glGetUniformLocation(id, "u_light_count");
+        char buf[64];
+        for (int i = 0; i < Const::MAX_POINT_LIGHTS; i++){
+            snprintf(buf, sizeof(buf), "u_light_pos[%d]", i);
+            LL.pos[i] = glGetUniformLocation(id, buf);
+            snprintf(buf, sizeof(buf), "u_light_color_pt[%d]", i);
+            LL.color[i] = glGetUniformLocation(id, buf);
+            snprintf(buf, sizeof(buf), "u_light_radius[%d]", i);
+            LL.radius[i] = glGetUniformLocation(id, buf);
+            snprintf(buf, sizeof(buf), "u_light_intensity[%d]", i);
+            LL.intensity[i] = glGetUniformLocation(id, buf);
+        }
+    }
 
     // persistent line batch for hitbox wireframes
     std::vector<float> empty(6, 0.0f);
@@ -595,6 +630,24 @@ void scene_update_daytime(SceneState& scene, float dt){
         scene.sky_blend = 1.0f; // fully night
     }
 
+    // night_factor: 0 at peak day (noon), 1 at full night
+    // ramps up from DAY_AFTERNOON_START, fully on by DAY_NIGHT_START
+    // ramps down from DAY_MORNING_START, fully off by DAY_MORNING_START + fade
+    float nf = 0.0f;
+    if (t >= Const::DAY_NIGHT_START)
+        nf = glm::clamp((t - Const::DAY_NIGHT_START) / Const::DAY_FADE_DURATION, 0.0f, 1.0f);
+    else if (t < Const::DAY_MORNING_START)
+        nf = 1.0f;
+    else if (t < Const::DAY_MORNING_START + Const::DAY_FADE_DURATION)
+        nf = 1.0f - glm::clamp((t - Const::DAY_MORNING_START) / Const::DAY_FADE_DURATION, 0.0f, 1.0f);
+    scene.night_factor = nf;
+
+    static float s_last_printed = -1.0f;
+    if ((int)scene.day_time != (int)s_last_printed){
+        std::cout << "[day] t=" << scene.day_time << " night_factor=" << nf << "\n";
+        s_last_printed = scene.day_time;
+    }
+
 
 
 }
@@ -639,6 +692,7 @@ void scene_draw(
     SceneState& scene,
     const TrikeState& trike,
     const std::vector<Obstacle>& obstacles,
+    const std::vector<LightSource>& lights,
     const glm::mat4& view,
     const glm::mat4& proj,
     bool show_hitboxes)
@@ -656,8 +710,19 @@ void scene_draw(
     glUniform3f(L.light_color, scene.light_color.r, scene.light_color.g, scene.light_color.b);
     glUniform1f(L.ambient, scene.ambient);
     glUniform1f(L.diff_intensity, scene.diff_intensity);
-    glUniform1f(L.shadow_bias,  Const::SHADOW_BIAS);
-    
+    glUniform1f(L.shadow_bias, Const::SHADOW_BIAS);
+
+    // upload point lights
+    int lcount = (int)std::min(lights.size(), (size_t)Const::MAX_POINT_LIGHTS);
+    // skip upload entirely during full day
+    int active_lcount = (scene.night_factor < 0.01f) ? 0 : lcount;
+    glUniform1i(scene.light_loc.count, active_lcount);
+    for (int i = 0; i < active_lcount; i++){
+        glUniform3f(scene.light_loc.pos[i], lights[i].position.x, lights[i].position.y, lights[i].position.z);
+        glUniform3f(scene.light_loc.color[i], lights[i].color.r, lights[i].color.g, lights[i].color.b);
+        glUniform1f(scene.light_loc.radius[i], lights[i].radius);
+        glUniform1f(scene.light_loc.intensity[i], lights[i].intensity * scene.night_factor);
+    }
 
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, scene.shadow_depth_tex);

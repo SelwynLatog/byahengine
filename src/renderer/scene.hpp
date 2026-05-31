@@ -7,6 +7,7 @@
 #include "../physics/obstacle.hpp"
 #include "../tricycle/tricycle_mesh.hpp"
 #include "../tricycle/tricycle_model.hpp"
+#include "../world/light_source.hpp"
 #include <glm/glm.hpp>
 #include <vector>
 
@@ -77,6 +78,15 @@ struct SceneState {
         GLint light_space, model;
     } shadow_loc;
 
+    struct {
+        GLint count;
+        GLint pos[Const::MAX_POINT_LIGHTS];
+        GLint color[Const::MAX_POINT_LIGHTS];
+        GLint radius[Const::MAX_POINT_LIGHTS];
+        GLint intensity[Const::MAX_POINT_LIGHTS];
+    } light_loc;
+
+    float night_factor = 1.0f;
     // persistent line batch for hitbox wireframes
     Mesh line_batch;
     std::vector<float> line_verts;
@@ -92,6 +102,7 @@ void scene_draw(
     SceneState& scene,
     const TrikeState& trike,
     const std::vector<Obstacle>& obstacles,
+    const std::vector<LightSource>& lights,
     const glm::mat4& view,
     const glm::mat4& proj,
     bool show_hitboxes = false

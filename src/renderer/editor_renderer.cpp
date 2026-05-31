@@ -60,6 +60,13 @@ uniform float     u_ambient;
 uniform float     u_diff_intensity;
 uniform vec3      u_light_color;
 
+#define MAX_LIGHTS 32
+uniform int   u_light_count;
+uniform vec3  u_light_pos[MAX_LIGHTS];
+uniform vec3  u_light_color_pt[MAX_LIGHTS];
+uniform float u_light_radius[MAX_LIGHTS];
+uniform float u_light_intensity[MAX_LIGHTS];
+
 float shadow_pcf(vec4 lsp, vec3 normal, vec3 ldir){
     // perspective divide -> NDC
     vec3 proj = lsp.xyz / lsp.w;
@@ -91,6 +98,17 @@ void main(){
     float shadow = shadow_pcf(v_light_space_pos, n, ldir);
     // shadow reduces diffuse but not ambient
     vec3 lit = tex_sample.rgb * u_light_color * (ambient + diff * u_diff_intensity * (1.0 - shadow));
+
+    for (int i = 0; i < u_light_count; i++){
+        float dist = length(u_light_pos[i] - v_world_pos);
+        if (dist >= u_light_radius[i]) continue;
+        float atten = 1.0 - (dist / u_light_radius[i]);
+        atten *= atten;
+        vec3 l = normalize(u_light_pos[i] - v_world_pos);
+        float ndotl = max(dot(n, l), 0.0);
+        lit += tex_sample.rgb * u_light_color_pt[i] * ndotl * atten * u_light_intensity[i];
+    }
+
     frag_color = vec4(lit, 1.0);
 }
 )";
@@ -211,12 +229,14 @@ uniform mat4 u_proj;
 uniform mat3 u_normal_mat;
 uniform mat4 u_light_space;
 out vec3 v_world_normal;
+out vec3 v_world_pos;
 out vec2 v_uv;
 out vec4 v_light_space_pos;
 void main(){
     vec4 world = u_model * vec4(a_pos, 1.0);
     gl_Position = u_proj * u_view * world;
     v_world_normal = normalize(u_normal_mat * a_normal);
+    v_world_pos = world.xyz;
     v_uv = a_uv;
     v_light_space_pos = u_light_space * world;
 }
@@ -225,6 +245,7 @@ void main(){
 static const char* ER_ROAD_FRAG = R"(
 #version 330 core
 in vec3 v_world_normal;
+in vec3 v_world_pos;
 in vec2 v_uv;
 in vec4 v_light_space_pos;
 out vec4 frag_color;
@@ -237,6 +258,13 @@ uniform float     u_shadow_bias;
 uniform float     u_ambient;
 uniform float     u_diff_intensity;
 uniform vec3      u_light_color;
+
+#define MAX_LIGHTS 32
+uniform int   u_light_count;
+uniform vec3  u_light_pos[MAX_LIGHTS];
+uniform vec3  u_light_color_pt[MAX_LIGHTS];
+uniform float u_light_radius[MAX_LIGHTS];
+uniform float u_light_intensity[MAX_LIGHTS];
 
 float shadow_pcf(vec4 lsp, vec3 normal, vec3 ldir){
     vec3 proj = lsp.xyz / lsp.w;
@@ -258,10 +286,20 @@ void main(){
     vec3 n = normalize(v_world_normal);
     vec3 ldir = normalize(u_light_dir);
     float diff = max(dot(n, ldir), 0.0);
-    float ambient = u_ambient;
     vec4 tex_col = (u_use_texture == 1) ? texture(u_tex, v_uv) : vec4(u_kd, 1.0);
     float shadow = shadow_pcf(v_light_space_pos, n, ldir);
-    vec3 lit = tex_col.rgb * u_light_color * (ambient + diff * u_diff_intensity * (1.0 - shadow));
+    vec3 lit = tex_col.rgb * u_light_color * (u_ambient + diff * u_diff_intensity * (1.0 - shadow));
+
+    for (int i = 0; i < u_light_count; i++){
+        float dist = length(u_light_pos[i] - v_world_pos);
+        if (dist >= u_light_radius[i]) continue;
+        float atten = 1.0 - (dist / u_light_radius[i]);
+        atten *= atten;
+        vec3 l = normalize(u_light_pos[i] - v_world_pos);
+        float ndotl = max(dot(n, l), 0.0);
+        lit += tex_col.rgb * u_light_color_pt[i] * ndotl * atten * u_light_intensity[i];
+    }
+
     frag_color = vec4(lit, 1.0);
 }
 )";
@@ -400,6 +438,22 @@ void editor_renderer_init(EditorRenderer& er){
     cache_road();
     er.depth_loc.light_space = glGetUniformLocation(er.depth_shader.id, "u_light_space");
     er.depth_loc.model = glGetUniformLocation(er.depth_shader.id, "u_model");
+    {
+        GLuint id = er.obj_shader.id;
+        auto& LL = er.pt_light_loc;
+        LL.count = glGetUniformLocation(id, "u_light_count");
+        char buf[64];
+        for (int i = 0; i < Const::MAX_POINT_LIGHTS; i++){
+            snprintf(buf, sizeof(buf), "u_light_pos[%d]", i);
+            LL.pos[i] = glGetUniformLocation(id, buf);
+            snprintf(buf, sizeof(buf), "u_light_color_pt[%d]", i);
+            LL.color[i] = glGetUniformLocation(id, buf);
+            snprintf(buf, sizeof(buf), "u_light_radius[%d]", i);
+            LL.radius[i] = glGetUniformLocation(id, buf);
+            snprintf(buf, sizeof(buf), "u_light_intensity[%d]", i);
+            LL.intensity[i] = glGetUniformLocation(id, buf);
+        }
+    }
 
     // init persistent line batch with empty buffer
     // sized for worst case: 200 wire boxes * 24 verts each
@@ -520,8 +574,9 @@ static void rotated_world_bounds(
     }
 }
 
-void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const WorldMap& map,
-    const glm::mat4& view, const glm::mat4& proj, bool show_hitboxes){
+void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const WorldMap& map,
+    const glm::mat4& view, const glm::mat4& proj, bool show_hitboxes,
+    const std::vector<LightSource>& lights){
 
     // light dir which matches scene.cpp
     glm::vec3 LIGHT_DIR = glm::normalize(er.sun_dir);
@@ -602,7 +657,60 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
             map.ocean.y_level, map.ocean.enabled ? "ON" : "OFF");
         font_draw(er.font, buf, 220, 60, 2, 1.0f, 0.80f, 0.10f);
     }
-    
+
+    if (editor.mode == MODE_LIGHT){
+        font_draw(er.font, "[ LIGHT MODE ]", 180, 16, 3, 1.0f, 0.90f, 0.30f);
+        font_draw(er.font, "LMB=place/select  DEL=delete  Arrows=move XZ  PgUp/Dn=move Y  [/]=radius  +/-=intensity",
+            220, 40, 2, 1.0f, 0.90f, 0.30f);
+        font_draw(er.font, "Q/E=red  Z/X=green  C/V=blue  L=exit",
+            220, 58, 2, 1.0f, 0.90f, 0.30f);
+
+        // draw a wire circle on the ground at each light's XZ + a vertical stem
+        er.line_verts.clear();
+        for (const auto& l : map.lights){
+            bool selected = (l.id == editor.selected_light_id);
+            glm::vec3 col = selected ? glm::vec3(1.0f, 1.0f, 0.0f) : glm::vec3(l.color);
+
+            // vertical stem from ground to light position
+            float ground_y = heightfield_sample(map.terrain, l.position.x, l.position.z);
+            er.line_verts.insert(er.line_verts.end(),
+                {l.position.x, ground_y, l.position.z, col.r, col.g, col.b});
+            er.line_verts.insert(er.line_verts.end(),
+                {l.position.x, l.position.y, l.position.z, col.r, col.g, col.b});
+
+            // radius circle on the ground
+            static const int SEGS = 32;
+            for (int i = 0; i < SEGS; i++){
+                float a0 = (float)i / SEGS * 2.0f * 3.14159265f;
+                float a1 = (float)(i + 1) / SEGS * 2.0f * 3.14159265f;
+                float x0 = l.position.x + std::cos(a0) * l.radius;
+                float z0 = l.position.z + std::sin(a0) * l.radius;
+                float x1 = l.position.x + std::cos(a1) * l.radius;
+                float z1 = l.position.z + std::sin(a1) * l.radius;
+                er.line_verts.insert(er.line_verts.end(), {x0, ground_y + 0.05f, z0, col.r, col.g, col.b});
+                er.line_verts.insert(er.line_verts.end(), {x1, ground_y + 0.05f, z1, col.r, col.g, col.b});
+            }
+        }
+        flush_line_batch(er, er.shader, view, proj);
+
+        // selected light info HUD
+        if (editor.selected_light_id != -1){
+            for (const auto& l : map.lights){
+                if (l.id != editor.selected_light_id) continue;
+                char buf[128];
+                snprintf(buf, sizeof(buf), "POS (%.1f, %.1f, %.1f)  R:%.2f G:%.2f B:%.2f",
+                    l.position.x, l.position.y, l.position.z,
+                    l.color.r, l.color.g, l.color.b);
+                font_draw(er.font, buf, 220, 76, 2, 1.0f, 1.0f, 1.0f);
+                snprintf(buf, sizeof(buf), "RADIUS: %.1fm   INTENSITY: %.2f",
+                    l.radius, l.intensity);
+                font_draw(er.font, buf, 220, 94, 2, 1.0f, 1.0f, 1.0f);
+                break;
+            }
+        }
+    }
+
+
     // 2. wireframe box colored by behavior
     // gives visual feedback for every placed object even before OBJ meshes load
     if (!show_hitboxes) goto skip_wireframes;
@@ -630,7 +738,7 @@ void editor_renderer_draw( EditorRenderer& er, const EditorState& editor, const 
     skip_wireframes:
 
     // draw placed object meshes
-    editor_renderer_draw_props(er, map, view, proj);
+    editor_renderer_draw_props(er, map, view, proj, {}, {}, lights);
 
     // 3. ghost box
     // only drawn when cursor is over valid ground and a model is selected
@@ -891,30 +999,43 @@ void editor_renderer_shadow_pass(EditorRenderer& er, const WorldMap& map,
 void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj,
     const std::map<int,float>& flash_map,
-    const std::unordered_map<int, DynamicSim>& dynamic_sims){
+    const std::unordered_map<int, DynamicSim>& dynamic_sims,
+    const std::vector<LightSource>& lights){
 
     glm::vec3 LIGHT_DIR = glm::normalize(er.sun_dir);
 
     auto& OL = er.obj_loc;
     shader_bind(er.obj_shader);
-    glUniformMatrix4fv(OL.view,  1, GL_FALSE, glm::value_ptr(view));
-    glUniformMatrix4fv(OL.proj,  1, GL_FALSE, glm::value_ptr(proj));
+    glUniformMatrix4fv(OL.view, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(OL.proj, 1, GL_FALSE, glm::value_ptr(proj));
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glUniform3f(OL.light_dir,        LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
+    glUniform3f(OL.light_dir, LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
     glUniformMatrix4fv(OL.light_space, 1, GL_FALSE, glm::value_ptr(er.light_space_mat));
-    glUniform1f(OL.shadow_bias,      Const::SHADOW_BIAS);
-    glUniform1f(OL.ambient,          er.ambient);
-    glUniform1f(OL.diff_intensity,   er.diff_intensity);
-    glUniform3f(OL.light_color,      er.light_color.r, er.light_color.g, er.light_color.b);
+    glUniform1f(OL.shadow_bias, Const::SHADOW_BIAS);
+    glUniform1f(OL.ambient, er.ambient);
+    glUniform1f(OL.diff_intensity, er.diff_intensity);
+    glUniform3f(OL.light_color, er.light_color.r, er.light_color.g, er.light_color.b);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, er.shadow_depth_tex);
     glUniform1i(OL.shadow_map, 1);
     glActiveTexture(GL_TEXTURE0);
 
+    // upload point lights
+    int lcount = (int)std::min(lights.size(), (size_t)Const::MAX_POINT_LIGHTS);
+    int active_lcount = (er.night_factor < 0.01f) ? 0 : lcount;
+    glUniform1i(er.pt_light_loc.count, active_lcount);
+    for (int i = 0; i < active_lcount; i++){
+        glUniform3f(er.pt_light_loc.pos[i], lights[i].position.x, lights[i].position.y, lights[i].position.z);
+        glUniform3f(er.pt_light_loc.color[i], lights[i].color.r, lights[i].color.g, lights[i].color.b);
+        glUniform1f(er.pt_light_loc.radius[i], lights[i].radius);
+        glUniform1f(er.pt_light_loc.intensity[i], lights[i].intensity * er.night_factor);
+    }
     
     // extract camera position from inverse view matrix
     // view is already passed in so no extra cost
+    er.last_lights = lights;
+
     glm::vec3 cam_pos = glm::vec3(glm::inverse(view)[3]);
     static constexpr float CULL_DIST_SQ = 150.0f * 150.0f;
 
@@ -1129,6 +1250,26 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
     glUniform1i(RL.shadow_map, 1);
     glActiveTexture(GL_TEXTURE0);
     glUniform1i(RL.tex, 0);
+
+    // upload point lights to road shader
+    // road_loc doesn't have pt_light atm slots so look them up directly
+    GLuint rid = er.road_shader.id;
+    int lcount = (int)std::min(er.last_lights.size(), (size_t)Const::MAX_POINT_LIGHTS);
+    int active_lcount = (er.night_factor < 0.01f) ? 0 : lcount;
+    glUniform1i(glGetUniformLocation(rid, "u_light_count"), active_lcount);
+    char _buf[64];
+    for (int i = 0; i < active_lcount; i++){
+        snprintf(_buf, sizeof(_buf), "u_light_pos[%d]", i);
+        glUniform3f(glGetUniformLocation(rid, _buf),
+            er.last_lights[i].position.x, er.last_lights[i].position.y, er.last_lights[i].position.z);
+        snprintf(_buf, sizeof(_buf), "u_light_color_pt[%d]", i);
+        glUniform3f(glGetUniformLocation(rid, _buf),
+            er.last_lights[i].color.r, er.last_lights[i].color.g, er.last_lights[i].color.b);
+        snprintf(_buf, sizeof(_buf), "u_light_radius[%d]", i);
+        glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].radius);
+        snprintf(_buf, sizeof(_buf), "u_light_intensity[%d]", i);
+        glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].intensity * er.night_factor);
+    }
 
     for (const auto& road : roads){
         if (road.vao == 0 || road.index_count == 0) continue;
@@ -1369,6 +1510,25 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
     glBindTexture(GL_TEXTURE_2D, er.shadow_depth_tex);
     glUniform1i(RL.shadow_map, 1);
     glActiveTexture(GL_TEXTURE0);
+
+    // UPLOAD POINT LIGHTS TO ROAD SHADER
+    GLuint rid = er.road_shader.id;
+    int lcount = (int)std::min(er.last_lights.size(), (size_t)Const::MAX_POINT_LIGHTS);
+    int active_lcount = (er.night_factor < 0.01f) ? 0 : lcount;
+    glUniform1i(glGetUniformLocation(rid, "u_light_count"), active_lcount);
+    char _buf[64];
+    for (int i = 0; i < active_lcount; i++){
+        snprintf(_buf, sizeof(_buf), "u_light_pos[%d]", i);
+        glUniform3f(glGetUniformLocation(rid, _buf),
+            er.last_lights[i].position.x, er.last_lights[i].position.y, er.last_lights[i].position.z);
+        snprintf(_buf, sizeof(_buf), "u_light_color_pt[%d]", i);
+        glUniform3f(glGetUniformLocation(rid, _buf),
+            er.last_lights[i].color.r, er.last_lights[i].color.g, er.last_lights[i].color.b);
+        snprintf(_buf, sizeof(_buf), "u_light_radius[%d]", i);
+        glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].radius);
+        snprintf(_buf, sizeof(_buf), "u_light_intensity[%d]", i);
+        glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].intensity * er.night_factor);
+    }
 
     glBindVertexArray(er.terrain_surface_mesh.vao);
 

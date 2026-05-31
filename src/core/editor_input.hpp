@@ -1,6 +1,7 @@
 #pragma once
 #include "editor_state.hpp"
 #include "../world/world_map.hpp"
+#include "../world/light_source.hpp"
 #include "../world/height_field.hpp"
 #include "../world/ocean.hpp"
 #include "../renderer/editor_renderer.hpp"

@@ -20,6 +20,21 @@ bool world_map_remove(WorldMap& map, int id){
     return false;
 }
 
+void world_map_light_place(WorldMap& map, LightSource light){
+    light.id = map.next_light_id++;
+    map.lights.push_back(light);
+}
+
+bool world_map_light_remove(WorldMap& map, int id){
+    for (auto it = map.lights.begin(); it != map.lights.end(); it++){
+        if (it->id == id){
+            map.lights.erase(it);
+            return true;
+        }
+    }
+    return false;
+}
+
 void world_map_save(const WorldMap& map, const std::string& path){
     std::ofstream f(path);
     if (!f){
@@ -36,14 +51,23 @@ void world_map_save(const WorldMap& map, const std::string& path){
           << o.model_path << " " << o.y_floor_offset << " "
           << o.mass << " " << o.restitution << " " << o.friction << "\n";
     }
+    
     std::cout << "world_map saved " << map.objects.size() << " objects to " << path << "\n";
 
     // derive sibling paths from the map path
-    // objects stay in the main file, terrain and roads get their own files
-    // keeps map path small and safe
-    // by safe I mean in case I fuck up I dont want to restart the entire map
     std::filesystem::path base(path);
     std::string terrain_path = (base.parent_path() / (base.stem().string() + "_terrain.hf")).string();
+    std::string lights_path = (base.parent_path() / (base.stem().string() + "_lights.lt")).string();
+    {
+        std::ofstream lf(lights_path);
+        for (const auto& l : map.lights){
+            lf << l.id << " "
+               << l.position.x << " " << l.position.y << " " << l.position.z << " "
+               << l.color.r << " " << l.color.g << " " << l.color.b << " "
+               << l.radius << " " << l.intensity << "\n";
+        }
+    }
+
     std::string roads_path = (base.parent_path() / (base.stem().string() + "_roads.rd")).string();
 
     heightfield_save(map.terrain, terrain_path);
@@ -96,7 +120,28 @@ bool world_map_load(WorldMap& map, const std::string& path){
     if (std::filesystem::exists(roads_path))
         road_splines_load(map.roads, roads_path);
     std::string ocean_path = (base.parent_path() / (base.stem().string() + "_ocean.oc")).string();
+
     if (std::filesystem::exists(ocean_path))
         ocean_load(map.ocean, ocean_path);
+
+    map.lights.clear();
+    map.next_light_id = 0;
+    std::string lights_path = (base.parent_path() / (base.stem().string() + "_lights.lt")).string();
+    if (std::filesystem::exists(lights_path)){
+        std::ifstream lf(lights_path);
+        std::string lline;
+        while (std::getline(lf, lline)){
+            if (lline.empty()) continue;
+            std::istringstream ss(lline);
+            LightSource l;
+            ss >> l.id
+               >> l.position.x >> l.position.y >> l.position.z
+               >> l.color.r >> l.color.g >> l.color.b
+               >> l.radius >> l.intensity;
+            if (l.id >= map.next_light_id) map.next_light_id = l.id + 1;
+            map.lights.push_back(l);
+        }
+        std::cout << "world_map loaded " << map.lights.size() << " lights\n";
+    }
     return true;
 }

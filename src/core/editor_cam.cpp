@@ -57,7 +57,7 @@ void editor_cam_update(EditorState& editor, GLFWwindow* window, float dt){
 
     glm::vec3 world_up = glm::vec3(0.0f, 1.0f, 0.0f);
     glm::vec3 right = glm::normalize(glm::cross(forward, world_up));
-
+    
     // WASD movement along freecam axes
     float speed = Const::EDITOR_CAM_SPEED * dt;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) editor.cam_pos += forward * speed;
@@ -71,7 +71,7 @@ void editor_cam_update(EditorState& editor, GLFWwindow* window, float dt){
 
     // arrow key look
     // note that it only fires when no object is selected
-    if (editor.selected_id == -1){
+    if (editor.selected_id == -1 && editor.mode != MODE_LIGHT){
         float look = Const::EDITOR_LOOK_SENSITIVITY * 600.0f * dt;
         if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) editor.cam_yaw += look;
         if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) editor.cam_yaw -= look;

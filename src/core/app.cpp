@@ -284,6 +284,7 @@ void app_run(App& app){
             // copy light data to editor_renderer for shadow sampling in draw_props
             app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
             app.editor_renderer.light_space_mat = app.scene.light_space_mat;
+            app.editor_renderer.night_factor = app.scene.night_factor;
 
 
 
@@ -292,7 +293,7 @@ void app_run(App& app){
             // draw world scene:
             // ground, gizmo
             // trike parked where it stopped last
-            scene_draw(app.scene, app.trike, app.obstacles, view, proj, app.editor.show_hitboxes);
+            scene_draw(app.scene, app.trike, app.obstacles, app.map.lights, view, proj, app.editor.show_hitboxes);
 
             // terrain wireframe
             if (app.editor.mode == MODE_TERRAIN || app.editor.mode == MODE_ROAD)
@@ -315,7 +316,7 @@ void app_run(App& app){
 
             // draw editor overlays:
             // grid, ghost, selection highlight
-            editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj, app.editor.show_hitboxes);
+            editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj, app.editor.show_hitboxes, app.map.lights);
 
             // temp editor control hud
             font_draw(app.editor_renderer.font,"[TAB] drive  [L CLICK] place/select  [DEL] delete  [B] behavior  [Ctrl+S] save",
@@ -766,12 +767,13 @@ void app_run(App& app){
 
         app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
         app.editor_renderer.light_space_mat = app.scene.light_space_mat;
+        app.editor_renderer.night_factor = app.scene.night_factor;
                 
         scene_draw_sky(app.scene, view, proj);
 
         // entire render pass in one call
         // ground, gizmo, trike, obstacles, wireframes
-        scene_draw(app.scene, app.trike, app.obstacles, view, proj, app.editor.show_hitboxes);
+        scene_draw(app.scene, app.trike, app.obstacles, app.map.lights, view, proj, app.editor.show_hitboxes);
 
         // build flash map from current obstacle hit timers
         std::map<int,float> flash_map;
@@ -789,7 +791,7 @@ void app_run(App& app){
             app.map.terrain.origin.z,
             app.map.terrain.origin.z + app.map.terrain.rows * app.map.terrain.cell_size);
         editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj, app.map.ocean);
-        editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims);
+        editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims, app.map.lights);
         hud_draw(app.hud, app.trike);
         window_swap_buffers(app.window);
         window_poll_events();
