@@ -460,6 +460,20 @@ float editor_get_y_floor_offset(EditorRenderer& er, const std::string& filename)
     return (it != er.prop_y_offset.end()) ? it->second : 0.0f;
 }
 
+void editor_renderer_preload_textures(EditorRenderer& er){
+    int count = 0;
+    for (auto& [name, mesh] : er.prop_cache){
+        for (int i = 0; i < (int)mesh.data.groups.size(); i++){
+            const ObjGroup& grp = mesh.data.groups[i];
+            const ObjMaterial* mat = obj_find_material(mesh.data, grp.mat_name);
+            if (mat && !mat->tex_path.empty()){
+                load_texture(er, mat->tex_path);
+                count++;
+            }
+        }
+    }
+}
+
 // maps out a color based on obj behavior
 // maps out a color based on obj behavior
 // makes it easier to read at first glance
@@ -836,6 +850,12 @@ void editor_renderer_shadow_pass(EditorRenderer& er, const WorldMap& map,
     glUniformMatrix4fv(er.depth_loc.light_space, 1, GL_FALSE, glm::value_ptr(light_space_mat));
     for (auto& o : map.objects){
         if (o.model_path.empty()) continue;
+
+        // shadow cull
+        glm::vec3 diff = o.position - er.shadow_cull_center;
+        static constexpr float SHADOW_CULL_SQ = 180.0f * 180.0f;
+        if (glm::dot(diff, diff) > SHADOW_CULL_SQ) continue;
+
         ObjMesh& mesh = get_prop_mesh(er, o.model_path);
         if (mesh.data.vertices.empty()) continue;
 
@@ -892,8 +912,18 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     glUniform1i(OL.shadow_map, 1);
     glActiveTexture(GL_TEXTURE0);
 
+    
+    // extract camera position from inverse view matrix
+    // view is already passed in so no extra cost
+    glm::vec3 cam_pos = glm::vec3(glm::inverse(view)[3]);
+    static constexpr float CULL_DIST_SQ = 150.0f * 150.0f;
+
     for (auto& o : map.objects){
         if (o.model_path.empty()) continue;
+
+        // distance cull
+        glm::vec3 diff = o.position - cam_pos;
+        if (glm::dot(diff, diff) > CULL_DIST_SQ) continue;
 
         ObjMesh& mesh = get_prop_mesh(er, o.model_path);
         if (mesh.data.vertices.empty()) continue;
@@ -901,13 +931,15 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
         glm::mat4 model = glm::mat4(1.0f);
 
         auto dit = dynamic_sims.find(o.id);
+
+
         if (o.behavior == DYNAMIC && dit != dynamic_sims.end()){
             // render from simulated transform = tipping, sliding, spinning
             const DynamicSim& sim = dit->second;
             model = glm::translate(model, sim.position);
             model = glm::rotate(model, sim.yaw + o.rotation.y, glm::vec3(0,1,0));
             model = glm::rotate(model, sim.pitch, glm::vec3(1,0,0));
-            model = glm::rotate(model, sim.roll,  glm::vec3(0,0,1));
+            model = glm::rotate(model, sim.roll, glm::vec3(0,0,1));
             model = glm::translate(model, glm::vec3(0.0f, o.y_floor_offset, 0.0f));
             model = glm::scale(model, o.scale);
         } 

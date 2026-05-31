@@ -110,8 +110,8 @@ namespace Const{
     inline constexpr float CAM_YAW_SPEED= 60.0f;  // degrees/sec
     inline constexpr float CAM_PITCH_SPEED= 40.0f;  // degrees/sec
     inline constexpr float CAM_FOV= 55.0f;  // degrees
-    inline constexpr float CAM_NEAR= 0.1f;
-    inline constexpr float CAM_FAR= 200.0f;
+    inline constexpr float CAM_NEAR= 0.5f;
+    inline constexpr float CAM_FAR= 600.0f;
     inline constexpr float CAM_ORBIT_TARGET_Y= 0.5f;
     inline constexpr float CAM_LERP_SPEED= 5.0f; // how fast cam catches to trike
     inline constexpr float CAM_LOOKAHEAD= 1.5f; //metres ahead of trike at max speed

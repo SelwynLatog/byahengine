@@ -96,6 +96,7 @@ struct EditorRenderer{
 
     Mesh line_batch;
     std::vector<float> line_verts;
+    glm::vec3 shadow_cull_center = glm::vec3(0.0f);
 };
 
 // builds the static grid mesh and compiles the flat shader
@@ -128,6 +129,8 @@ void editor_renderer_shadow_pass(EditorRenderer& er, const WorldMap& map,
 void editor_renderer_destroy(EditorRenderer& er);
 
 float editor_get_y_floor_offset(EditorRenderer& er, const std::string& filename);
+
+void editor_renderer_preload_textures(EditorRenderer& er);
 
 void editor_renderer_build_terrain_mesh(EditorRenderer& er, const HeightField& hf);
 

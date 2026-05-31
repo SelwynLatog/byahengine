@@ -179,6 +179,8 @@ void app_init(App& app){
     for (const auto& o : app.map.objects)
         app.wo_by_id[o.id] = &o;
 
+    editor_renderer_preload_textures(app.editor_renderer);
+
 
     // pre editor hardcoded static objs
     // kept for now in case I fuck up my world_map_to_obstacles
@@ -262,6 +264,7 @@ void app_run(App& app){
             app.editor_renderer.light_color = app.scene.light_color;
             app.editor_renderer.ambient = app.scene.ambient;
             app.editor_renderer.diff_intensity = app.scene.diff_intensity;
+            app.editor_renderer.shadow_cull_center = app.editor.cam_pos;
             scene_shadow_pass(app.scene, app.obstacles, app.editor.cam_pos);
             glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
             glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
@@ -743,6 +746,7 @@ void app_run(App& app){
         app.scene.shadow_frame_counter++;
         if (app.scene.shadow_frame_counter >= 3){
             app.scene.shadow_frame_counter = 0;
+            app.editor_renderer.shadow_cull_center = app.trike.position;
             scene_shadow_pass(app.scene, app.obstacles, app.trike.position);
             glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
             glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
