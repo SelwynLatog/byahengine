@@ -54,9 +54,6 @@ struct SceneState {
     GLuint shadow_depth_tex = 0;
     glm::mat4 light_space_mat = glm::mat4(1.0f);
 
-     // shadow throttle
-    int shadow_frame_counter = 0;
-
     // cached uniform locations
     struct {
         GLint view, proj, model, normal_mat;
@@ -105,3 +102,5 @@ void scene_draw_sky(SceneState& scene, const glm::mat4& view, const glm::mat4& p
 void scene_update_daytime(SceneState& scene, float dt);
 
 void scene_shadow_pass(SceneState& scene, const std::vector<Obstacle>& obstacles, glm::vec3 center);
+
+void scene_trike_shadow_draw(SceneState& scene, const TrikeState& trike);

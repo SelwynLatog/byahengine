@@ -273,6 +273,7 @@ void app_run(App& app){
             glCullFace(GL_FRONT);
             editor_renderer_shadow_pass(app.editor_renderer, app.map,
                 app.scene.light_space_mat, app.dynamic_sims);
+            scene_trike_shadow_draw(app.scene, app.trike);
             glCullFace(GL_BACK);
             glDisable(GL_CULL_FACE);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -744,30 +745,28 @@ void app_run(App& app){
         app.editor_renderer.light_color = app.scene.light_color;
         app.editor_renderer.ambient = app.scene.ambient;
         app.editor_renderer.diff_intensity= app.scene.diff_intensity;
+        
+        app.editor_renderer.shadow_cull_center = app.trike.position;
+        scene_shadow_pass(app.scene, app.obstacles, app.trike.position);
 
-        app.scene.shadow_frame_counter++;
-        if (app.scene.shadow_frame_counter >= 3){
-            app.scene.shadow_frame_counter = 0;
-            app.editor_renderer.shadow_cull_center = app.trike.position;
-            scene_shadow_pass(app.scene, app.obstacles, app.trike.position);
-            glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
-            glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
-            glClear(GL_DEPTH_BUFFER_BIT);
-            glEnable(GL_CULL_FACE);
-            glCullFace(GL_FRONT);
-            editor_renderer_shadow_pass(app.editor_renderer, app.map,
-                app.scene.light_space_mat, app.dynamic_sims);
-            glCullFace(GL_BACK);
-            glDisable(GL_CULL_FACE);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            int fb_w, fb_h;
-            glfwGetFramebufferSize(app.window.handle, &fb_w, &fb_h);
-            glViewport(0, 0, fb_w, fb_h);
-            app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
-            app.editor_renderer.light_space_mat  = app.scene.light_space_mat;
-        }
+        glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
+        glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_FRONT);
+        editor_renderer_shadow_pass(app.editor_renderer, app.map,
+            app.scene.light_space_mat, app.dynamic_sims);
+        scene_trike_shadow_draw(app.scene, app.trike);
+        glCullFace(GL_BACK);
+        glDisable(GL_CULL_FACE);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        int fb_w, fb_h;
+        glfwGetFramebufferSize(app.window.handle, &fb_w, &fb_h);
+        glViewport(0, 0, fb_w, fb_h);
 
-
+        app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
+        app.editor_renderer.light_space_mat = app.scene.light_space_mat;
+                
         scene_draw_sky(app.scene, view, proj);
 
         // entire render pass in one call

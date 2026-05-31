@@ -328,9 +328,7 @@ void scene_init(SceneState& scene){
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-
-
+    
     // toggle between using proc mesh or a OBJ model
     // I'll use it for debugging purposes
     // I want to get the physics close to "realistic" because
@@ -437,13 +435,19 @@ void scene_shadow_pass(SceneState& scene, const std::vector<Obstacle>& obstacles
     // orthographic projection looking from sun toward scene center
     glm::vec3 light_dir = scene.sun_dir;
 
-    glm::vec3 light_pos = center + light_dir * 150.0f;
-    glm::mat4 light_view = glm::lookAt(light_pos, center, glm::vec3(0,1,0));
+    float texel_size = (2.0f * Const::SHADOW_ORTHO_SIZE) / (float)Const::SHADOW_MAP_SIZE;
+    glm::vec3 snapped = glm::vec3(
+        std::floor(center.x / texel_size) * texel_size,
+        center.y,
+        std::floor(center.z / texel_size) * texel_size);
 
+    glm::vec3 light_pos = snapped + light_dir * 150.0f;
+    glm::mat4 light_view = glm::lookAt(light_pos, snapped, glm::vec3(0,1,0));
 
     float s = Const::SHADOW_ORTHO_SIZE;
     glm::mat4 light_proj = glm::ortho(-s, s, -s, s, Const::SHADOW_NEAR, Const::SHADOW_FAR);
     scene.light_space_mat = light_proj * light_view;
+
 
     glBindFramebuffer(GL_FRAMEBUFFER, scene.shadow_fbo);
     glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
@@ -473,6 +477,39 @@ void scene_shadow_pass(SceneState& scene, const std::vector<Obstacle>& obstacles
     glDisable(GL_CULL_FACE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
+}
+
+void scene_trike_shadow_draw(SceneState& scene, const TrikeState& trike){
+    glm::vec3 render_pos = trike.position;
+    if (trike.is_tipping)
+        render_pos.y = scene.model_half_height * std::abs(std::cos(trike.roll_angle));
+    else if (trike.is_rolled_over)
+        render_pos.y = 0.0f;
+
+    glm::vec3 sc = scene.model_center * scene.model_scale;
+    glm::mat4 tm =
+        glm::translate(glm::mat4(1.0f), render_pos)
+        * glm::rotate(glm::mat4(1.0f), -trike.heading, glm::vec3(0,1,0))
+        * glm::rotate(glm::mat4(1.0f), -trike.roll_angle, glm::vec3(1,0,0))
+        * glm::rotate(glm::mat4(1.0f), glm::radians(Const::TRIKE_MODEL_YAW_OFFSET), glm::vec3(0,1,0))
+        * glm::translate(glm::mat4(1.0f), -sc)
+        * glm::scale(glm::mat4(1.0f), glm::vec3(scene.model_scale));
+
+    shader_bind(scene.shadow_shader);
+    glUniformMatrix4fv(scene.shadow_loc.light_space, 1, GL_FALSE, glm::value_ptr(scene.light_space_mat));
+    glUniformMatrix4fv(scene.shadow_loc.model, 1, GL_FALSE, glm::value_ptr(tm));
+
+    if constexpr (Const::USE_PROC_MESH){
+        glBindVertexArray(scene.proc_mesh.vao);
+        glDrawArrays(GL_TRIANGLES, 0, scene.proc_mesh.count);
+        glBindVertexArray(0);
+    } 
+    else {
+        ObjMesh& mesh = scene.trike_model.mesh;
+        glBindVertexArray(mesh.vao);
+        glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(mesh.data.vertices.size() / 8));
+        glBindVertexArray(0);
+    }
 }
 
 void scene_update_daytime(SceneState& scene, float dt){
@@ -646,26 +683,32 @@ void scene_draw(
     glm::mat4 gm = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, Const::GROUND_Y_OFFSET, 0.0f));
     glm::mat3 gnm = glm::mat3(1.0f);
 
-     auto& L = scene.shader_loc;
+    auto& L = scene.shader_loc;
     shader_bind(scene.shader);
-    glUniformMatrix4fv(L.view,  1, GL_FALSE, glm::value_ptr(view));
-    glUniformMatrix4fv(L.proj,  1, GL_FALSE, glm::value_ptr(proj));
-    glUniform3f(L.light_dir,    scene.sun_dir.x, scene.sun_dir.y, scene.sun_dir.z);
+    glUniformMatrix4fv(L.view, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(L.proj, 1, GL_FALSE, glm::value_ptr(proj));
+    glUniform3f(L.light_dir, scene.sun_dir.x, scene.sun_dir.y, scene.sun_dir.z);
     glUniformMatrix4fv(L.light_space, 1, GL_FALSE, glm::value_ptr(scene.light_space_mat));
     glUniform3f(L.light_color, scene.light_color.r, scene.light_color.g, scene.light_color.b);
     glUniform1f(L.ambient, scene.ambient);
     glUniform1f(L.diff_intensity, scene.diff_intensity);
     glUniform1f(L.shadow_bias,  Const::SHADOW_BIAS);
+    
+
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, scene.shadow_depth_tex);
     glUniform1i(L.shadow_map, 1);
     glActiveTexture(GL_TEXTURE0);
+
     glUniformMatrix4fv(L.model, 1, GL_FALSE, glm::value_ptr(gm));
     glUniformMatrix3fv(L.normal_mat, 1, GL_FALSE, glm::value_ptr(gnm));
     glUniform3f(L.kd, Const::GROUND_KD, Const::GROUND_KD, Const::GROUND_KD);
     glUniform3f(L.kd_alt, Const::GROUND_KD_ALT, Const::GROUND_KD_ALT, Const::GROUND_KD_ALT);
     glUniform1f(L.checker_scale, 1.0f / Const::GROUND_GRID_TILE_SIZE);
     glUniform1i(L.use_checker, 0);
+    glBindVertexArray(scene.ground.vao);
+    glDrawArrays(GL_TRIANGLES, 0, scene.ground.count);
+    glBindVertexArray(0);
 
     // axis gizmo
     /*shader_bind(scene.gizmo_shader);
@@ -693,9 +736,8 @@ void scene_draw(
 
     glm::mat3 tnm = glm::mat3(tm);
 
-    shader_bind(scene.shader);
     glUniformMatrix4fv(L.model, 1, GL_FALSE, glm::value_ptr(tm));
-    glUniformMatrix3fv(L.normal_mat,1, GL_FALSE, glm::value_ptr(tnm));
+    glUniformMatrix3fv(L.normal_mat, 1, GL_FALSE, glm::value_ptr(tnm));
 
     if constexpr (Const::USE_PROC_MESH){
         // proc mesh uses rgb color layout not normals 
