@@ -335,8 +335,17 @@ void trike_physics_update(TrikeState& state, const TrikeInput& input, const Heig
         // gravity component pulling along forward axis
         // negative = going uphill (drag)
         // positive = going downhill (free acceleration)
-         state.slope_force = -Const::GRAVITY * Const::TERRAIN_SLOPE_GRAVITY_SCALE
+        state.slope_force = -Const::GRAVITY * Const::TERRAIN_SLOPE_GRAVITY_SCALE
             * std::sin(state.pitch_angle);
+
+        // pitch restoring spring 
+        // no "any slope immediately tilts the body with no pushback" bs
+        if (!state.is_tipping){
+            float pitch_restore = -state.pitch_angle * 18.0f;
+            float pitch_damp = -state.air_pitch_vel * 6.0f;
+            state.air_pitch_vel += (pitch_restore + pitch_damp) * dt;
+            state.pitch_angle += state.air_pitch_vel * dt;
+        }
 
         // cross-slope: how much the terrain tilts the trike sideways
         // project surface normal onto the local right vector
