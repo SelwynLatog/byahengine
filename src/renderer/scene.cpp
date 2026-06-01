@@ -50,7 +50,7 @@ uniform float     u_diff_intensity;
 uniform sampler2D u_shadow_map;
 uniform float     u_shadow_bias;
 
-#define MAX_LIGHTS 200
+#define MAX_LIGHTS 150
 uniform int   u_light_count;
 uniform vec3  u_light_pos[MAX_LIGHTS];
 uniform vec3  u_light_color_pt[MAX_LIGHTS];
@@ -712,17 +712,23 @@ void scene_draw(
     glUniform1f(L.diff_intensity, scene.diff_intensity);
     glUniform1f(L.shadow_bias, Const::SHADOW_BIAS);
 
-    // upload point lights
-    int lcount = (int)std::min(lights.size(), (size_t)Const::MAX_POINT_LIGHTS);
-    // skip upload entirely during full day
-    int active_lcount = (scene.night_factor < 0.01f) ? 0 : lcount;
-    glUniform1i(scene.light_loc.count, active_lcount);
-    for (int i = 0; i < active_lcount; i++){
-        glUniform3f(scene.light_loc.pos[i], lights[i].position.x, lights[i].position.y, lights[i].position.z);
-        glUniform3f(scene.light_loc.color[i], lights[i].color.r, lights[i].color.g, lights[i].color.b);
-        glUniform1f(scene.light_loc.radius[i], lights[i].radius);
-        glUniform1f(scene.light_loc.intensity[i], lights[i].intensity * scene.night_factor);
+    // upload point lights 
+    // cpu cull to camera distance
+    glm::vec3 cam_pos = glm::vec3(glm::inverse(view)[3]);
+    int active_lcount = 0;
+    if (scene.night_factor >= 0.01f){
+        for (int i = 0; i < (int)lights.size() && active_lcount < Const::MAX_POINT_LIGHTS; i++){
+            glm::vec3 d = lights[i].position - cam_pos;
+            if (glm::dot(d, d) > Const::LIGHT_CULL_DIST_SQ) continue;
+            glUniform3f(scene.light_loc.pos[active_lcount], lights[i].position.x, lights[i].position.y, lights[i].position.z);
+            glUniform3f(scene.light_loc.color[active_lcount], lights[i].color.r, lights[i].color.g, lights[i].color.b);
+            glUniform1f(scene.light_loc.radius[active_lcount], lights[i].radius);
+            glUniform1f(scene.light_loc.intensity[active_lcount], lights[i].intensity * scene.night_factor);
+            active_lcount++;
+        }
     }
+    glUniform1i(scene.light_loc.count, active_lcount);
+
 
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, scene.shadow_depth_tex);

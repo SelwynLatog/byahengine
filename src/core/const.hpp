@@ -17,7 +17,7 @@ namespace Const{
     // day cycle
     // 10 real minutes = 1 full in-game day
     inline constexpr float DAY_DURATION_SECONDS = 600.0f;
-    inline constexpr float DAY_START_TIME = 7.0f; // start at 7am
+    inline constexpr float DAY_START_TIME = 22.0f;//7.0f; // start at 7am
 
     // time ranges (0-24)
     inline constexpr float DAY_MORNING_START = 5.0f;
@@ -139,9 +139,16 @@ namespace Const{
     inline constexpr float LIGHT_DIFF= 0.85f;
 
     // point lights
-    inline constexpr int MAX_POINT_LIGHTS = 200;
+    inline constexpr int MAX_POINT_LIGHTS = 150;
     inline constexpr float LIGHT_DEFAULT_RADIUS = 20.0f;
     inline constexpr float LIGHT_DEFAULT_INTENSITY = 4.5f;
+
+    // light cull
+    inline constexpr float LIGHT_CULL_DIST = 120.0f; // metres, lights beyond this aren't uploaded
+    inline constexpr float LIGHT_CULL_DIST_SQ = LIGHT_CULL_DIST * LIGHT_CULL_DIST;
+
+    inline constexpr float PROP_CULL_DIST = 150.0f;
+    inline constexpr float PROP_CULL_DIST_SQ = PROP_CULL_DIST * PROP_CULL_DIST;
 
     // streetlight warm yellow
     inline constexpr float LIGHT_DEFAULT_R = 1.00f;

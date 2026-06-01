@@ -60,7 +60,7 @@ uniform float     u_ambient;
 uniform float     u_diff_intensity;
 uniform vec3      u_light_color;
 
-#define MAX_LIGHTS 200
+#define MAX_LIGHTS 150
 uniform int   u_light_count;
 uniform vec3  u_light_pos[MAX_LIGHTS];
 uniform vec3  u_light_color_pt[MAX_LIGHTS];
@@ -259,7 +259,7 @@ uniform float     u_ambient;
 uniform float     u_diff_intensity;
 uniform vec3      u_light_color;
 
-#define MAX_LIGHTS 200
+#define MAX_LIGHTS 150
 uniform int   u_light_count;
 uniform vec3  u_light_pos[MAX_LIGHTS];
 uniform vec3  u_light_color_pt[MAX_LIGHTS];
@@ -1022,29 +1022,36 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     glActiveTexture(GL_TEXTURE0);
 
     // upload point lights
-    int lcount = (int)std::min(lights.size(), (size_t)Const::MAX_POINT_LIGHTS);
-    int active_lcount = (er.night_factor < 0.01f) ? 0 : lcount;
-    glUniform1i(er.pt_light_loc.count, active_lcount);
-    for (int i = 0; i < active_lcount; i++){
-        glUniform3f(er.pt_light_loc.pos[i], lights[i].position.x, lights[i].position.y, lights[i].position.z);
-        glUniform3f(er.pt_light_loc.color[i], lights[i].color.r, lights[i].color.g, lights[i].color.b);
-        glUniform1f(er.pt_light_loc.radius[i], lights[i].radius);
-        glUniform1f(er.pt_light_loc.intensity[i], lights[i].intensity * er.night_factor);
-    }
     
+    // cpu cull
+
+    // cpu cull: only upload lights within draw distance of camera
+    glm::vec3 cam_pos = glm::vec3(glm::inverse(view)[3]);
+    int active_lcount = 0;
+    if (er.night_factor >= 0.01f){
+        for (int i = 0; i < (int)lights.size() && active_lcount < Const::MAX_POINT_LIGHTS; i++){
+            glm::vec3 d = lights[i].position - cam_pos;
+            if (glm::dot(d, d) > Const::LIGHT_CULL_DIST_SQ) continue;
+            // compact into slots 0..active_lcount
+            glUniform3f(er.pt_light_loc.pos[active_lcount], lights[i].position.x, lights[i].position.y, lights[i].position.z);
+            glUniform3f(er.pt_light_loc.color[active_lcount], lights[i].color.r, lights[i].color.g, lights[i].color.b);
+            glUniform1f(er.pt_light_loc.radius[active_lcount], lights[i].radius);
+            glUniform1f(er.pt_light_loc.intensity[active_lcount], lights[i].intensity * er.night_factor);
+            active_lcount++;
+        }
+    }
+    glUniform1i(er.pt_light_loc.count, active_lcount);
+ 
     // extract camera position from inverse view matrix
     // view is already passed in so no extra cost
     er.last_lights = lights;
-
-    glm::vec3 cam_pos = glm::vec3(glm::inverse(view)[3]);
-    static constexpr float CULL_DIST_SQ = 150.0f * 150.0f;
 
     for (auto& o : map.objects){
         if (o.model_path.empty()) continue;
 
         // distance cull
         glm::vec3 diff = o.position - cam_pos;
-        if (glm::dot(diff, diff) > CULL_DIST_SQ) continue;
+        if (glm::dot(diff, diff) > Const::PROP_CULL_DIST_SQ) continue;
 
         ObjMesh& mesh = get_prop_mesh(er, o.model_path);
         if (mesh.data.vertices.empty()) continue;
@@ -1254,22 +1261,27 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
     // upload point lights to road shader
     // road_loc doesn't have pt_light atm slots so look them up directly
     GLuint rid = er.road_shader.id;
-    int lcount = (int)std::min(er.last_lights.size(), (size_t)Const::MAX_POINT_LIGHTS);
-    int active_lcount = (er.night_factor < 0.01f) ? 0 : lcount;
-    glUniform1i(glGetUniformLocation(rid, "u_light_count"), active_lcount);
+    glm::vec3 cam_pos_r = glm::vec3(glm::inverse(view)[3]);
+    int active_lcount = 0;
     char _buf[64];
-    for (int i = 0; i < active_lcount; i++){
-        snprintf(_buf, sizeof(_buf), "u_light_pos[%d]", i);
-        glUniform3f(glGetUniformLocation(rid, _buf),
-            er.last_lights[i].position.x, er.last_lights[i].position.y, er.last_lights[i].position.z);
-        snprintf(_buf, sizeof(_buf), "u_light_color_pt[%d]", i);
-        glUniform3f(glGetUniformLocation(rid, _buf),
-            er.last_lights[i].color.r, er.last_lights[i].color.g, er.last_lights[i].color.b);
-        snprintf(_buf, sizeof(_buf), "u_light_radius[%d]", i);
-        glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].radius);
-        snprintf(_buf, sizeof(_buf), "u_light_intensity[%d]", i);
-        glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].intensity * er.night_factor);
+    if (er.night_factor >= 0.01f){
+        for (int i = 0; i < (int)er.last_lights.size() && active_lcount < Const::MAX_POINT_LIGHTS; i++){
+            glm::vec3 d = er.last_lights[i].position - cam_pos_r;
+            if (glm::dot(d, d) > Const::LIGHT_CULL_DIST_SQ) continue;
+            snprintf(_buf, sizeof(_buf), "u_light_pos[%d]", active_lcount);
+            glUniform3f(glGetUniformLocation(rid, _buf),
+                er.last_lights[i].position.x, er.last_lights[i].position.y, er.last_lights[i].position.z);
+            snprintf(_buf, sizeof(_buf), "u_light_color_pt[%d]", active_lcount);
+            glUniform3f(glGetUniformLocation(rid, _buf),
+                er.last_lights[i].color.r, er.last_lights[i].color.g, er.last_lights[i].color.b);
+            snprintf(_buf, sizeof(_buf), "u_light_radius[%d]", active_lcount);
+            glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].radius);
+            snprintf(_buf, sizeof(_buf), "u_light_intensity[%d]", active_lcount);
+            glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].intensity * er.night_factor);
+            active_lcount++;
+        }
     }
+    glUniform1i(glGetUniformLocation(rid, "u_light_count"), active_lcount);
 
     for (const auto& road : roads){
         if (road.vao == 0 || road.index_count == 0) continue;
@@ -1513,22 +1525,27 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
 
     // UPLOAD POINT LIGHTS TO ROAD SHADER
     GLuint rid = er.road_shader.id;
-    int lcount = (int)std::min(er.last_lights.size(), (size_t)Const::MAX_POINT_LIGHTS);
-    int active_lcount = (er.night_factor < 0.01f) ? 0 : lcount;
-    glUniform1i(glGetUniformLocation(rid, "u_light_count"), active_lcount);
+    glm::vec3 cam_pos_t = glm::vec3(glm::inverse(view)[3]);
+    int active_lcount = 0;
     char _buf[64];
-    for (int i = 0; i < active_lcount; i++){
-        snprintf(_buf, sizeof(_buf), "u_light_pos[%d]", i);
-        glUniform3f(glGetUniformLocation(rid, _buf),
-            er.last_lights[i].position.x, er.last_lights[i].position.y, er.last_lights[i].position.z);
-        snprintf(_buf, sizeof(_buf), "u_light_color_pt[%d]", i);
-        glUniform3f(glGetUniformLocation(rid, _buf),
-            er.last_lights[i].color.r, er.last_lights[i].color.g, er.last_lights[i].color.b);
-        snprintf(_buf, sizeof(_buf), "u_light_radius[%d]", i);
-        glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].radius);
-        snprintf(_buf, sizeof(_buf), "u_light_intensity[%d]", i);
-        glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].intensity * er.night_factor);
+    if (er.night_factor >= 0.01f){
+        for (int i = 0; i < (int)er.last_lights.size() && active_lcount < Const::MAX_POINT_LIGHTS; i++){
+            glm::vec3 d = er.last_lights[i].position - cam_pos_t;
+            if (glm::dot(d, d) > Const::LIGHT_CULL_DIST_SQ) continue;
+            snprintf(_buf, sizeof(_buf), "u_light_pos[%d]", active_lcount);
+            glUniform3f(glGetUniformLocation(rid, _buf),
+                er.last_lights[i].position.x, er.last_lights[i].position.y, er.last_lights[i].position.z);
+            snprintf(_buf, sizeof(_buf), "u_light_color_pt[%d]", active_lcount);
+            glUniform3f(glGetUniformLocation(rid, _buf),
+                er.last_lights[i].color.r, er.last_lights[i].color.g, er.last_lights[i].color.b);
+            snprintf(_buf, sizeof(_buf), "u_light_radius[%d]", active_lcount);
+            glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].radius);
+            snprintf(_buf, sizeof(_buf), "u_light_intensity[%d]", active_lcount);
+            glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].intensity * er.night_factor);
+            active_lcount++;
+        }
     }
+    glUniform1i(glGetUniformLocation(rid, "u_light_count"), active_lcount);
 
     glBindVertexArray(er.terrain_surface_mesh.vao);
 
