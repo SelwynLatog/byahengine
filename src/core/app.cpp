@@ -242,7 +242,10 @@ void app_run(App& app){
         }
         s_tab_pressed_last = tab_down;
 
+        //******************************************************************************/
         // EDITOR MODE
+        //******************************************************************************/
+        
         if (app.editor.active){
             editor_cam_update(app.editor, app.window.handle, dt);
 
@@ -329,26 +332,96 @@ void app_run(App& app){
             continue;
         }
 
-
+        //******************************************************************************/
         // DRIVING MODE
-        TrikeInput input;
-        input.throttle = (glfwGetKey(app.window.handle, GLFW_KEY_W) == GLFW_PRESS) ? 1.0f : 0.0f;
-        bool s_held   = glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS;
-        input.brake   = (s_held && app.trike.speed >  0.5f) ? 1.0f : 0.0f;
-        input.reverse = (s_held && app.trike.speed <= 0.5f) ? 1.0f : 0.0f;
-        input.steer = 0.0f;
-        if (glfwGetKey(app.window.handle, GLFW_KEY_A) == GLFW_PRESS) input.steer -= 1.0f;
-        if (glfwGetKey(app.window.handle, GLFW_KEY_D) == GLFW_PRESS) input.steer += 1.0f;
+        //******************************************************************************/
+
+        // lock drive mode to player driving
+        TrikeInput input = {};
+        if (app.player.mode == PLAYER_DRIVING || app.player.mode == PLAYER_MOUNTING){
+            input.throttle = (glfwGetKey(app.window.handle, GLFW_KEY_W) == GLFW_PRESS) ? 1.0f : 0.0f;
+            bool s_held   = glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS;
+            input.brake   = (s_held && app.trike.speed >  0.5f) ? 1.0f : 0.0f;
+            input.reverse = (s_held && app.trike.speed <= 0.5f) ? 1.0f : 0.0f;
+            input.steer = 0.0f;
+            if (glfwGetKey(app.window.handle, GLFW_KEY_A) == GLFW_PRESS) input.steer -= 1.0f;
+            if (glfwGetKey(app.window.handle, GLFW_KEY_D) == GLFW_PRESS) input.steer += 1.0f;
+        }
+        else {
+            // FOOT mode walking
+            // WASD moves relative to camera facing
+            // arrows orbit the camera (handled in CAM ORBIT INPUT below)
+            float move = 0.0f, strafe = 0.0f;
+            if (glfwGetKey(app.window.handle, GLFW_KEY_W) == GLFW_PRESS) move   =  1.0f;
+            if (glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS) move   = -1.0f;
+            if (glfwGetKey(app.window.handle, GLFW_KEY_A) == GLFW_PRESS) strafe = -1.0f;
+            if (glfwGetKey(app.window.handle, GLFW_KEY_D) == GLFW_PRESS) strafe =  1.0f;
+
+            // cam faces player from s_cam_yaw world angle
+            float cam_world_angle = glm::radians(s_cam_yaw) + glm::radians(180.0f);
+            glm::vec3 fwd_dir = { std::cos(cam_world_angle), 0.0f, std::sin(cam_world_angle) };
+            glm::vec3 rgt_dir = { -std::sin(cam_world_angle), 0.0f, std::cos(cam_world_angle) };
+
+            float walk_speed = 4.0f;
+            glm::vec3 walk_vel = fwd_dir * move + rgt_dir * strafe;
+
+            if (glm::length(walk_vel) > 0.001f){
+                walk_vel = glm::normalize(walk_vel) * walk_speed;
+                // character faces direction of travel, independent of cam
+                app.player.yaw = std::atan2(walk_vel.z, walk_vel.x);
+            }
+
+            app.player.pos += walk_vel * dt;
+            app.player.speed = glm::length(walk_vel);
+            app.player.pos.y = heightfield_sample(app.map.terrain,
+                app.player.pos.x, app.player.pos.z);
+            app.player.anim_timer += app.player.speed * dt * 1.8f;
+        }
+
+        // PLAYER MOUNT
         bool f_down = glfwGetKey(app.window.handle, GLFW_KEY_F) == GLFW_PRESS;
         if (f_down && !s_f_pressed_last) s_free_cam = !s_free_cam;
         s_f_pressed_last = f_down;
 
+        // E key: mount / dismount
+        static bool s_e_last = false;
+        bool e_down = glfwGetKey(app.window.handle, GLFW_KEY_E) == GLFW_PRESS;
+        if (e_down && !s_e_last && app.player.mode != PLAYER_MOUNTING){
+            if (app.player.mode == PLAYER_DRIVING){
+                // dismount: drop player beside trike
+                float side = app.trike.heading + glm::half_pi<float>();
+                app.player.pos = app.trike.position
+                    + glm::vec3(std::cos(side), 0.0f, std::sin(side)) * 1.2f;
+                app.player.yaw = app.trike.heading;
+                app.player.mode = PLAYER_FOOT;
+            }
+            else {
+                // mount: only if close enough
+                glm::vec3 delta = app.trike.position - app.player.pos;
+                delta.y = 0.0f;
+                if (glm::dot(delta, delta) < 9.0f){ // 3m radius
+                    app.player.mode = PLAYER_MOUNTING;
+                    app.player.mount_timer = 0.3f;
+                }
+            }
+        }
+        s_e_last = e_down;
+
+        // mounting transition tick
+        if (app.player.mode == PLAYER_MOUNTING){
+            app.player.mount_timer -= dt;
+            if (app.player.mount_timer <= 0.0f)
+                app.player.mode = PLAYER_DRIVING;
+        }
+
+        // RESET DRIVE
         // R key resets trike and dynamic objects to initial state
         static bool s_r_last = false;
         bool r_down = glfwGetKey(app.window.handle, GLFW_KEY_R) == GLFW_PRESS;
         if (r_down && !s_r_last){
             // reset trike to spawn
             app.trike = TrikeState{};
+            app.player = PlayerState{};
             s_cam_yaw   = Const::CAM_YAW_DEFAULT;
             s_cam_pitch = Const::CAM_PITCH_DEFAULT;
             s_cam_dist  = Const::CAM_DIST_DEFAULT;
@@ -363,14 +436,14 @@ void app_run(App& app){
         }
         s_r_last = r_down;
 
-        // camera orbit input
-        if (glfwGetKey(app.window.handle, GLFW_KEY_LEFT)  == GLFW_PRESS) s_cam_yaw -= Const::CAM_YAW_SPEED * dt;
+        // CAM ORBIT IMPUT
+        if (glfwGetKey(app.window.handle, GLFW_KEY_LEFT) == GLFW_PRESS) s_cam_yaw -= Const::CAM_YAW_SPEED * dt;
         if (glfwGetKey(app.window.handle, GLFW_KEY_RIGHT) == GLFW_PRESS) s_cam_yaw += Const::CAM_YAW_SPEED * dt;
-        if (glfwGetKey(app.window.handle, GLFW_KEY_UP)    == GLFW_PRESS) s_cam_pitch += Const::CAM_PITCH_SPEED * dt;
-        if (glfwGetKey(app.window.handle, GLFW_KEY_DOWN)  == GLFW_PRESS) s_cam_pitch -= Const::CAM_PITCH_SPEED * dt;
+        if (glfwGetKey(app.window.handle, GLFW_KEY_UP) == GLFW_PRESS) s_cam_pitch += Const::CAM_PITCH_SPEED * dt;
+        if (glfwGetKey(app.window.handle, GLFW_KEY_DOWN) == GLFW_PRESS) s_cam_pitch -= Const::CAM_PITCH_SPEED * dt;
         s_cam_pitch = glm::clamp(s_cam_pitch, Const::CAM_PITCH_MIN, Const::CAM_PITCH_MAX);
-        // spring yaw offset back toward 0 (behind trike) when trike is moving
-        if (std::abs(app.trike.speed) > 0.3f)
+        // spring cam yaw back behind trike only while driving
+        if (app.player.mode == PLAYER_DRIVING && std::abs(app.trike.speed) > 0.3f)
             s_cam_yaw = glm::mix(s_cam_yaw, 0.0f, 1.0f - std::exp(-3.5f * dt));
 
         // fixed timestep physics
@@ -395,7 +468,8 @@ void app_run(App& app){
         float pre_collision_speed = app.trike.speed;
         bool any_collision = false;
 
-        // collision detection + response
+
+        // COLLISION DETECTION + RESPONSE
         // suspended during tumble
         if (app.trike.is_tipping || app.trike.is_rolled_over) goto skip_collision;
         for (auto& obs : app.obstacles){
@@ -676,65 +750,81 @@ void app_run(App& app){
             }
         }
 
-        // camera
-        float yaw_r = glm::radians(s_cam_yaw);
-        float cam_yaw_world = app.trike.heading + yaw_r + glm::radians(180.0f);
 
-        float speed_t = glm::clamp(std::abs(app.trike.speed) / Const::TRIKE_MAX_SPEED, 0.0f, 1.0f);
-        float slope_contribution = -app.trike.pitch_angle * speed_t * Const::CAM_SLOPE_PITCH_SCALE;
-        static float s_cam_pitch_smoothed = 0.0f;
-        s_cam_pitch_smoothed = glm::mix(s_cam_pitch_smoothed, slope_contribution,
-            glm::clamp(Const::CAM_SLOPE_LERP_SPEED * dt, 0.0f, 1.0f));
-
-        float pitch_r = glm::radians(s_cam_pitch) + s_cam_pitch_smoothed;
-        pitch_r = glm::clamp(pitch_r, glm::radians(Const::CAM_PITCH_MIN), glm::radians(Const::CAM_PITCH_MAX + 25.0f));
-
-        // smooth lookat height bias
-        static float s_target_y_bias = 0.0f;
-        float target_y_goal = -app.trike.pitch_angle * speed_t * Const::CAM_SLOPE_TARGET_Y_BIAS;
-        s_target_y_bias = glm::mix(s_target_y_bias, target_y_goal,
-            glm::clamp(Const::CAM_SLOPE_LERP_SPEED * dt, 0.0f, 1.0f));
-
-        glm::vec3 cam_origin = app.trike.position + glm::vec3(0.0f, Const::CAM_ORBIT_TARGET_Y, 0.0f);
-        glm::vec3 ideal_eye  = cam_origin + glm::vec3(
-            s_cam_dist * cosf(pitch_r) * cosf(cam_yaw_world),
-            s_cam_dist * sinf(pitch_r),
-            s_cam_dist * cosf(pitch_r) * sinf(cam_yaw_world));
-        s_cam_pos = glm::mix(s_cam_pos, ideal_eye, Const::CAM_LERP_SPEED * dt);
-
-        float fwd_angle = app.trike.heading;
-        glm::vec3 fwd = glm::vec3(cosf(fwd_angle), 0.0f, sinf(fwd_angle));
-        float lookahead = (app.trike.speed / Const::TRIKE_MAX_SPEED) * Const::CAM_LOOKAHEAD;
-        glm::vec3 target = cam_origin + fwd * lookahead + glm::vec3(0.0f, s_target_y_bias, 0.0f);
-
-        // camera shake on impact
-        // shake the lookat target and not the eye position
-        // this feels more natural and looks more natural
-        // 3 sin.cos at diff frequencies gives pseudorandom wobble without actual RNG
-        // decays at zero as impact_timer runs out
-        // pretty sweet if i must say
-        if (app.trike.impact_timer > 0.0f){
-            float t = app.trike.impact_timer;
-            float mag = glm::clamp(app.trike.last_impact_force * 0.018f, 0.0f, 0.4f);
-            float decay = t / 0.35f;
-            target.x += std::sin(t * 47.0f) * mag * decay;
-            target.y += std::cos(t * 31.0f) * mag * decay;
-            target.z += std::sin(t * 23.0f) * mag * decay;
-        }
-
+        //**************************************/
+        // CAMERA
+        //**************************************/
         glm::mat4 view;
-        if (s_free_cam){
-            glm::vec3 top = app.trike.position + glm::vec3(0.0f, 15.0f, 0.0f);
-            view = glm::lookAt(top, app.trike.position, glm::vec3(1,0,0));
-        } 
-        else {
-            view = glm::lookAt(s_cam_pos, target, glm::vec3(0,1,0));
-        }
-
         glm::mat4 proj = glm::perspective(
             glm::radians(Const::CAM_FOV),
             (float)Const::WINDOW_WIDTH / (float)Const::WINDOW_HEIGHT,
             Const::CAM_NEAR, Const::CAM_FAR);
+
+        if (app.player.mode == PLAYER_FOOT){
+            float cam_world_yaw = glm::radians(s_cam_yaw);
+            float pitch_r = glm::radians(s_cam_pitch);
+            pitch_r = glm::clamp(pitch_r, glm::radians(Const::CAM_PITCH_MIN),
+                                          glm::radians(Const::CAM_PITCH_MAX));
+            float foot_dist = 4.0f;
+            glm::vec3 foot_origin = app.player.pos + glm::vec3(0.0f, 1.0f, 0.0f);
+            glm::vec3 ideal_eye = foot_origin + glm::vec3(
+                foot_dist * cosf(pitch_r) * cosf(cam_world_yaw),
+                foot_dist * sinf(pitch_r),
+                foot_dist * cosf(pitch_r) * sinf(cam_world_yaw));
+            s_cam_pos = glm::mix(s_cam_pos, ideal_eye, Const::CAM_LERP_SPEED * dt);
+            view = glm::lookAt(s_cam_pos, foot_origin, glm::vec3(0,1,0));
+        }
+        else {
+            float yaw_r = glm::radians(s_cam_yaw);
+            float cam_yaw_world = app.trike.heading + yaw_r + glm::radians(180.0f);
+
+            float speed_t = glm::clamp(std::abs(app.trike.speed) / Const::TRIKE_MAX_SPEED, 0.0f, 1.0f);
+            float slope_contribution = -app.trike.pitch_angle * speed_t * Const::CAM_SLOPE_PITCH_SCALE;
+            static float s_cam_pitch_smoothed = 0.0f;
+            s_cam_pitch_smoothed = glm::mix(s_cam_pitch_smoothed, slope_contribution,
+                glm::clamp(Const::CAM_SLOPE_LERP_SPEED * dt, 0.0f, 1.0f));
+
+            float pitch_r = glm::radians(s_cam_pitch) + s_cam_pitch_smoothed;
+            pitch_r = glm::clamp(pitch_r, glm::radians(Const::CAM_PITCH_MIN),
+                                        glm::radians(Const::CAM_PITCH_MAX + 25.0f));
+
+            static float s_target_y_bias = 0.0f;
+            float target_y_goal = -app.trike.pitch_angle * speed_t * Const::CAM_SLOPE_TARGET_Y_BIAS;
+            s_target_y_bias = glm::mix(s_target_y_bias, target_y_goal,
+                glm::clamp(Const::CAM_SLOPE_LERP_SPEED * dt, 0.0f, 1.0f));
+
+            glm::vec3 cam_origin = app.trike.position + glm::vec3(0.0f, Const::CAM_ORBIT_TARGET_Y, 0.0f);
+            glm::vec3 ideal_eye  = cam_origin + glm::vec3(
+                s_cam_dist * cosf(pitch_r) * cosf(cam_yaw_world),
+                s_cam_dist * sinf(pitch_r),
+                s_cam_dist * cosf(pitch_r) * sinf(cam_yaw_world));
+            s_cam_pos = glm::mix(s_cam_pos, ideal_eye, Const::CAM_LERP_SPEED * dt);
+
+            float fwd_angle = app.trike.heading;
+            glm::vec3 fwd = glm::vec3(cosf(fwd_angle), 0.0f, sinf(fwd_angle));
+            float lookahead = (app.trike.speed / Const::TRIKE_MAX_SPEED) * Const::CAM_LOOKAHEAD;
+            glm::vec3 target = cam_origin + fwd * lookahead + glm::vec3(0.0f, s_target_y_bias, 0.0f);
+
+            if (app.trike.impact_timer > 0.0f){
+                float t = app.trike.impact_timer;
+                float mag = glm::clamp(app.trike.last_impact_force * 0.018f, 0.0f, 0.4f);
+                float decay = t / 0.35f;
+                target.x += std::sin(t * 47.0f) * mag * decay;
+                target.y += std::cos(t * 31.0f) * mag * decay;
+                target.z += std::sin(t * 23.0f) * mag * decay;
+            }
+
+            if (s_free_cam){
+                glm::vec3 top = app.trike.position + glm::vec3(0.0f, 15.0f, 0.0f);
+                view = glm::lookAt(top, app.trike.position, glm::vec3(1,0,0));
+            }
+            else {
+                view = glm::lookAt(s_cam_pos, target, glm::vec3(0,1,0));
+            }
+        }
+
+
+
 
         // render
         glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);
@@ -792,6 +882,7 @@ void app_run(App& app){
             app.map.terrain.origin.z + app.map.terrain.rows * app.map.terrain.cell_size);
         editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj, app.map.ocean);
         editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims, app.map.lights);
+        scene_draw_driver(app.scene, app.player, app.trike, view, proj);
         hud_draw(app.hud, app.trike);
         window_swap_buffers(app.window);
         window_poll_events();

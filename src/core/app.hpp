@@ -12,11 +12,13 @@
 #include <vector>
 #include <unordered_map>
 #include "../physics/dynamic_sim.hpp"
+#include "player_state.hpp"
 
 
 struct App {
     Window window;
     TrikeState trike;
+    PlayerState player;
     Hud hud;
     SceneState scene;
     float last_time = 0.0f;

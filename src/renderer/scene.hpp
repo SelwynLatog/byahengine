@@ -2,11 +2,13 @@
 #include "shader.hpp"
 #include "mesh.hpp"
 #include "../core/const.hpp"
+#include "../core/player_state.hpp"
 #include "obj_mesh.hpp"
 #include "../physics/trike_state.hpp"
 #include "../physics/obstacle.hpp"
 #include "../tricycle/tricycle_mesh.hpp"
 #include "../tricycle/tricycle_model.hpp"
+#include "../tricycle/driver_model.hpp"
 #include "../world/light_source.hpp"
 #include <glm/glm.hpp>
 #include <vector>
@@ -23,6 +25,7 @@ struct SceneState {
     ObjMesh trike_mesh; // OBJ file
     Mesh proc_mesh; // hard coded mesh
     TrikeModel trike_model; // animated parts model
+    DriverModel driver_model; // animated parts driver model
 
     // computed at load time from OBJ bounding box
     glm::vec3 model_center = glm::vec3(0.0f);
@@ -115,3 +118,6 @@ void scene_update_daytime(SceneState& scene, float dt);
 void scene_shadow_pass(SceneState& scene, const std::vector<Obstacle>& obstacles, glm::vec3 center);
 
 void scene_trike_shadow_draw(SceneState& scene, const TrikeState& trike);
+
+void scene_draw_driver(SceneState& scene, const PlayerState& player,
+    const TrikeState& trike, const glm::mat4& view, const glm::mat4& proj);

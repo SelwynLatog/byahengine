@@ -363,6 +363,7 @@ void scene_init(SceneState& scene){
     } 
     else {
         trike_model_init(scene.trike_model);
+        driver_model_init(scene.driver_model);
 
         const auto& verts = scene.trike_model.mesh.data.vertices;
 
@@ -858,6 +859,18 @@ void scene_draw(
 
     shader_bind(scene.shader);
 }
+
+void scene_draw_driver(
+    SceneState& scene,
+    const PlayerState& player,
+    const TrikeState& trike,
+    const glm::mat4& view,
+    const glm::mat4& proj)
+{
+    shader_bind(scene.shader);
+    driver_model_draw(scene.driver_model, player, trike, scene.shader, view, proj);
+}
+
 
 void scene_destroy(SceneState& scene){
     if (scene.sky_tex) glDeleteTextures(1, &scene.sky_tex);

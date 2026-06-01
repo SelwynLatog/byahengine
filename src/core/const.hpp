@@ -17,7 +17,7 @@ namespace Const{
     // day cycle
     // 10 real minutes = 1 full in-game day
     inline constexpr float DAY_DURATION_SECONDS = 600.0f;
-    inline constexpr float DAY_START_TIME = 22.0f;//7.0f; // start at 7am
+    inline constexpr float DAY_START_TIME = 17.0f;//7.0f; // start at 7am
 
     // time ranges (0-24)
     inline constexpr float DAY_MORNING_START = 5.0f;
@@ -305,5 +305,12 @@ namespace Const{
     inline constexpr float OCEAN_WAVE_FREQ2 = 0.27f; // second layer spatial freq
     inline constexpr float OCEAN_WAVE_SPEED2 = 1.3f; // second layer time mult
     inline constexpr float OCEAN_SHALLOW_DIST = 12.0f; // metres from shore edge for teal tint
+
+    // driver / NPC character scale
+    // scale against actual height axis, not longest axis like trike
+    inline constexpr float DRIVER_TARGET_HEIGHT = 1.75f; // metres
+    inline constexpr float DRIVER_SEAT_OFFSET_X = -0.15f; // forward/back in trike local space
+    inline constexpr float DRIVER_SEAT_OFFSET_Y = 0.68f; // seat height above trike position
+    inline constexpr float DRIVER_SEAT_OFFSET_Z = 0.0f;  // lateral
 
 }
