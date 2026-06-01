@@ -735,9 +735,6 @@ void scene_draw(
     glUniform3f(L.kd_alt, Const::GROUND_KD_ALT, Const::GROUND_KD_ALT, Const::GROUND_KD_ALT);
     glUniform1f(L.checker_scale, 1.0f / Const::GROUND_GRID_TILE_SIZE);
     glUniform1i(L.use_checker, 0);
-    glBindVertexArray(scene.ground.vao);
-    glDrawArrays(GL_TRIANGLES, 0, scene.ground.count);
-    glBindVertexArray(0);
 
     // axis gizmo
     /*shader_bind(scene.gizmo_shader);
