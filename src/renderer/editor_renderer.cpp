@@ -60,7 +60,7 @@ uniform float     u_ambient;
 uniform float     u_diff_intensity;
 uniform vec3      u_light_color;
 
-#define MAX_LIGHTS 32
+#define MAX_LIGHTS 200
 uniform int   u_light_count;
 uniform vec3  u_light_pos[MAX_LIGHTS];
 uniform vec3  u_light_color_pt[MAX_LIGHTS];
@@ -259,7 +259,7 @@ uniform float     u_ambient;
 uniform float     u_diff_intensity;
 uniform vec3      u_light_color;
 
-#define MAX_LIGHTS 32
+#define MAX_LIGHTS 200
 uniform int   u_light_count;
 uniform vec3  u_light_pos[MAX_LIGHTS];
 uniform vec3  u_light_color_pt[MAX_LIGHTS];

@@ -41,11 +41,11 @@ namespace Const{
     inline constexpr float LIGHT_AFTERNOON_DIFF = 0.90f;
 
     // night: dim cool blue
-    inline constexpr float LIGHT_NIGHT_R = 0.10f;
-    inline constexpr float LIGHT_NIGHT_G = 0.15f;
-    inline constexpr float LIGHT_NIGHT_B = 0.40f;
-    inline constexpr float LIGHT_NIGHT_AMBIENT = 0.90f;
-    inline constexpr float LIGHT_NIGHT_DIFF = 0.20f;
+    inline constexpr float LIGHT_NIGHT_R = 0.30f;
+    inline constexpr float LIGHT_NIGHT_G = 0.35f;
+    inline constexpr float LIGHT_NIGHT_B = 0.55f;
+    inline constexpr float LIGHT_NIGHT_AMBIENT = 0.07f;
+    inline constexpr float LIGHT_NIGHT_DIFF = 1.0f;
 
     // physics
     inline constexpr float GRAVITY= 9.81f; // m/s2
@@ -139,7 +139,7 @@ namespace Const{
     inline constexpr float LIGHT_DIFF= 0.85f;
 
     // point lights
-    inline constexpr int MAX_POINT_LIGHTS = 32;
+    inline constexpr int MAX_POINT_LIGHTS = 200;
     inline constexpr float LIGHT_DEFAULT_RADIUS = 20.0f;
     inline constexpr float LIGHT_DEFAULT_INTENSITY = 4.5f;
 
