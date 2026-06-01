@@ -22,6 +22,7 @@ add_executable(tricycle-sim
     src/tricycle/tricycle_mesh.cpp
     src/tricycle/tricycle_model.cpp
     src/tricycle/driver_model.cpp
+    src/tricycle/driver_anim.cpp
     src/physics/trike_physics.cpp
     src/physics/trike_aabb.cpp
     src/world/world_map.cpp

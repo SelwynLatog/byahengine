@@ -3,14 +3,18 @@
 #include "../renderer/obj_mesh.hpp"
 #include "../core/player_state.hpp"
 #include "../physics/trike_state.hpp"
+#include "driver_anim.hpp"
 #include <glm/glm.hpp>
 
 struct DriverModel {
-    ObjMesh mesh;
-    float model_scale = 1.0f;
-    glm::vec3 model_center = glm::vec3(0.0f);
-    float half_height = 1.0f;
-    float model_foot_z = 0.0f;
+    // one mesh per bone part, sliced from the same OBJ load
+    ObjMesh parts[BONE_COUNT];
+    BonePivot pivots[BONE_COUNT]; // joint pivots in model space
+
+    float model_scale   = 1.0f;
+    glm::vec3 model_center = glm::vec3(0.0f); // XZ center for alignment
+    float model_foot_z  = 0.0f;  // min Z in model space, for foot anchoring
+    float half_height   = 1.0f;
 };
 
 void driver_model_init(DriverModel& d);
