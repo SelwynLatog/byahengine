@@ -26,8 +26,8 @@ struct DriverPose {
 
 // fills pose for the current frame
 // anim_timer: accumulated walk cycle timer (seconds * speed)
-// speed:      scalar m/s, used to scale swing amplitude
-// mode:       0 = foot walking, 1 = sitting/driving, 2 = mounting (blend)
-// mount_t:    0..1, used when mode == 2 to lerp walk->sit
+// speed: scalar m/s, used to scale swing amplitude
+// mode: 0 = foot walking, 1 = sitting/driving, 2 = mounting (blend)
+// mount_t: 0..1, used when mode == 2 to lerp walk->sit
 void driver_pose_compute(DriverPose& pose, float anim_timer,
                          float speed, int mode, float mount_t);

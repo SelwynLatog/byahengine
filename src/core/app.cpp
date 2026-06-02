@@ -297,6 +297,15 @@ void app_run(App& app){
             // ground, gizmo
             // trike parked where it stopped last
             scene_draw(app.scene, app.trike, app.obstacles, app.map.lights, view, proj, app.editor.show_hitboxes);
+            
+            // draw driver in editor except pose mode (pose mode has its own draw)
+            if (app.editor.mode != MODE_POSE) {
+                 PlayerState fake_driving;
+                 fake_driving.mode = PLAYER_DRIVING;
+                 scene_draw_driver(app.scene, fake_driving, app.trike, view, proj,
+                     app.editor_renderer.obj_shader,
+                     app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
+            }
 
             // terrain wireframe
             if (app.editor.mode == MODE_TERRAIN || app.editor.mode == MODE_ROAD)
@@ -887,7 +896,7 @@ void app_run(App& app){
             app.map.terrain.origin.z + app.map.terrain.rows * app.map.terrain.cell_size);
         editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj, app.map.ocean);
         editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims, app.map.lights);
-        scene_draw_driver(app.scene, app.player, app.trike, view, proj);
+        scene_draw_driver(app.scene, app.player, app.trike, view, proj, app.editor_renderer.obj_shader,  app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
         hud_draw(app.hud, app.trike);
         window_swap_buffers(app.window);
         window_poll_events();

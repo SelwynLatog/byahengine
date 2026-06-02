@@ -91,5 +91,7 @@ struct EditorState{
         Const::DRIVER_SEAT_OFFSET_X,
         Const::DRIVER_SEAT_OFFSET_Y,
         Const::DRIVER_SEAT_OFFSET_Z);
+    glm::vec3 pose_offset[6] = {};       // per bone translation in model space
+    bool pose_numpad_translate = false;
 
 };

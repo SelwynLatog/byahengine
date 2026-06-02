@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 
 /*
 =============================================================
@@ -347,13 +348,39 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         if (editor.mode == MODE_POSE){
             editor.mode = MODE_OBJECT;
             std::cout << "[editor] mode -> OBJECT\n";
-        } else {
-            editor.mode = MODE_POSE;
-            for (int i = 0; i < 6; i++) editor.pose_quat[i] = glm::quat(1,0,0,0);
-            editor.pose_seat = glm::vec3(
-                Const::DRIVER_SEAT_OFFSET_X,
-                Const::DRIVER_SEAT_OFFSET_Y,
-                Const::DRIVER_SEAT_OFFSET_Z);
+        } 
+        else {
+                editor.mode = MODE_POSE;
+                editor.pose_numpad_translate = false;
+                // reset to defaults first, then try to load saved pose
+                for (int i = 0; i < 6; i++) editor.pose_quat[i] = glm::quat(1,0,0,0);
+                for (int i = 0; i < 6; i++) editor.pose_offset[i] = glm::vec3(0.0f);
+                editor.pose_seat = glm::vec3(
+                    Const::DRIVER_SEAT_OFFSET_X,
+                    Const::DRIVER_SEAT_OFFSET_Y,
+                    Const::DRIVER_SEAT_OFFSET_Z);
+                {
+                    std::ifstream pf("../assets/people/driver_pose.txt");
+                    if (pf.is_open()) {
+                        std::string tag;
+                        while (pf >> tag) {
+                            if (tag == "seat") {
+                                pf >> editor.pose_seat.x >> editor.pose_seat.y >> editor.pose_seat.z;
+                            } else if (tag == "quat") {
+                                int idx; pf >> idx;
+                                if (idx >= 0 && idx < 6)
+                                    pf >> editor.pose_quat[idx].w >> editor.pose_quat[idx].x
+                                       >> editor.pose_quat[idx].y >> editor.pose_quat[idx].z;
+                            } else if (tag == "offset") {
+                                int idx; pf >> idx;
+                                if (idx >= 0 && idx < 6)
+                                    pf >> editor.pose_offset[idx].x >> editor.pose_offset[idx].y
+                                       >> editor.pose_offset[idx].z;
+                            }
+                        }
+                        std::cout << "[pose] loaded ../assets/people/driver_pose.txt\n";
+                    }
+                }
             std::cout << "[editor] mode -> POSE\n";
         }
     }
@@ -384,28 +411,53 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         // incremental rotation in bone local space — no gimbal
         // each press rotates around a fixed local axis
         // left/right = Y (twist), up/down = X (bend fwd/back), pgup/dn = Z (lean)
-        if (glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS)
-            q = glm::angleAxis(-rot_speed, glm::vec3(1,0,0)) * q;
-        if (glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS)
-            q = glm::angleAxis( rot_speed, glm::vec3(1,0,0)) * q;
-        if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS)
-            q = glm::angleAxis(-rot_speed, glm::vec3(0,1,0)) * q;
-        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-            q = glm::angleAxis( rot_speed, glm::vec3(0,1,0)) * q;
-        if (glfwGetKey(window, GLFW_KEY_PAGE_UP)   == GLFW_PRESS)
-            q = glm::angleAxis( rot_speed, glm::vec3(0,0,1)) * q;
-        if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS)
-            q = glm::angleAxis(-rot_speed, glm::vec3(0,0,1)) * q;
+        if (!editor.pose_numpad_translate) {
+            if (glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS)
+                q = glm::angleAxis(-rot_speed, glm::vec3(1,0,0)) * q;
+            if (glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS)
+                q = glm::angleAxis( rot_speed, glm::vec3(1,0,0)) * q;
+            if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS)
+                q = glm::angleAxis(-rot_speed, glm::vec3(0,1,0)) * q;
+            if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+                q = glm::angleAxis( rot_speed, glm::vec3(0,1,0)) * q;
+            if (glfwGetKey(window, GLFW_KEY_PAGE_UP)   == GLFW_PRESS)
+                q = glm::angleAxis( rot_speed, glm::vec3(0,0,1)) * q;
+            if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS)
+                q = glm::angleAxis(-rot_speed, glm::vec3(0,0,1)) * q;
+        }
 
-        // numpad: seat offset
-        float seat_speed = 0.5f * dt;
-        if (shift) seat_speed *= 0.1f;
-        if (glfwGetKey(window, GLFW_KEY_KP_8) == GLFW_PRESS) editor.pose_seat.z -= seat_speed;
-        if (glfwGetKey(window, GLFW_KEY_KP_2) == GLFW_PRESS) editor.pose_seat.z += seat_speed;
-        if (glfwGetKey(window, GLFW_KEY_KP_4) == GLFW_PRESS) editor.pose_seat.x -= seat_speed;
-        if (glfwGetKey(window, GLFW_KEY_KP_6) == GLFW_PRESS) editor.pose_seat.x += seat_speed;
-        if (glfwGetKey(window, GLFW_KEY_KP_ADD)      == GLFW_PRESS) editor.pose_seat.y += seat_speed;
-        if (glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS) editor.pose_seat.y -= seat_speed;
+        // numpad 0 toggles between seat nudge and bone translate
+        static bool s_kp0_last = false;
+        bool kp0 = glfwGetKey(window, GLFW_KEY_KP_0) == GLFW_PRESS;
+        if (kp0 && !s_kp0_last){
+            editor.pose_numpad_translate = !editor.pose_numpad_translate;
+            std::cout << "[pose] numpad -> "
+                      << (editor.pose_numpad_translate ? "BONE TRANSLATE" : "SEAT") << "\n";
+        }
+        s_kp0_last = kp0;
+
+        float nudge_speed = 8.0f * dt;
+        if (shift) nudge_speed *= 0.1f;
+
+        if (editor.pose_numpad_translate){
+            // bone translate mode: move active bone mesh in model space
+            glm::vec3& off = editor.pose_offset[editor.pose_bone];
+            if (glfwGetKey(window, GLFW_KEY_KP_8) == GLFW_PRESS) off.z -= nudge_speed;
+            if (glfwGetKey(window, GLFW_KEY_KP_2) == GLFW_PRESS) off.z += nudge_speed;
+            if (glfwGetKey(window, GLFW_KEY_KP_4) == GLFW_PRESS) off.x -= nudge_speed;
+            if (glfwGetKey(window, GLFW_KEY_KP_6) == GLFW_PRESS) off.x += nudge_speed;
+            if (glfwGetKey(window, GLFW_KEY_KP_ADD)      == GLFW_PRESS) off.y += nudge_speed;
+            if (glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS) off.y -= nudge_speed;
+        } 
+        else {
+            // seat mode: move entire driver
+            if (glfwGetKey(window, GLFW_KEY_KP_8) == GLFW_PRESS) editor.pose_seat.z -= nudge_speed;
+            if (glfwGetKey(window, GLFW_KEY_KP_2) == GLFW_PRESS) editor.pose_seat.z += nudge_speed;
+            if (glfwGetKey(window, GLFW_KEY_KP_4) == GLFW_PRESS) editor.pose_seat.x -= nudge_speed;
+            if (glfwGetKey(window, GLFW_KEY_KP_6) == GLFW_PRESS) editor.pose_seat.x += nudge_speed;
+            if (glfwGetKey(window, GLFW_KEY_KP_ADD)      == GLFW_PRESS) editor.pose_seat.y += nudge_speed;
+            if (glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS) editor.pose_seat.y -= nudge_speed;
+        }
 
         // Enter: dump as axis-angle, paste into driver_anim.cpp
         static bool s_pose_enter_last = false;
@@ -429,6 +481,14 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
                           << angle << "f, glm::vec3("
                           << axis.x << "f, " << axis.y << "f, " << axis.z << "f));\n";
             }
+           // bone offsets
+            for (int i = 0; i < 6; i++){
+                glm::vec3& off = editor.pose_offset[i];
+                if (glm::length(off) < 0.001f) continue;
+                std::cout << "// " << bone_names[i] << " offset\n";
+                std::cout << "bone_local = glm::translate(bone_local, glm::vec3("
+                          << off.x << "f, " << off.y << "f, " << off.z << "f));\n";
+            }
             std::cout << "\n// --- paste into const.hpp ---\n";
             std::cout << "inline constexpr float DRIVER_SEAT_OFFSET_X = "
                       << editor.pose_seat.x << "f;\n";
@@ -437,7 +497,31 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             std::cout << "inline constexpr float DRIVER_SEAT_OFFSET_Z = "
                       << editor.pose_seat.z << "f;\n\n";
         }
+
         s_pose_enter_last = enter;
+
+        // Ctrl+S saves pose to file
+        bool ctrl = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+        static bool s_pose_s_last = false;
+        bool s_down = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
+        if (ctrl && s_down && !s_pose_s_last) {
+            std::ofstream pf("../assets/people/driver_pose.txt");
+            if (pf.is_open()) {
+                pf << "seat " << editor.pose_seat.x << " "
+                   << editor.pose_seat.y << " " << editor.pose_seat.z << "\n";
+                for (int i = 0; i < 6; i++)
+                    pf << "quat " << i << " "
+                       << editor.pose_quat[i].w << " " << editor.pose_quat[i].x << " "
+                       << editor.pose_quat[i].y << " " << editor.pose_quat[i].z << "\n";
+                for (int i = 0; i < 6; i++)
+                    pf << "offset " << i << " "
+                       << editor.pose_offset[i].x << " "
+                       << editor.pose_offset[i].y << " "
+                       << editor.pose_offset[i].z << "\n";
+                std::cout << "[pose] saved ../assets/people/driver_pose.txt\n";
+            }
+        }
+        s_pose_s_last = s_down;
 
         return;
     }

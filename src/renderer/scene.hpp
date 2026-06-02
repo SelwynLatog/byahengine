@@ -119,5 +119,13 @@ void scene_shadow_pass(SceneState& scene, const std::vector<Obstacle>& obstacles
 
 void scene_trike_shadow_draw(SceneState& scene, const TrikeState& trike);
 
-void scene_draw_driver(SceneState& scene, const PlayerState& player,
-    const TrikeState& trike, const glm::mat4& view, const glm::mat4& proj);
+void scene_draw_driver(
+    SceneState& scene,
+    const PlayerState& player,
+    const TrikeState& trike,
+    const glm::mat4& view,
+    const glm::mat4& proj,
+    const Shader& lit_shader,
+    const glm::quat pose_quats[BONE_COUNT],
+    const glm::vec3 pose_offsets[BONE_COUNT],
+    glm::vec3 pose_seat);

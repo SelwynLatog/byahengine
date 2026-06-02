@@ -733,11 +733,19 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
             bone_names[editor.pose_bone], editor.pose_bone,
             baxis.x, baxis.y, baxis.z, bangle);
         font_draw(er.font, buf, 220, 76, 2, 1.0f, 1.0f, 1.0f);
-        
 
-        snprintf(buf, sizeof(buf), "SEAT  X:%.3f  Y:%.3f  Z:%.3f",
-            editor.pose_seat.x, editor.pose_seat.y, editor.pose_seat.z);
-        font_draw(er.font, buf, 220, 94, 2, 0.7f, 1.0f, 0.7f);
+
+        if (editor.pose_numpad_translate){
+            const glm::vec3& off = editor.pose_offset[editor.pose_bone];
+            snprintf(buf, sizeof(buf), "NP=BONE TRANSLATE  X:%.3f  Y:%.3f  Z:%.3f  [NP0 for seat]",
+                off.x, off.y, off.z);
+            font_draw(er.font, buf, 220, 94, 2, 1.0f, 0.7f, 0.3f);
+        } 
+        else {
+            snprintf(buf, sizeof(buf), "NP=SEAT  X:%.3f  Y:%.3f  Z:%.3f  [NP0 for bone translate]",
+                editor.pose_seat.x, editor.pose_seat.y, editor.pose_seat.z);
+            font_draw(er.font, buf, 220, 94, 2, 0.7f, 1.0f, 0.7f);
+        }
     }
 
     // 2. wireframe box colored by behavior
@@ -1639,6 +1647,7 @@ void editor_renderer_draw_pose_mode(EditorRenderer& er, const EditorState& edito
         driver,
         editor.pose_seat,
         editor.pose_quat,
+        editor.pose_offset,
         editor.pose_bone,
         er.obj_shader,
         view,

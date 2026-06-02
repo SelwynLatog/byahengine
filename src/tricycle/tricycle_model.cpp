@@ -134,10 +134,9 @@ void trike_model_draw(
 
     // static body parts 
     // cab, cart, rear spring, driver
-    draw_part(t.mesh, "trike_cab_body",    body, shader);
-    draw_part(t.mesh, "cart",              body, shader);
+    draw_part(t.mesh, "trike_cab_body", body, shader);
+    draw_part(t.mesh, "cart", body, shader);
     draw_part(t.mesh, "trike_rear_spring", body, shader);
-    draw_part(t.mesh, "trike_driver_body", body, shader);
 
     // spinning wheels
     // spin axis is local X (axle runs left-right in model space)
@@ -155,8 +154,8 @@ void trike_model_draw(
 
         return world_base
             * glm::translate(glm::mat4(1.0f),  p)
-            * glm::rotate(glm::mat4(1.0f), extra_yaw,       glm::vec3(0,1,0))
-            * glm::rotate(glm::mat4(1.0f), -t.wheel_spin,   glm::vec3(0,0,1))
+            * glm::rotate(glm::mat4(1.0f), extra_yaw, glm::vec3(0,1,0))
+            * glm::rotate(glm::mat4(1.0f), -t.wheel_spin, glm::vec3(0,0,1))
             * glm::translate(glm::mat4(1.0f), -p)
             * glm::translate(glm::mat4(1.0f), -sc)
             * glm::scale(glm::mat4(1.0f), glm::vec3(model_scale));
@@ -182,8 +181,8 @@ void trike_model_draw(
             * glm::translate(glm::mat4(1.0f), -sc)
             * glm::scale(glm::mat4(1.0f), glm::vec3(model_scale));
     };
-    draw_part(t.mesh, "trike_front_fork",  steer_matrix("trike_front_fork"),  shader);
-    draw_part(t.mesh, "trike_handlebar",   steer_matrix("trike_handlebar"),   shader);
+    draw_part(t.mesh, "trike_front_fork", steer_matrix("trike_front_fork"), shader);
+    draw_part(t.mesh, "trike_handlebar", steer_matrix("trike_handlebar"), shader);
 }
 
 void trike_model_destroy(TrikeModel& t){

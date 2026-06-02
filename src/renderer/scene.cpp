@@ -861,15 +861,20 @@ void scene_draw(
 }
 
 void scene_draw_driver(
-    SceneState& scene,
-    const PlayerState& player,
-    const TrikeState& trike,
-    const glm::mat4& view,
-    const glm::mat4& proj)
-{
-    shader_bind(scene.shader);
-    driver_model_draw(scene.driver_model, player, trike, scene.shader, view, proj);
-}
+     SceneState& scene,
+     const PlayerState& player,
+     const TrikeState& trike,
+     const glm::mat4& view,
+     const glm::mat4& proj,
+     const Shader& lit_shader,
+     const glm::quat  pose_quats[BONE_COUNT],
+     const glm::vec3  pose_offsets[BONE_COUNT],
+     glm::vec3 pose_seat)
+ {
+     shader_bind(lit_shader);
+     driver_model_draw(scene.driver_model, player, trike, lit_shader, view, proj,
+         pose_quats, pose_offsets, pose_seat);
+ }
 
 
 void scene_destroy(SceneState& scene){

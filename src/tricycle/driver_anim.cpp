@@ -18,7 +18,7 @@ static void pose_walk(DriverPose& pose, float t, float speed) {
     float swing = std::sin(t) * amp;
 
     // legs swing forward/back around hip pivot (Y=0 in bone local, pivot computed externally)
-    // pivot is passed as zero here — driver_model_draw offsets by the actual pivot
+    // pivot is passed as zero here
     pose.local[BONE_LEG_L] = glm::rotate(glm::mat4(1.0f),  swing, glm::vec3(1,0,0));
     pose.local[BONE_LEG_R] = glm::rotate(glm::mat4(1.0f), -swing, glm::vec3(1,0,0));
 
