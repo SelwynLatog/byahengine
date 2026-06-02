@@ -1,5 +1,7 @@
 #include "editor_input.hpp"
 #include "const.hpp"
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include "../renderer/editor_renderer.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -347,8 +349,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             std::cout << "[editor] mode -> OBJECT\n";
         } else {
             editor.mode = MODE_POSE;
-            // reset euler overrides on entry so we start from clean pose_sit
-            for (int i = 0; i < 6; i++) editor.pose_euler[i] = glm::vec3(0.0f);
+            for (int i = 0; i < 6; i++) editor.pose_quat[i] = glm::quat(1,0,0,0);
             editor.pose_seat = glm::vec3(
                 Const::DRIVER_SEAT_OFFSET_X,
                 Const::DRIVER_SEAT_OFFSET_Y,
@@ -363,7 +364,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     // *******************************
     if (editor.mode == MODE_POSE){
         bool shift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
-        float rot_speed = 45.0f * dt;
+        float rot_speed = glm::radians(60.0f * dt);
         if (shift) rot_speed *= 0.1f;
 
         // F cycles active bone
@@ -378,19 +379,23 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         }
         s_pose_f_last = f_down;
 
-        glm::vec3& euler = editor.pose_euler[editor.pose_bone];
+        glm::quat& q = editor.pose_quat[editor.pose_bone];
 
-        // arrows: bone rotation XY
-        if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) euler.y -= rot_speed;
-        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) euler.y += rot_speed;
-        if (glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS) euler.x -= rot_speed;
-        if (glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS) euler.x += rot_speed;
-
-        // PgUp/PgDn: bone rotation Z
-        bool pgup = glfwGetKey(window, GLFW_KEY_PAGE_UP)   == GLFW_PRESS;
-        bool pgdn = glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS;
-        if (pgup) euler.z += rot_speed;
-        if (pgdn) euler.z -= rot_speed;
+        // incremental rotation in bone local space — no gimbal
+        // each press rotates around a fixed local axis
+        // left/right = Y (twist), up/down = X (bend fwd/back), pgup/dn = Z (lean)
+        if (glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS)
+            q = glm::angleAxis(-rot_speed, glm::vec3(1,0,0)) * q;
+        if (glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS)
+            q = glm::angleAxis( rot_speed, glm::vec3(1,0,0)) * q;
+        if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS)
+            q = glm::angleAxis(-rot_speed, glm::vec3(0,1,0)) * q;
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+            q = glm::angleAxis( rot_speed, glm::vec3(0,1,0)) * q;
+        if (glfwGetKey(window, GLFW_KEY_PAGE_UP)   == GLFW_PRESS)
+            q = glm::angleAxis( rot_speed, glm::vec3(0,0,1)) * q;
+        if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS)
+            q = glm::angleAxis(-rot_speed, glm::vec3(0,0,1)) * q;
 
         // numpad: seat offset
         float seat_speed = 0.5f * dt;
@@ -402,6 +407,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         if (glfwGetKey(window, GLFW_KEY_KP_ADD)      == GLFW_PRESS) editor.pose_seat.y += seat_speed;
         if (glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS) editor.pose_seat.y -= seat_speed;
 
+        // Enter: dump as axis-angle, paste into driver_anim.cpp
         static bool s_pose_enter_last = false;
         bool enter = glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS;
         if (enter && !s_pose_enter_last){
@@ -410,15 +416,18 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             };
             std::cout << "\n// --- paste into pose_sit() in driver_anim.cpp ---\n";
             for (int i = 0; i < 6; i++){
-                glm::vec3& e = editor.pose_euler[i];
-                if (glm::length(e) < 0.01f) continue;
-                std::cout << "// " << bone_names[i] << "\n";
-                if (std::abs(e.x) > 0.01f)
-                    std::cout << "  rotX = glm::radians(" << e.x << "f);\n";
-                if (std::abs(e.y) > 0.01f)
-                    std::cout << "  rotY = glm::radians(" << e.y << "f);\n";
-                if (std::abs(e.z) > 0.01f)
-                    std::cout << "  rotZ = glm::radians(" << e.z << "f);\n";
+                glm::quat& bq = editor.pose_quat[i];
+                // skip identity bones
+                if (std::abs(bq.w - 1.0f) < 0.001f) continue;
+                float angle = 2.0f * std::acos(glm::clamp(bq.w, -1.0f, 1.0f));
+                float s = std::sqrt(1.0f - bq.w * bq.w);
+                glm::vec3 axis = (s > 0.001f)
+                    ? glm::vec3(bq.x/s, bq.y/s, bq.z/s)
+                    : glm::vec3(1,0,0);
+                std::cout << "pose.local[" << bone_names[i] << "] = "
+                          << "glm::rotate(pose.local[" << bone_names[i] << "], "
+                          << angle << "f, glm::vec3("
+                          << axis.x << "f, " << axis.y << "f, " << axis.z << "f));\n";
             }
             std::cout << "\n// --- paste into const.hpp ---\n";
             std::cout << "inline constexpr float DRIVER_SEAT_OFFSET_X = "

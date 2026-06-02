@@ -6,6 +6,7 @@
 #include "../world/ocean.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
 #include <string>
@@ -720,13 +721,19 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
             220, 40, 2, 1.0f, 0.60f, 0.10f);
         font_draw(er.font, "SHIFT=fine  ENTER=dump values  K=exit", 220, 58, 2, 1.0f, 0.60f, 0.10f);
 
+        // convert active bone quat to axis-angle for HUD display
+        const glm::quat& bq = editor.pose_quat[editor.pose_bone];
+        float bangle = glm::degrees(2.0f * std::acos(glm::clamp(bq.w, -1.0f, 1.0f)));
+        float bs = std::sqrt(std::max(0.0f, 1.0f - bq.w * bq.w));
+        glm::vec3 baxis = (bs > 0.001f)
+            ? glm::vec3(bq.x/bs, bq.y/bs, bq.z/bs)
+            : glm::vec3(1,0,0);
         char buf[128];
-        snprintf(buf, sizeof(buf), "BONE: %s  [%d]  euler X:%.1f Y:%.1f Z:%.1f",
+        snprintf(buf, sizeof(buf), "BONE: %s  [%d]  axis(%.2f,%.2f,%.2f)  angle:%.1fdeg",
             bone_names[editor.pose_bone], editor.pose_bone,
-            editor.pose_euler[editor.pose_bone].x,
-            editor.pose_euler[editor.pose_bone].y,
-            editor.pose_euler[editor.pose_bone].z);
+            baxis.x, baxis.y, baxis.z, bangle);
         font_draw(er.font, buf, 220, 76, 2, 1.0f, 1.0f, 1.0f);
+        
 
         snprintf(buf, sizeof(buf), "SEAT  X:%.3f  Y:%.3f  Z:%.3f",
             editor.pose_seat.x, editor.pose_seat.y, editor.pose_seat.z);
@@ -1631,7 +1638,7 @@ void editor_renderer_draw_pose_mode(EditorRenderer& er, const EditorState& edito
     driver_model_draw_pose(
         driver,
         editor.pose_seat,
-        editor.pose_euler,
+        editor.pose_quat,
         editor.pose_bone,
         er.obj_shader,
         view,

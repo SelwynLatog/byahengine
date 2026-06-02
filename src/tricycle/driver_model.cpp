@@ -1,5 +1,6 @@
 #include "driver_model.hpp"
 #include "driver_anim.hpp"
+#include <glm/gtc/quaternion.hpp>
 #include "../core/const.hpp"
 #include "../renderer/obj_loader.hpp"
 #include "../renderer/obj_mesh.hpp"
@@ -243,7 +244,7 @@ void driver_model_draw(
 void driver_model_draw_pose(
     const DriverModel& d,
     glm::vec3 seat_offset,
-    const glm::vec3 euler_deg[6],
+    const glm::quat bone_quats[6],
     int highlight_bone,
     const Shader& shader,
     const glm::mat4& view,
@@ -266,13 +267,10 @@ void driver_model_draw_pose(
     DriverPose pose;
     driver_pose_compute(pose, 0.0f, 0.0f, 1, 0.0f);
 
-    // layer euler overrides on top per bone
+    // apply quat overrides on top of pose_sit() per bone
+    // quat_mat is pre-multiplied so it rotates in bone local space
     for (int b = 0; b < BONE_COUNT; b++){
-        glm::vec3 deg = euler_deg[b];
-        glm::mat4 extra = glm::mat4(1.0f);
-        if (std::abs(deg.x) > 0.001f) extra = glm::rotate(extra, glm::radians(deg.x), glm::vec3(1,0,0));
-        if (std::abs(deg.y) > 0.001f) extra = glm::rotate(extra, glm::radians(deg.y), glm::vec3(0,1,0));
-        if (std::abs(deg.z) > 0.001f) extra = glm::rotate(extra, glm::radians(deg.z), glm::vec3(0,0,1));
+        glm::mat4 extra = glm::mat4_cast(bone_quats[b]);
         pose.local[b] = pose.local[b] * extra;
     }
 

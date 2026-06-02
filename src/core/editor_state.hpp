@@ -1,5 +1,6 @@
 #pragma once
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <string>
 #include <vector>
 #include "../world/world_object.hpp"
@@ -79,10 +80,13 @@ struct EditorState{
     float light_edit_intensity = Const::LIGHT_DEFAULT_INTENSITY;
 
     // pose editor
-    int pose_bone = 0;  // active bone index (Tab cycles)
-    // euler offsets in degrees per bone, applied on top of pose_sit()
-    glm::vec3 pose_euler[6] = {};
-    // seat position nudged live, initialized from Const on mode entry
+    int pose_bone = 0;
+    // incremental quaternion per bone, applied on top of pose_sit()
+    // stored as quat so rotations accumulate without gimbal lock
+    glm::quat pose_quat[6] = {
+        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0),
+        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0)
+    };
     glm::vec3 pose_seat = glm::vec3(
         Const::DRIVER_SEAT_OFFSET_X,
         Const::DRIVER_SEAT_OFFSET_Y,

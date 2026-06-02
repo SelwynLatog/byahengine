@@ -5,6 +5,7 @@
 #include "../physics/trike_state.hpp"
 #include "driver_anim.hpp"
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 struct DriverModel {
     // one mesh per bone part, sliced from the same OBJ load
@@ -34,7 +35,7 @@ void driver_model_draw(
 void driver_model_draw_pose(
     const DriverModel& d,
     glm::vec3 seat_offset,
-    const glm::vec3 euler_deg[6],
+    const glm::quat bone_quats[6],
     int highlight_bone,
     const Shader& shader,
     const glm::mat4& view,
