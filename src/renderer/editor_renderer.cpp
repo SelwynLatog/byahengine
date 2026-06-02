@@ -711,6 +711,28 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
     }
 
 
+    if (editor.mode == MODE_POSE){
+        static const char* bone_names[6] = {
+            "TORSO", "HEAD", "LEG_L", "LEG_R", "ARM_L", "ARM_R"
+        };
+        font_draw(er.font, "[ POSE MODE ]", 180, 16, 3, 1.0f, 0.60f, 0.10f);
+        font_draw(er.font, "F=next bone  Arrows=rot XY  PgUp/Dn=rot Z  NP8/2=seat Z  NP4/6=seat X  NP+/-=seat Y",
+            220, 40, 2, 1.0f, 0.60f, 0.10f);
+        font_draw(er.font, "SHIFT=fine  ENTER=dump values  K=exit", 220, 58, 2, 1.0f, 0.60f, 0.10f);
+
+        char buf[128];
+        snprintf(buf, sizeof(buf), "BONE: %s  [%d]  euler X:%.1f Y:%.1f Z:%.1f",
+            bone_names[editor.pose_bone], editor.pose_bone,
+            editor.pose_euler[editor.pose_bone].x,
+            editor.pose_euler[editor.pose_bone].y,
+            editor.pose_euler[editor.pose_bone].z);
+        font_draw(er.font, buf, 220, 76, 2, 1.0f, 1.0f, 1.0f);
+
+        snprintf(buf, sizeof(buf), "SEAT  X:%.3f  Y:%.3f  Z:%.3f",
+            editor.pose_seat.x, editor.pose_seat.y, editor.pose_seat.z);
+        font_draw(er.font, buf, 220, 94, 2, 0.7f, 1.0f, 0.7f);
+    }
+
     // 2. wireframe box colored by behavior
     // gives visual feedback for every placed object even before OBJ meshes load
     if (!show_hitboxes) goto skip_wireframes;
@@ -1575,6 +1597,45 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
     }
 
     glBindVertexArray(0);
+}
+
+void editor_renderer_draw_pose_mode(EditorRenderer& er, const EditorState& editor,
+    const DriverModel& driver, const TrikeModel& trike,
+    const glm::mat4& view, const glm::mat4& proj)
+{
+    // prime obj_shader with lighting state — same setup as draw_props
+    // without this the shader has uninitialized uniforms and draws black/nothing
+    auto& OL = er.obj_loc;
+    glm::vec3 ld = glm::normalize(er.sun_dir);
+    shader_bind(er.obj_shader);
+    glUniformMatrix4fv(OL.view,  1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(OL.proj,  1, GL_FALSE, glm::value_ptr(proj));
+    glUniform3f(OL.light_dir, ld.x, ld.y, ld.z);
+    glUniform3f(OL.light_color, er.light_color.r, er.light_color.g, er.light_color.b);
+    glUniform1f(OL.ambient, er.ambient);
+    glUniform1f(OL.diff_intensity, er.diff_intensity);
+    glUniformMatrix4fv(OL.light_space, 1, GL_FALSE, glm::value_ptr(er.light_space_mat));
+    glUniform1f(OL.shadow_bias, Const::SHADOW_BIAS);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, er.shadow_depth_tex);
+    glUniform1i(OL.shadow_map, 1);
+    glUniform1i(OL.use_texture, 0);
+    glUniform1i(er.pt_light_loc.count, 0); // no point lights in pose mode
+    glActiveTexture(GL_TEXTURE0);
+
+    TrikeState dummy_trike;
+    memset(&dummy_trike, 0, sizeof(dummy_trike));
+
+    trike_model_draw(trike, dummy_trike, er.obj_shader, view, proj);
+
+    driver_model_draw_pose(
+        driver,
+        editor.pose_seat,
+        editor.pose_euler,
+        editor.pose_bone,
+        er.obj_shader,
+        view,
+        proj);
 }
 
 void editor_renderer_destroy(EditorRenderer& er){

@@ -24,13 +24,13 @@ static void set_vec3(const Shader& s, const char* n, glm::vec3 v) {
 // maps bone index to the OBJ part name
 static const char* bone_part_name(int bone) {
     switch (bone) {
-        case BONE_TORSO:  return "driver_torso";
-        case BONE_HEAD:   return "driver_head";
-        case BONE_LEG_L:  return "driver_leg_l";
-        case BONE_LEG_R:  return "driver_leg_r";
-        case BONE_ARM_L:  return "driver_upper_arm_l";
-        case BONE_ARM_R:  return "driver_upper_arm_r";
-        default:          return "";
+        case BONE_TORSO: return "driver_torso";
+        case BONE_HEAD: return "driver_head";
+        case BONE_LEG_L: return "driver_leg_l";
+        case BONE_LEG_R: return "driver_leg_r";
+        case BONE_ARM_L: return "driver_upper_arm_l";
+        case BONE_ARM_R: return "driver_upper_arm_r";
+        default: return "";
     }
 }
 
@@ -39,17 +39,17 @@ static const char* bone_part_name(int bone) {
 // head: pivot at bottom-center (neck joint)
 // torso: pivot at center (anchor, not really used)
 static glm::vec3 compute_pivot(int bone, glm::vec3 bmin, glm::vec3 bmax) {
-    glm::vec3 top_center    = { (bmin.x+bmax.x)*0.5f, (bmin.y+bmax.y)*0.5f, bmax.z };
+    glm::vec3 top_center = { (bmin.x+bmax.x)*0.5f, (bmin.y+bmax.y)*0.5f, bmax.z };
     glm::vec3 bottom_center = { (bmin.x+bmax.x)*0.5f, (bmin.y+bmax.y)*0.5f, bmin.z };
-    glm::vec3 center        = { (bmin.x+bmax.x)*0.5f, (bmin.y+bmax.y)*0.5f, (bmin.z+bmax.z)*0.5f };
+    glm::vec3 center = { (bmin.x+bmax.x)*0.5f, (bmin.y+bmax.y)*0.5f, (bmin.z+bmax.z)*0.5f };
 
     switch (bone) {
         case BONE_LEG_L:
-        case BONE_LEG_R:  return top_center;    // hip joint at top of leg
+        case BONE_LEG_R: return top_center;    // hip joint at top of leg
         case BONE_ARM_L:
-        case BONE_ARM_R:  return top_center;    // shoulder at top of arm
-        case BONE_HEAD:   return bottom_center; // neck at bottom of head
-        default:          return center;
+        case BONE_ARM_R: return top_center;    // shoulder at top of arm
+        case BONE_HEAD: return bottom_center; // neck at bottom of head
+        default: return center;
     }
 }
 
@@ -232,6 +232,78 @@ void driver_model_draw(
                 if (grp.vertex_count <= 0) continue;
                 const ObjMaterial* mat = obj_find_material(mesh.data, grp.mat_name);
                 glm::vec3 kd = mat ? mat->kd : glm::vec3(0.6f, 0.4f, 0.25f);
+                set_vec3(shader, "u_kd", kd);
+                glDrawArrays(GL_TRIANGLES, grp.vertex_start, grp.vertex_count);
+            }
+        }
+        glBindVertexArray(0);
+    }
+}
+
+void driver_model_draw_pose(
+    const DriverModel& d,
+    glm::vec3 seat_offset,
+    const glm::vec3 euler_deg[6],
+    int highlight_bone,
+    const Shader& shader,
+    const glm::mat4& view,
+    const glm::mat4& proj)
+{
+    float foot_lift = -d.model_foot_z * d.model_scale;
+
+    // place driver at seat_offset with no trike roll/pitch — editor is static
+    glm::mat4 base = glm::mat4(1.0f);
+    base = glm::translate(base, seat_offset + glm::vec3(0.0f, foot_lift, 0.0f));
+    base = glm::rotate(base, glm::radians(90.0f), glm::vec3(0,1,0));
+    // OBJ is Z-up
+    base = glm::rotate(base, glm::radians(-90.0f), glm::vec3(1,0,0));
+    glm::vec3 center_off = glm::vec3(d.model_center.x, d.model_foot_z, 0.0f);
+    base = base
+        * glm::translate(glm::mat4(1.0f), -center_off * d.model_scale)
+        * glm::scale(glm::mat4(1.0f), glm::vec3(d.model_scale));
+
+    // sit pose as baseline
+    DriverPose pose;
+    driver_pose_compute(pose, 0.0f, 0.0f, 1, 0.0f);
+
+    // layer euler overrides on top per bone
+    for (int b = 0; b < BONE_COUNT; b++){
+        glm::vec3 deg = euler_deg[b];
+        glm::mat4 extra = glm::mat4(1.0f);
+        if (std::abs(deg.x) > 0.001f) extra = glm::rotate(extra, glm::radians(deg.x), glm::vec3(1,0,0));
+        if (std::abs(deg.y) > 0.001f) extra = glm::rotate(extra, glm::radians(deg.y), glm::vec3(0,1,0));
+        if (std::abs(deg.z) > 0.001f) extra = glm::rotate(extra, glm::radians(deg.z), glm::vec3(0,0,1));
+        pose.local[b] = pose.local[b] * extra;
+    }
+
+    set_mat4(shader, "u_view", view);
+    set_mat4(shader, "u_proj", proj);
+    glUniform1i(glGetUniformLocation(shader.id, "u_use_checker"), 0);
+
+    for (int b = 0; b < BONE_COUNT; b++){
+        const ObjMesh& mesh = d.parts[b];
+        if (mesh.data.vertices.empty()) continue;
+
+        glm::vec3 piv = d.pivots[b].pivot;
+        glm::mat4 bone_local = glm::mat4(1.0f);
+        bone_local = glm::translate(bone_local,  piv);
+        bone_local = bone_local * pose.local[b];
+        bone_local = glm::translate(bone_local, -piv);
+
+        glm::mat4 model = base * bone_local;
+        glm::mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
+
+        set_mat4(shader, "u_model", model);
+        set_mat3(shader, "u_normal_mat", normal_mat);
+
+        glBindVertexArray(mesh.vao);
+        for (const auto& part : mesh.data.parts){
+            for (const auto& grp : part.groups){
+                if (grp.vertex_count <= 0) continue;
+                const ObjMaterial* mat = obj_find_material(mesh.data, grp.mat_name);
+                glm::vec3 kd = mat ? mat->kd : glm::vec3(0.6f, 0.4f, 0.25f);
+                // tint active bone orange so you can see what you're editing
+                if (b == highlight_bone) kd = glm::vec3(1.0f, 0.45f, 0.05f);
                 set_vec3(shader, "u_kd", kd);
                 glDrawArrays(GL_TRIANGLES, grp.vertex_start, grp.vertex_count);
             }

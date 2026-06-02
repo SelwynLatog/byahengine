@@ -13,6 +13,8 @@
 #include <string>
 #include <unordered_map>
 #include "../physics/dynamic_sim.hpp"
+#include "../tricycle/driver_model.hpp"
+#include "../tricycle/tricycle_model.hpp"
 
 // all visual feedback for editor:
 // uses same gizmo shader pattern as scene.cpp
@@ -158,3 +160,7 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
 void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline>& roads, const glm::mat4& view, const glm::mat4& proj);
 
 void editor_renderer_draw_ocean(EditorRenderer& er, Ocean& ocean, const glm::mat4& view, const glm::mat4& proj, float dt, float terrain_x_min, float terrain_x_max, float terrain_z_min, float terrain_z_max);
+
+void editor_renderer_draw_pose_mode(EditorRenderer& er, const EditorState& editor,
+    const DriverModel& driver, const TrikeModel& trike,
+    const glm::mat4& view, const glm::mat4& proj);

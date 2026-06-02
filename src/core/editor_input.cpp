@@ -338,6 +338,102 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     }
     s_l_last = l_down;
 
+    // K to toggle pose editor mode
+    static bool s_k_last = false;
+    bool k_down = glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS;
+    if (k_down && !s_k_last){
+        if (editor.mode == MODE_POSE){
+            editor.mode = MODE_OBJECT;
+            std::cout << "[editor] mode -> OBJECT\n";
+        } else {
+            editor.mode = MODE_POSE;
+            // reset euler overrides on entry so we start from clean pose_sit
+            for (int i = 0; i < 6; i++) editor.pose_euler[i] = glm::vec3(0.0f);
+            editor.pose_seat = glm::vec3(
+                Const::DRIVER_SEAT_OFFSET_X,
+                Const::DRIVER_SEAT_OFFSET_Y,
+                Const::DRIVER_SEAT_OFFSET_Z);
+            std::cout << "[editor] mode -> POSE\n";
+        }
+    }
+    s_k_last = k_down;
+
+    // *******************************
+    // POSE MODE
+    // *******************************
+    if (editor.mode == MODE_POSE){
+        bool shift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+        float rot_speed = 45.0f * dt;
+        if (shift) rot_speed *= 0.1f;
+
+        // F cycles active bone
+        static bool s_pose_f_last = false;
+        bool f_down = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
+        if (f_down && !s_pose_f_last){
+            editor.pose_bone = (editor.pose_bone + 1) % 6;
+            static const char* bone_names[6] = {
+                "TORSO", "HEAD", "LEG_L", "LEG_R", "ARM_L", "ARM_R"
+            };
+            std::cout << "[pose] bone -> " << bone_names[editor.pose_bone] << "\n";
+        }
+        s_pose_f_last = f_down;
+
+        glm::vec3& euler = editor.pose_euler[editor.pose_bone];
+
+        // arrows: bone rotation XY
+        if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) euler.y -= rot_speed;
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) euler.y += rot_speed;
+        if (glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS) euler.x -= rot_speed;
+        if (glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS) euler.x += rot_speed;
+
+        // PgUp/PgDn: bone rotation Z
+        bool pgup = glfwGetKey(window, GLFW_KEY_PAGE_UP)   == GLFW_PRESS;
+        bool pgdn = glfwGetKey(window, GLFW_KEY_PAGE_DOWN) == GLFW_PRESS;
+        if (pgup) euler.z += rot_speed;
+        if (pgdn) euler.z -= rot_speed;
+
+        // numpad: seat offset
+        float seat_speed = 0.5f * dt;
+        if (shift) seat_speed *= 0.1f;
+        if (glfwGetKey(window, GLFW_KEY_KP_8) == GLFW_PRESS) editor.pose_seat.z -= seat_speed;
+        if (glfwGetKey(window, GLFW_KEY_KP_2) == GLFW_PRESS) editor.pose_seat.z += seat_speed;
+        if (glfwGetKey(window, GLFW_KEY_KP_4) == GLFW_PRESS) editor.pose_seat.x -= seat_speed;
+        if (glfwGetKey(window, GLFW_KEY_KP_6) == GLFW_PRESS) editor.pose_seat.x += seat_speed;
+        if (glfwGetKey(window, GLFW_KEY_KP_ADD)      == GLFW_PRESS) editor.pose_seat.y += seat_speed;
+        if (glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS) editor.pose_seat.y -= seat_speed;
+
+        static bool s_pose_enter_last = false;
+        bool enter = glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS;
+        if (enter && !s_pose_enter_last){
+            static const char* bone_names[6] = {
+                "BONE_TORSO", "BONE_HEAD", "BONE_LEG_L", "BONE_LEG_R", "BONE_ARM_L", "BONE_ARM_R"
+            };
+            std::cout << "\n// --- paste into pose_sit() in driver_anim.cpp ---\n";
+            for (int i = 0; i < 6; i++){
+                glm::vec3& e = editor.pose_euler[i];
+                if (glm::length(e) < 0.01f) continue;
+                std::cout << "// " << bone_names[i] << "\n";
+                if (std::abs(e.x) > 0.01f)
+                    std::cout << "  rotX = glm::radians(" << e.x << "f);\n";
+                if (std::abs(e.y) > 0.01f)
+                    std::cout << "  rotY = glm::radians(" << e.y << "f);\n";
+                if (std::abs(e.z) > 0.01f)
+                    std::cout << "  rotZ = glm::radians(" << e.z << "f);\n";
+            }
+            std::cout << "\n// --- paste into const.hpp ---\n";
+            std::cout << "inline constexpr float DRIVER_SEAT_OFFSET_X = "
+                      << editor.pose_seat.x << "f;\n";
+            std::cout << "inline constexpr float DRIVER_SEAT_OFFSET_Y = "
+                      << editor.pose_seat.y << "f;\n";
+            std::cout << "inline constexpr float DRIVER_SEAT_OFFSET_Z = "
+                      << editor.pose_seat.z << "f;\n\n";
+        }
+        s_pose_enter_last = enter;
+
+        return;
+    }
+
+
     // *******************************
     // TERRAIN MODE
     // *******************************

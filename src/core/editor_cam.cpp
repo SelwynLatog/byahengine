@@ -71,7 +71,7 @@ void editor_cam_update(EditorState& editor, GLFWwindow* window, float dt){
 
     // arrow key look
     // note that it only fires when no object is selected
-    if (editor.selected_id == -1 && editor.mode != MODE_LIGHT){
+    if (editor.selected_id == -1 && editor.mode != MODE_LIGHT && editor.mode != MODE_POSE){
         float look = Const::EDITOR_LOOK_SENSITIVITY * 600.0f * dt;
         if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) editor.cam_yaw += look;
         if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) editor.cam_yaw -= look;

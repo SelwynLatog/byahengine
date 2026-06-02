@@ -19,40 +19,40 @@ static void pose_walk(DriverPose& pose, float t, float speed) {
 
     // legs swing forward/back around hip pivot (Y=0 in bone local, pivot computed externally)
     // pivot is passed as zero here — driver_model_draw offsets by the actual pivot
-    pose.local[BONE_LEG_L]  = glm::rotate(glm::mat4(1.0f),  swing, glm::vec3(1,0,0));
-    pose.local[BONE_LEG_R]  = glm::rotate(glm::mat4(1.0f), -swing, glm::vec3(1,0,0));
+    pose.local[BONE_LEG_L] = glm::rotate(glm::mat4(1.0f),  swing, glm::vec3(1,0,0));
+    pose.local[BONE_LEG_R] = glm::rotate(glm::mat4(1.0f), -swing, glm::vec3(1,0,0));
 
     // arms swing opposite to legs
     float arm_amp = amp * 0.6f;
-    pose.local[BONE_ARM_L]  = glm::rotate(glm::mat4(1.0f), -swing * arm_amp / amp, glm::vec3(1,0,0));
-    pose.local[BONE_ARM_R]  = glm::rotate(glm::mat4(1.0f),  swing * arm_amp / amp, glm::vec3(1,0,0));
+    pose.local[BONE_ARM_L] = glm::rotate(glm::mat4(1.0f), -swing * arm_amp / amp, glm::vec3(1,0,0));
+    pose.local[BONE_ARM_R] = glm::rotate(glm::mat4(1.0f),  swing * arm_amp / amp, glm::vec3(1,0,0));
 
     // head bobs very subtly
     float bob_angle = std::sin(t * 2.0f) * 0.015f;
-    pose.local[BONE_HEAD]   = glm::rotate(glm::mat4(1.0f), bob_angle, glm::vec3(1,0,0));
+    pose.local[BONE_HEAD] = glm::rotate(glm::mat4(1.0f), bob_angle, glm::vec3(1,0,0));
 
-    pose.local[BONE_TORSO]  = glm::mat4(1.0f);
+    pose.local[BONE_TORSO] = glm::mat4(1.0f);
 }
 
 static void pose_sit(DriverPose& pose) {
     // legs bent forward at roughly 80 degrees (sitting on seat)
-    float leg_bend = glm::radians(80.0f);
-    pose.local[BONE_LEG_L]  = glm::rotate(glm::mat4(1.0f),  leg_bend, glm::vec3(1,0,0));
-    pose.local[BONE_LEG_R]  = glm::rotate(glm::mat4(1.0f),  leg_bend, glm::vec3(1,0,0));
+    float leg_bend = glm::radians(-80.0f);
+    pose.local[BONE_LEG_L] = glm::rotate(glm::mat4(1.0f), leg_bend, glm::vec3(1,0,0));
+    pose.local[BONE_LEG_R] = glm::rotate(glm::mat4(1.0f), leg_bend, glm::vec3(1,0,0));
 
     // arms forward and slightly down, gripping handlebars
     float arm_fwd  = glm::radians(-55.0f);
     float arm_down = glm::radians(15.0f);
     glm::mat4 arm_base = glm::rotate(glm::mat4(1.0f), arm_fwd,  glm::vec3(1,0,0));
-    arm_base            = glm::rotate(arm_base,         arm_down, glm::vec3(0,0,1));
+    arm_base = glm::rotate(arm_base, arm_down, glm::vec3(0,0,1));
     pose.local[BONE_ARM_L]  = arm_base;
-    arm_base = glm::rotate(glm::mat4(1.0f), arm_fwd,  glm::vec3(1,0,0));
-    arm_base = glm::rotate(arm_base,        -arm_down, glm::vec3(0,0,1));
-    pose.local[BONE_ARM_R]  = arm_base;
+    arm_base = glm::rotate(glm::mat4(1.0f), arm_fwd, glm::vec3(1,0,0));
+    arm_base = glm::rotate(arm_base, -arm_down, glm::vec3(0,0,1));
+    pose.local[BONE_ARM_R] = arm_base;
 
     // slight forward lean on torso
-    pose.local[BONE_TORSO]  = glm::rotate(glm::mat4(1.0f), glm::radians(12.0f), glm::vec3(1,0,0));
-    pose.local[BONE_HEAD]   = glm::mat4(1.0f);
+    pose.local[BONE_TORSO] = glm::rotate(glm::mat4(1.0f), glm::radians(12.0f), glm::vec3(1,0,0));
+    pose.local[BONE_HEAD] = glm::mat4(1.0f);
 }
 
 void driver_pose_compute(DriverPose& pose, float anim_timer,

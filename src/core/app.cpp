@@ -321,6 +321,11 @@ void app_run(App& app){
             // grid, ghost, selection highlight
             editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj, app.editor.show_hitboxes, app.map.lights);
 
+            // pose mode: draw driver + trike at origin for live tuning
+            if (app.editor.mode == MODE_POSE)
+                editor_renderer_draw_pose_mode(app.editor_renderer, app.editor,
+                    app.scene.driver_model, app.scene.trike_model, view, proj);
+
             // temp editor control hud
             font_draw(app.editor_renderer.font,"[TAB] drive  [L CLICK] place/select  [DEL] delete  [B] behavior  [Ctrl+S] save",
                       10, Const::WINDOW_HEIGHT - 40, 2, 0.7f, 0.7f, 0.7f);

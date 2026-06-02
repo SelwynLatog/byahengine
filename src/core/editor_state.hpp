@@ -19,7 +19,8 @@ enum EditorMode{
     MODE_TERRAIN, // sculpt heightfield
     MODE_ROAD, // place/edit road spline control points
     MODE_OCEAN, // place/resize ocean zones
-    MODE_LIGHT // place light source, adjust intensity
+    MODE_LIGHT, // place light source, adjust intensity
+    MODE_POSE
 };
 
 // editor mode state lives in App
@@ -76,5 +77,15 @@ struct EditorState{
     glm::vec3 light_edit_color = glm::vec3(Const::LIGHT_DEFAULT_R, Const::LIGHT_DEFAULT_G, Const::LIGHT_DEFAULT_B);
     float light_edit_radius = Const::LIGHT_DEFAULT_RADIUS;
     float light_edit_intensity = Const::LIGHT_DEFAULT_INTENSITY;
+
+    // pose editor
+    int pose_bone = 0;  // active bone index (Tab cycles)
+    // euler offsets in degrees per bone, applied on top of pose_sit()
+    glm::vec3 pose_euler[6] = {};
+    // seat position nudged live, initialized from Const on mode entry
+    glm::vec3 pose_seat = glm::vec3(
+        Const::DRIVER_SEAT_OFFSET_X,
+        Const::DRIVER_SEAT_OFFSET_Y,
+        Const::DRIVER_SEAT_OFFSET_Z);
 
 };
