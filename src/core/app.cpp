@@ -302,6 +302,9 @@
                 editor_renderer_shadow_pass(app.editor_renderer, app.map,
                     app.scene.light_space_mat, app.dynamic_sims);
                 scene_trike_shadow_draw(app.scene, app.trike);
+                driver_model_draw(app.scene.driver_model, app.player, app.trike,
+                app.scene.shadow_shader, app.scene.light_space_mat, glm::mat4(1.0f),
+                app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
                 glCullFace(GL_BACK);
                 glDisable(GL_CULL_FACE);
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -887,6 +890,9 @@
             editor_renderer_shadow_pass(app.editor_renderer, app.map,
                 app.scene.light_space_mat, app.dynamic_sims);
             scene_trike_shadow_draw(app.scene, app.trike);
+            driver_model_draw(app.scene.driver_model, app.player, app.trike,
+                app.scene.shadow_shader, app.scene.light_space_mat, glm::mat4(1.0f),
+                app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
             glCullFace(GL_BACK);
             glDisable(GL_CULL_FACE);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
