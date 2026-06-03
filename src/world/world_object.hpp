@@ -35,7 +35,15 @@ struct WorldObject{
     // RIGID BODY DEFS - DYNAMIC 
     // TEMP: hardcoded at placement
     // tunable in the future
-    float mass = 10.0f; //kg. cone, poles, barell, etc
-    float restitution = 0.50f; // bounciness on 
-    float friction = 0.80f; // ground drag, higher stops faster
+    float mass = 10.0f;
+    float restitution = 0.50f;
+    float friction = 0.80f;
+
+    // PEDESTRIAN config
+    int npc_type = 0; // maps to NpcType enum
+    bool npc_can_hail = false;
+    glm::vec3 npc_walk_a = glm::vec3(0.0f); // patrol start
+    glm::vec3 npc_walk_b = glm::vec3(0.0f); // patrol end
+    glm::vec3 npc_drop_point = glm::vec3(0.0f); // passenger destination
+    float npc_weight = 60.0f; // kg, affects trike physics when riding configurable in editor
 };
