@@ -42,11 +42,14 @@ struct EditorState{
     // active tool
     EditorTool tool = TOOL_TRANSLATE;
 
-    // prop palette
-    // scan OBJ files from assets/
-    // allows selector to scan which page of lets say for now 0-9 we are on
+    // prop palette scans assets/ root only
     std::vector<std::string> prop_list;
     int prop_page = 0;
+
+    // entity palette scans assets/entity/ for Driver/NPC models
+    // active when selected object is PEDESTRIAN
+    std::vector<std::string> entity_list;
+    int entity_page = 0;
 
     // dynamic behavior selector
     // when DYNAMIC, select obj type N key cycles through DYN_PRESETS

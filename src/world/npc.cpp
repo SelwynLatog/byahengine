@@ -169,12 +169,17 @@ void npc_draw(
     static const glm::vec3 zero_offsets[BONE_COUNT] = {};
     static const glm::vec3 no_seat = glm::vec3(0.0f);
 
+    TrikeState fake_trike{};
     if (npc.mode == NPC_RAGDOLL) {
-        // collapsed flat for now, full bone ragdoll is phase 2
+        fake.mode = PLAYER_DRIVING; // use driving path so roll/pitch are applied
         fake.speed = 0.0f;
         fake.anim_timer = 0.0f;
+        fake_trike.position = npc.position;
+        fake_trike.heading = npc.yaw;
+        fake_trike.roll_angle = npc.ragdoll_roll;
+        fake_trike.pitch_angle = npc.ragdoll_pitch;
     }
 
-    driver_model_draw(model, fake, TrikeState{}, shader, view, proj,
+    driver_model_draw(model, fake, fake_trike, shader, view, proj,
         identity_quats, zero_offsets, no_seat);
 }

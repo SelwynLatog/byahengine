@@ -83,10 +83,10 @@ static ObjData slice_part(const ObjData& full, const ObjPart& part) {
     return out;
 }
 
-void driver_model_init(DriverModel& d) {
+void driver_model_init(DriverModel& d, const char* path) {
     ObjData full;
-    if (!obj_load("../assets/people/DRIVER.obj", full))
-        std::cerr << "[driver_model] failed to load DRIVER.obj\n";
+    if (!obj_load(path, full))
+        std::cerr << "[driver_model] failed to load " << path << "\n";
 
     // compute full model bounding box for scale and foot anchor
     float minX= 1e9f, maxX=-1e9f;

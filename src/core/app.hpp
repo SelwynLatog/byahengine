@@ -41,10 +41,10 @@ struct App {
     int passenger_npc_id = -1; // -1 = no passenger
     float passenger_fare = 0.0f; // accumulated fare for current ride
 
-    // one DriverModel per NpcType indexed by NpcType enum
-    // 0=PERSON, 1=CHICKEN, 2=COW, 3=DOG
-    // person reuses scene.driver_model, others loaded separately when assets exist
-    DriverModel* npc_models[4] = {};
+    // one DriverModel per unique entity model_path
+    // keyed by filename eg. "female_1.obj"
+    // loaded once on init_npcs, reused across all npcs sharing the same model
+    std::unordered_map<std::string, DriverModel> npc_model_cache;
 };
 
 void app_init(App& app);

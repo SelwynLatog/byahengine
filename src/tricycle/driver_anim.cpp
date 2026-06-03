@@ -2,6 +2,20 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
 
+static void pose_idle(DriverPose& pose, float t) {
+    
+    // subtle sway when standing still
+    float sway = std::sin(t * 0.8f) * 0.18f;
+
+    pose.local[BONE_TORSO] = glm::mat4(1.0f);
+    float look = std::sin(t * 0.25f) * 0.06f;
+    pose.local[BONE_HEAD] = glm::rotate(glm::mat4(1.0f), look, glm::vec3(0,1,0));
+    pose.local[BONE_ARM_L] = glm::rotate(glm::mat4(1.0f),  sway * 0.6f, glm::vec3(0,0,1));
+    pose.local[BONE_ARM_R] = glm::rotate(glm::mat4(1.0f), -sway * 0.6f, glm::vec3(0,0,1));
+    pose.local[BONE_LEG_L] = glm::mat4(1.0f);
+    pose.local[BONE_LEG_R] = glm::mat4(1.0f);
+}
+
 static void pose_walk(DriverPose& pose, float t, float speed) {
     // amplitude scales with speed, clamped so slow walk looks natural
     float amp = glm::clamp(speed / 4.0f, 0.15f, 0.55f);
@@ -52,7 +66,21 @@ void driver_pose_compute(DriverPose& pose, float anim_timer,
         pose.local[i] = glm::mat4(1.0f);
 
     if (mode == 0) {
-        pose_walk(pose, anim_timer, speed);
+        if (speed < 0.1f) {
+            pose_idle(pose, anim_timer);
+        } 
+        else {
+            // blend idle -> walk over first 0.5 m/s so transition isn't a snap
+            float blend = glm::clamp(speed / 0.5f, 0.0f, 1.0f);
+            DriverPose idle_pose, walk_pose;
+            for (int i = 0; i < BONE_COUNT; i++)
+                idle_pose.local[i] = walk_pose.local[i] = glm::mat4(1.0f);
+            pose_idle(idle_pose, anim_timer);
+            pose_walk(walk_pose, anim_timer, speed);
+            for (int i = 0; i < BONE_COUNT; i++)
+                for (int c = 0; c < 4; c++)
+                    pose.local[i][c] = glm::mix(idle_pose.local[i][c], walk_pose.local[i][c], blend);
+        }
         return;
     }
 

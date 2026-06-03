@@ -132,8 +132,25 @@ void editor_scan_props(EditorState& editor, const char* assets_dir){
     // sort alphabetically so the palette is stable across runs
     std::sort(editor.prop_list.begin(), editor.prop_list.end());
 
-    std::cout << "[editor] found " << editor.prop_list.size() << " props in"<< assets_dir<< "\n";
-    for(const auto& p : editor.prop_list) std::cout<< " "<< p << "\n";
+    std::cout << "[editor] found " << editor.prop_list.size() << " props in " << assets_dir << "\n";
+
+    // scan entity subfolder separately for NPC models
+    editor.entity_list.clear();
+    std::string entity_dir = std::string(assets_dir) + "/entity";
+    if (std::filesystem::exists(entity_dir)) {
+        for (const auto& entry : std::filesystem::directory_iterator(entity_dir)) {
+            if (!entry.is_regular_file()) continue;
+            if (entry.path().extension() != ".obj") continue;
+            editor.entity_list.push_back(entry.path().filename().string());
+        }
+        std::sort(editor.entity_list.begin(), editor.entity_list.end());
+    }
+    // also merge entity list into prop list with entity/ prefix
+    // so they appear in the normal object mode palette
+    for (const auto& e : editor.entity_list)
+        editor.prop_list.push_back("entity/" + e);
+
+    std::cout << "[editor] found " << editor.entity_list.size() << " entities in " << entity_dir << "\n";
 }
 
 bool editor_raycast_ground( double mx, double my,
@@ -361,7 +378,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
                     Const::DRIVER_SEAT_OFFSET_Y,
                     Const::DRIVER_SEAT_OFFSET_Z);
                 {
-                    std::ifstream pf("../assets/people/driver_pose.txt");
+                    std::ifstream pf("../assets/entity/driver_pose.txt");
                     if (pf.is_open()) {
                         std::string tag;
                         while (pf >> tag) {
@@ -379,7 +396,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
                                        >> editor.pose_offset[idx].z;
                             }
                         }
-                        std::cout << "[pose] loaded ../assets/people/driver_pose.txt\n";
+                        std::cout << "[pose] loaded ../assets/entity/driver_pose.txt\n";
                     }
                 }
             std::cout << "[editor] mode -> POSE\n";
@@ -506,7 +523,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         static bool s_pose_s_last = false;
         bool s_down = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
         if (ctrl && s_down && !s_pose_s_last) {
-            std::ofstream pf("../assets/people/driver_pose.txt");
+            std::ofstream pf("../assets/entity/driver_pose.txt");
             if (pf.is_open()) {
                 pf << "seat " << editor.pose_seat.x << " "
                    << editor.pose_seat.y << " " << editor.pose_seat.z << "\n";
@@ -519,7 +536,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
                        << editor.pose_offset[i].x << " "
                        << editor.pose_offset[i].y << " "
                        << editor.pose_offset[i].z << "\n";
-                std::cout << "[pose] saved ../assets/people/driver_pose.txt\n";
+                std::cout << "[pose] saved ../assets/entity/driver_pose.txt\n";
             }
         }
         s_pose_s_last = s_down;
@@ -929,36 +946,45 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     // num keys 1-9 select from curr page of prop_list
     // page flips with [ and ] so we scroll past 9 props
     {
-        int total = (int)editor.prop_list.size();
+        // resolve active list first
+        // PEDESTRIAN selected = entity palette, else prop palette
+        bool ped_selected = false;
+        for (const auto& o : map.objects)
+            if (o.id == editor.selected_id && o.behavior == PEDESTRIAN) { ped_selected = true; break; }
 
-        // page scroll
-        // using bracket keys: [ = prev page, ] = next page
+        const std::vector<std::string>& active_list = ped_selected ? editor.entity_list : editor.prop_list;
+        int& active_page = ped_selected ? editor.entity_page : editor.prop_page;
+
+        // page scroll 
+        // operates on whichever list is active
         static bool s_pgup_last = false;
         static bool s_pgdn_last = false;
         bool pgup = glfwGetKey(window, GLFW_KEY_LEFT_BRACKET)  == GLFW_PRESS;
         bool pgdn = glfwGetKey(window, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS;
-        if (pgup && !s_pgup_last && editor.prop_page > 0) editor.prop_page--;
+        if (pgup && !s_pgup_last && active_page > 0) active_page--;
         if (pgdn && !s_pgdn_last){
-            int max_page = (total - 1) / Const::EDITOR_PAGE_SIZE;
-            if (editor.prop_page < max_page) editor.prop_page++;
+            int list_size = (int)active_list.size();
+            int max_page = list_size > 0 ? (list_size - 1) / Const::EDITOR_PAGE_SIZE : 0;
+            if (active_page < max_page) active_page++;
         }
         s_pgup_last = pgup;
         s_pgdn_last = pgdn;
 
-        // 1-9 select prop on curr page
-         static const int num_keys[9] = {
+        // 1-9 select from active list
+        static const int num_keys[9] = {
             GLFW_KEY_1, GLFW_KEY_2, GLFW_KEY_3,
             GLFW_KEY_4, GLFW_KEY_5, GLFW_KEY_6,
             GLFW_KEY_7, GLFW_KEY_8, GLFW_KEY_9
         };
 
-        for (int i =0; i<Const::EDITOR_PAGE_SIZE; i++){
+        for (int i = 0; i < Const::EDITOR_PAGE_SIZE; i++){
             if (glfwGetKey(window, num_keys[i]) == GLFW_PRESS){
-                int idx = editor.prop_page * Const::EDITOR_PAGE_SIZE + i;
-                if (idx < total){
-                    editor.selected_model = editor.prop_list[idx];
-                    editor.selected_id = -1; // deselect placed object when picking a new prop
-                    std::cout << "[editor] selected prop: " << editor.selected_model << "\n";
+                int idx = active_page * Const::EDITOR_PAGE_SIZE + i;
+                if (idx < (int)active_list.size()){
+                    editor.selected_model = active_list[idx];
+                    if (!ped_selected) editor.selected_id = -1;
+                    std::cout << "[editor] selected " << (ped_selected ? "entity" : "prop")
+                              << ": " << editor.selected_model << "\n";
                 }
             }
         }
@@ -1124,7 +1150,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             static bool s_j_last = false;
             bool j_down = glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS;
             if (j_down && !s_j_last){
-                o.npc_type = (o.npc_type + 1) % 4;
+                o.npc_type = (o.npc_type + 1) % NPC_TYPE_COUNT;
                 std::cout << "[npc] type -> " << NPC_TYPE_NAMES[o.npc_type] << "\n";
                 map_dirty = true;
             }

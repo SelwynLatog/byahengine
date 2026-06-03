@@ -21,9 +21,12 @@ static constexpr const char* NPC_TYPE_NAMES[] = {
     "PERSON", 
     "CHICKEN", 
     "COW", 
+    "CAT",
     "DOG",
     "TIKBALANG"
 };
+
+static constexpr int NPC_TYPE_COUNT = sizeof(NPC_TYPE_NAMES) / sizeof(NPC_TYPE_NAMES[0]);
 
 enum NpcMode {
     NPC_IDLE,
@@ -68,6 +71,7 @@ struct NpcState {
 
     // future
     int voiceline_id = -1;
+    std::string model_path = ""; // filename from WorldObject, used to look up model in app
 };
 
 void npc_init(NpcState& npc, int id, NpcType type, glm::vec3 pos, float yaw,

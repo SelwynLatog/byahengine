@@ -14,6 +14,7 @@
     #include <cmath>
     #include <iostream>
     #include <fstream>
+    #include <filesystem>
 
     // this commit ver is much cleaner now. Used to be a horrendous god file
     // basically had shaders, draw calls, mesh uploads, everything
@@ -102,6 +103,21 @@
 
         for (const auto& o : app.map.objects){
             if (o.behavior != PEDESTRIAN) continue;
+
+            // load model if not already cached
+            if (app.npc_model_cache.find(o.model_path) == app.npc_model_cache.end()){
+                std::string full_path = "../assets/" + o.model_path;
+                if (std::filesystem::exists(full_path)){
+                    driver_model_init(app.npc_model_cache[o.model_path], full_path.c_str());
+                    std::cout << "[npc] loaded model " << o.model_path << "\n";
+                } 
+                else {
+                    // fallback: point to DRIVER model via empty key sentinel
+                    app.npc_model_cache[o.model_path]; // default-construct, will be remapped below
+                    std::cout << "[npc] model not found: " << o.model_path << ", using DRIVER fallback\n";
+                }
+            }
+
             NpcState npc;
             npc_init(npc, o.id,
                 (NpcType)o.npc_type,
@@ -109,6 +125,7 @@
                 o.npc_walk_a, o.npc_walk_b,
                 o.npc_can_hail, o.npc_drop_point,
                 o.npc_weight);
+            npc.model_path = o.model_path;
             app.npcs.push_back(npc);
         }
         std::cout << "[npc] spawned " << app.npcs.size() << " npcs\n";
@@ -195,15 +212,7 @@
         init_dynamic_sims(app);
         init_npcs(app);
 
-        // person reuses driver model no extra load
-        app.npc_models[NPC_TYPE_PERSON] = &app.scene.driver_model;
-
-        // NPC TYPES: load when assets exist, fallback to person model for now
-        // TODO: 
-        app.npc_models[NPC_TYPE_CHICKEN] = &app.scene.driver_model;
-        app.npc_models[NPC_TYPE_COW] = &app.scene.driver_model;
-        app.npc_models[NPC_TYPE_DOG] = &app.scene.driver_model;
-
+        
         // build id->object lookup so dynamic sim loop is O(1) not O(n)
         app.wo_by_id.clear();
         for (const auto& o : app.map.objects)
@@ -213,7 +222,7 @@
 
         // load saved driver pose so drive mode is correct from the start
         {
-            std::ifstream pf("../assets/people/driver_pose.txt");
+            std::ifstream pf("../assets/entity/driver_pose.txt");
             if (pf.is_open()) {
                 std::string tag;
                 while (pf >> tag) {
@@ -235,18 +244,6 @@
             }
         }
 
-
-        // pre editor hardcoded static objs
-        // kept for now in case I fuck up my world_map_to_obstacles
-        /*
-        // spawn static obstacles
-        // position=center-bottom 
-        // half_extents=half w/h/d
-
-        app.obstacles.push_back(make_obstacle({10.0f, 0.0f,  0.0f}, {0.75f, 1.0f, 0.75f}));
-        app.obstacles.push_back(make_obstacle({ 0.0f, 0.0f, 10.0f}, {1.0f,  1.5f, 0.5f}));
-        app.obstacles.push_back(make_obstacle({15.0f, 0.0f,  8.0f}, {0.5f,  0.8f, 0.5f}));
-        */
 
         hud_init(app.hud, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
 
@@ -469,7 +466,7 @@
                 app.player.speed = glm::length(walk_vel);
                 app.player.pos.y = heightfield_sample(app.map.terrain,
                     app.player.pos.x, app.player.pos.z);
-                app.player.anim_timer += app.player.speed * dt * 1.8f;
+                app.player.anim_timer += (app.player.speed > 0.1f ? app.player.speed * 1.8f : 1.0f) * dt;
             }
 
             // PLAYER MOUNT
@@ -1097,9 +1094,10 @@
             scene_draw_driver(app.scene, app.player, app.trike, view, proj, app.editor_renderer.obj_shader,  app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
             
             for (const auto& npc : app.npcs){
-                DriverModel* mdl = app.npc_models[npc.type];
-                if (mdl)
-                    npc_draw(npc, *mdl, app.editor_renderer.obj_shader, view, proj);
+                auto it = app.npc_model_cache.find(npc.model_path);
+                DriverModel* mdl = (it != app.npc_model_cache.end())
+                    ? &it->second : &app.scene.driver_model;
+                npc_draw(npc, *mdl, app.editor_renderer.obj_shader, view, proj);
             }
 
             hud_draw(app.hud, app.trike, app.passenger_npc_id != -1, app.passenger_fare);

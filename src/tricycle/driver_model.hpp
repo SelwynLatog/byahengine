@@ -22,7 +22,8 @@
         std::unordered_map<std::string, GLuint> tex_cache;
     };
 
-    void driver_model_init(DriverModel& d);
+    // path defaults to DRIVER.obj for backwards compat with scene init
+void driver_model_init(DriverModel& d, const char* path = "../assets/entity/DRIVER.obj");
 
     void driver_model_draw(
         const DriverModel& d,
