@@ -222,6 +222,7 @@ void driver_model_draw(
         mount_t = 1.0f - glm::clamp(player.mount_timer / 0.3f, 0.0f, 1.0f);
     }
 
+    
     DriverPose pose;
     driver_pose_compute(pose, player.anim_timer, player.speed, anim_mode, mount_t);
     // apply saved pose editor quats on top of the sit pose when driving
@@ -229,6 +230,7 @@ void driver_model_draw(
         for (int b = 0; b < BONE_COUNT; b++)
             pose.local[b] = pose.local[b] * glm::mat4_cast(pose_quats[b]);
     }
+
 
     set_mat4(shader, "u_view", view);
     set_mat4(shader, "u_proj", proj);
@@ -247,7 +249,8 @@ void driver_model_draw(
         bone_local = glm::translate(bone_local, -piv);
         // apply per-bone translation offset in model space
         // lets you close gaps between parts without rotation
-        bone_local = glm::translate(bone_local, pose_offsets[b]);
+        if (player.mode == PLAYER_DRIVING || player.mode == PLAYER_MOUNTING)
+            bone_local = glm::translate(bone_local, pose_offsets[b]);
 
         glm::mat4 model = base * bone_local;
         glm::mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));

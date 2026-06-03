@@ -135,6 +135,7 @@ void trike_model_draw(
     // static body parts 
     // cab, cart, rear spring, driver
     draw_part(t.mesh, "trike_cab_body", body, shader);
+    draw_part(t.mesh, "trike_driver_body", body, shader);
     draw_part(t.mesh, "cart", body, shader);
     draw_part(t.mesh, "trike_rear_spring", body, shader);
 
