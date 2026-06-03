@@ -196,10 +196,8 @@ void driver_model_draw(
     base = glm::translate(base, draw_pos + glm::vec3(0.0f, foot_lift + bob, 0.0f));
     base = glm::rotate(base, -draw_yaw + glm::radians(90.0f), glm::vec3(0,1,0));
     if (player.mode == PLAYER_DRIVING || player.mode == PLAYER_MOUNTING) {
-        glm::vec3 fwd = { std::cos(trike.heading), 0.0f, std::sin(trike.heading) };
-        glm::vec3 right = { -std::sin(trike.heading), 0.0f, std::cos(trike.heading) };
-        base = glm::rotate(base, -trike.roll_angle,  fwd);
-        base = glm::rotate(base, trike.pitch_angle, right);
+        base = glm::rotate(base, -trike.roll_angle, glm::vec3(1,0,0));
+        base = glm::rotate(base, trike.pitch_angle, glm::vec3(0,0,1));
     }
     // OBJ is Z-up
     base = glm::rotate(base, glm::radians(-90.0f), glm::vec3(1,0,0));
@@ -229,6 +227,20 @@ void driver_model_draw(
     if (player.mode == PLAYER_DRIVING || player.mode == PLAYER_MOUNTING) {
         for (int b = 0; b < BONE_COUNT; b++)
             pose.local[b] = pose.local[b] * glm::mat4_cast(pose_quats[b]);
+
+        // arms tilt with steering 
+        // left arm pushes forward, right pulls back on left turn
+        float steer = trike.steer_angle; // radians, positive = right turn
+        float arm_fwd  = steer * 0.6f;  // forward/back swing along X
+        float arm_twist = steer * 0.3f; // Y twist into the turn
+
+        glm::mat4 steer_l = glm::rotate(glm::mat4(1.0f), -arm_fwd,  glm::vec3(1,0,0));
+        steer_l = glm::rotate(steer_l, -arm_twist, glm::vec3(0,1,0));
+        glm::mat4 steer_r = glm::rotate(glm::mat4(1.0f),  arm_fwd,  glm::vec3(1,0,0));
+        steer_r = glm::rotate(steer_r, arm_twist, glm::vec3(0,1,0));
+
+        pose.local[BONE_ARM_L] = pose.local[BONE_ARM_L] * steer_l;
+        pose.local[BONE_ARM_R] = pose.local[BONE_ARM_R] * steer_r;
     }
 
 

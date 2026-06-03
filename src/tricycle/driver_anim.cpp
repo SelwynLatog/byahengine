@@ -2,16 +2,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
 
-// rotate a matrix around a pivot point in model space
-// equiv to: translate(pivot) * rotate * translate(-pivot)
-static glm::mat4 rot_around(glm::vec3 pivot, float angle, glm::vec3 axis) {
-    glm::mat4 m = glm::mat4(1.0f);
-    m = glm::translate(m, pivot);
-    m = glm::rotate(m, angle, axis);
-    m = glm::translate(m, -pivot);
-    return m;
-}
-
 static void pose_walk(DriverPose& pose, float t, float speed) {
     // amplitude scales with speed, clamped so slow walk looks natural
     float amp = glm::clamp(speed / 4.0f, 0.15f, 0.55f);
