@@ -95,6 +95,25 @@
             << " obstacles from world map\n";
     }
 
+    void init_npcs(App& app){
+        app.npcs.clear();
+        app.passenger_npc_id = -1;
+        app.passenger_fare = 0.0f;
+
+        for (const auto& o : app.map.objects){
+            if (o.behavior != PEDESTRIAN) continue;
+            NpcState npc;
+            npc_init(npc, o.id,
+                (NpcType)o.npc_type,
+                o.position, o.rotation.y,
+                o.npc_walk_a, o.npc_walk_b,
+                o.npc_can_hail, o.npc_drop_point,
+                o.npc_weight);
+            app.npcs.push_back(npc);
+        }
+        std::cout << "[npc] spawned " << app.npcs.size() << " npcs\n";
+    }
+
     // rigid body dynamic sim init
     // called and loaded when returning from editor
     void init_dynamic_sims(App& app){
@@ -174,6 +193,16 @@
         }
         world_map_to_obstacles(app);
         init_dynamic_sims(app);
+        init_npcs(app);
+
+        // person reuses driver model no extra load
+        app.npc_models[NPC_TYPE_PERSON] = &app.scene.driver_model;
+
+        // NPC TYPES: load when assets exist, fallback to person model for now
+        // TODO: 
+        app.npc_models[NPC_TYPE_CHICKEN] = &app.scene.driver_model;
+        app.npc_models[NPC_TYPE_COW] = &app.scene.driver_model;
+        app.npc_models[NPC_TYPE_DOG] = &app.scene.driver_model;
 
         // build id->object lookup so dynamic sim loop is O(1) not O(n)
         app.wo_by_id.clear();
@@ -259,6 +288,7 @@
                     if (app.obstacles_dirty){
                         world_map_to_obstacles(app);
                         init_dynamic_sims(app);
+                        init_npcs(app);
                         app.wo_by_id.clear();
                         for (const auto& o : app.map.objects)
                             app.wo_by_id[o.id] = &o;
@@ -368,6 +398,28 @@
                         10, Const::WINDOW_HEIGHT - 40, 2, 0.7f, 0.7f, 0.7f);
                 font_draw(app.editor_renderer.font,"[T] translate  [R] rotate  [Y] scale  [PgUp/PgDn] Y nudge  [1-9] prop  [/] page",
                         10, Const::WINDOW_HEIGHT - 20, 2, 0.7f, 0.7f, 0.7f);
+
+                // PEDESTRIAN config overlay
+                if (app.editor.selected_id != -1){
+                    for (const auto& o : app.map.objects){
+                        if (o.id != app.editor.selected_id) continue;
+                        if (o.behavior != PEDESTRIAN) break;
+                        char buf[256];
+                        snprintf(buf, sizeof(buf),
+                            "[PEDESTRIAN] type:%s  hail:%s  weight:%.1fkg  [J]=type [G]=hail [+/-]=weight",
+                            NPC_TYPE_NAMES[o.npc_type], o.npc_can_hail ? "YES" : "NO", o.npc_weight);
+                        font_draw(app.editor_renderer.font, buf,
+                            10, Const::WINDOW_HEIGHT - 60, 2, 1.0f, 0.85f, 0.3f);
+                        snprintf(buf, sizeof(buf),
+                            "walk_a:(%.1f,%.1f)  walk_b:(%.1f,%.1f)  drop:(%.1f,%.1f)  [I]=A [U]=B [X]=drop",
+                            o.npc_walk_a.x, o.npc_walk_a.z,
+                            o.npc_walk_b.x, o.npc_walk_b.z,
+                            o.npc_drop_point.x, o.npc_drop_point.z);
+                        font_draw(app.editor_renderer.font, buf,
+                            10, Const::WINDOW_HEIGHT - 80, 2, 1.0f, 0.85f, 0.3f);
+                        break;
+                    }
+                }
                 
                 window_swap_buffers(app.window);
                 window_poll_events();
@@ -792,6 +844,121 @@
                 }
             }
 
+            //**************************************/
+            // NPC UPDATE
+            //**************************************/
+            static constexpr float NPC_HAIL_RANGE_SQ = 36.0f; // 6m
+
+            for (auto& npc : app.npcs){
+                // passenger: lock to sidecar position
+                if (npc.mode == NPC_PASSENGER){
+                    float c = std::cos(app.trike.heading);
+                    float s = std::sin(app.trike.heading);
+                    // sidecar offset — right side of trike
+                    glm::vec3 sidecar_off = glm::vec3(0.2f, 0.0f, 0.6f);
+                    npc.position = app.trike.position + glm::vec3(
+                        c * sidecar_off.x - s * sidecar_off.z,
+                        sidecar_off.y,
+                        s * sidecar_off.x + c * sidecar_off.z);
+                    npc.yaw = app.trike.heading;
+                    // accumulate fare distance
+                    app.passenger_fare += std::abs(app.trike.speed) * dt
+                        * Const::FARE_RATE_PER_METRE;
+                    // check arrival at drop point
+                    glm::vec3 to_drop = npc.drop_point - app.trike.position;
+                    to_drop.y = 0.0f;
+                    if (glm::dot(to_drop, to_drop) < 4.0f){
+                        // arrived — dismount
+                        npc.mode = NPC_DISMOUNTING;
+                        app.passenger_npc_id = -1;
+                        std::cout << "[npc] dropoff fare=" << app.passenger_fare << "\n";
+                        app.passenger_fare = 0.0f;
+                    }
+                    continue;
+                }
+
+                npc_update(npc, app.map.terrain, dt);
+
+                // hailing logic — only idle/walk persons in range
+                if (npc.can_hail
+                    && npc.mode != NPC_RAGDOLL
+                    && npc.mode != NPC_HAILING
+                    && npc.mode != NPC_MOUNTING
+                    && npc.mode != NPC_DISMOUNTING
+                    && app.passenger_npc_id == -1)
+                {
+                    glm::vec3 d = npc.position - app.trike.position;
+                    d.y = 0.0f;
+                    if (glm::dot(d, d) < NPC_HAIL_RANGE_SQ && npc.hail_timer <= 0.0f){
+                        npc.mode = NPC_HAILING;
+                        std::cout << "[npc] id=" << npc.id << " hailing\n";
+                    }
+                }
+
+                // hailing: face trike
+                if (npc.mode == NPC_HAILING){
+                    glm::vec3 d = app.trike.position - npc.position;
+                    d.y = 0.0f;
+                    if (glm::length(d) > 0.1f)
+                        npc.yaw = std::atan2(d.z, d.x);
+
+                    // player stops near hailing npc 
+                    // start mounting
+                    glm::vec3 to_npc = npc.position - app.trike.position;
+                    to_npc.y = 0.0f;
+                    if (glm::dot(to_npc, to_npc) < 4.0f
+                        && std::abs(app.trike.speed) < 1.0f
+                        && app.passenger_npc_id == -1)
+                    {
+                        npc.mode = NPC_MOUNTING;
+                        app.passenger_npc_id = npc.id;
+                        std::cout << "[npc] id=" << npc.id << " mounting\n";
+                    }
+                }
+
+                // mounting: walk toward sidecar, snap when close
+                if (npc.mode == NPC_MOUNTING){
+                    float c = std::cos(app.trike.heading);
+                    float s = std::sin(app.trike.heading);
+                    glm::vec3 sidecar_off = glm::vec3(0.2f, 0.0f, 0.6f);
+                    glm::vec3 mount_target = app.trike.position + glm::vec3(
+                        c * sidecar_off.x - s * sidecar_off.z,
+                        sidecar_off.y,
+                        s * sidecar_off.x + c * sidecar_off.z);
+
+                    glm::vec3 to_mount = mount_target - npc.position;
+                    to_mount.y = 0.0f;
+                    float dist = glm::length(to_mount);
+
+                    if (dist < 0.4f){
+                        npc.mode = NPC_PASSENGER;
+                    } 
+                    else {
+                        glm::vec3 dir = to_mount / dist;
+                        npc.yaw = std::atan2(dir.z, dir.x);
+                        npc.position += dir * 2.5f * dt; // walk faster to mount
+                    }
+                }
+
+                // RAGDOLL
+                // trike vs NPC collision 
+                if (npc.mode != NPC_RAGDOLL && npc.mode != NPC_PASSENGER){
+                    glm::vec3 d = npc.position - app.trike.position;
+                    d.y = 0.0f;
+                    if (glm::dot(d, d) < 1.2f * 1.2f){
+                        glm::vec3 trike_fwd = {
+                            std::cos(app.trike.heading), 0.0f,
+                            std::sin(app.trike.heading) };
+                        float closing = app.trike.speed;
+                        if (std::abs(closing) > 0.5f){
+                            glm::vec3 impulse = trike_fwd * closing * 0.8f;
+                            npc_hit(npc, impulse);
+                            if (npc.id == app.passenger_npc_id)
+                                app.passenger_npc_id = -1;
+                        }
+                    }
+                }
+            }
 
             //**************************************/
             // CAMERA
@@ -918,7 +1085,7 @@
             for (const auto& [id, sim] : app.dynamic_sims)
                 if (sim.hit_timer > 0.0f)
                     flash_map[id] = sim.hit_timer;
-
+            
             editor_renderer_draw_roads(app.editor_renderer, app.map.roads, view, proj);
             editor_renderer_draw_ocean(app.editor_renderer, app.map.ocean, view, proj, dt,
                 app.map.terrain.origin.x,
@@ -928,7 +1095,14 @@
             editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj, app.map.ocean);
             editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims, app.map.lights);
             scene_draw_driver(app.scene, app.player, app.trike, view, proj, app.editor_renderer.obj_shader,  app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
-            hud_draw(app.hud, app.trike);
+            
+            for (const auto& npc : app.npcs){
+                DriverModel* mdl = app.npc_models[npc.type];
+                if (mdl)
+                    npc_draw(npc, *mdl, app.editor_renderer.obj_shader, view, proj);
+            }
+
+            hud_draw(app.hud, app.trike, app.passenger_npc_id != -1, app.passenger_fare);
             window_swap_buffers(app.window);
             window_poll_events();
         }

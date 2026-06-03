@@ -49,7 +49,12 @@ void world_map_save(const WorldMap& map, const std::string& path){
           << o.rotation.x << " " << o.rotation.y << " " << o.rotation.z << " "
           << o.scale.x << " " << o.scale.y << " " << o.scale.z << " "
           << o.model_path << " " << o.y_floor_offset << " "
-          << o.mass << " " << o.restitution << " " << o.friction << "\n";
+          << o.mass << " " << o.restitution << " " << o.friction << " "
+          << o.npc_type << " " << (o.npc_can_hail ? 1 : 0) << " "
+          << o.npc_walk_a.x << " " << o.npc_walk_a.y << " " << o.npc_walk_a.z << " "
+          << o.npc_walk_b.x << " " << o.npc_walk_b.y << " " << o.npc_walk_b.z << " "
+          << o.npc_drop_point.x << " " << o.npc_drop_point.y << " " << o.npc_drop_point.z << " "
+          << o.npc_weight << "\n";
     }
     
     std::cout << "world_map saved " << map.objects.size() << " objects to " << path << "\n";
@@ -99,8 +104,15 @@ bool world_map_load(WorldMap& map, const std::string& path){
            >> o.scale.x >> o.scale.y >> o.scale.z
            >> o.model_path >> o.y_floor_offset
            >> o.mass >> o.restitution >> o.friction;
-        // older map files won't have mass/restitution/friction
-        // ss will just leave defaults intact if fields are missing
+        // npc fields 
+        // optional, older maps leave defaults intact
+        int can_hail_int = 0;
+        ss >> o.npc_type >> can_hail_int
+           >> o.npc_walk_a.x >> o.npc_walk_a.y >> o.npc_walk_a.z
+           >> o.npc_walk_b.x >> o.npc_walk_b.y >> o.npc_walk_b.z
+           >> o.npc_drop_point.x >> o.npc_drop_point.y >> o.npc_drop_point.z
+           >> o.npc_weight;
+        o.npc_can_hail = (can_hail_int == 1);
 
         o.behavior = (ObjectBehavior)behavior_int;
         if (o.id >= map.next_id) map.next_id = o.id + 1;

@@ -15,6 +15,16 @@ enum NpcType {
     NPC_TYPE_TIKBALANG
 };
 
+// map enum to names so easier to set up in editor
+// add more npcs here
+static constexpr const char* NPC_TYPE_NAMES[] = {
+    "PERSON", 
+    "CHICKEN", 
+    "COW", 
+    "DOG",
+    "TIKBALANG"
+};
+
 enum NpcMode {
     NPC_IDLE,
     NPC_WALK,

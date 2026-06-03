@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
+#include "../world/npc.hpp"
 
 /*
 =============================================================
@@ -1109,6 +1110,77 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         }
     }
     
+    // PEDESTRIAN config for selected object
+    // only active when selected object is PEDESTRIAN
+    if (editor.selected_id != -1){
+        for (auto& o : map.objects){
+            if (o.id != editor.selected_id) continue;
+            if (o.behavior != PEDESTRIAN) break;
+
+            bool shift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+            float step = shift ? 0.05f : 0.5f;
+
+            // J key cycles npc type
+            static bool s_j_last = false;
+            bool j_down = glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS;
+            if (j_down && !s_j_last){
+                o.npc_type = (o.npc_type + 1) % 4;
+                std::cout << "[npc] type -> " << NPC_TYPE_NAMES[o.npc_type] << "\n";
+                map_dirty = true;
+            }
+            s_j_last = j_down;
+
+            // G toggles can_hail (only meaningful for PERSON)
+            static bool s_g_last = false;
+            bool g_down = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS;
+            if (g_down && !s_g_last){
+                o.npc_can_hail = !o.npc_can_hail;
+                std::cout << "[npc] can_hail -> " << (o.npc_can_hail ? "YES" : "NO") << "\n";
+                map_dirty = true;
+            }
+            s_g_last = g_down;
+
+            // + / - adjust weight
+            bool plus  = glfwGetKey(window, GLFW_KEY_EQUAL) == GLFW_PRESS;
+            bool minus = glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS;
+            if (plus)  { o.npc_weight += 5.0f * dt; map_dirty = true; }
+            if (minus) { o.npc_weight = std::max(0.5f, o.npc_weight - 5.0f * dt); map_dirty = true; }
+
+            // set walk_a / walk_b / drop_point from current ghost pos
+            // I = set walk_a, U = set walk_b, X = set drop point
+            static bool s_i_last = false;
+            static bool s_u_last = false;
+            static bool s_x_last = false;
+            bool i_down = glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS;
+            bool u_down = glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS;
+            bool x_down = glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS;
+
+            if (i_down && !s_i_last && editor.placement_valid){
+                o.npc_walk_a = editor.ghost_pos;
+                std::cout << "[npc] walk_a set to ("
+                          << o.npc_walk_a.x << ", " << o.npc_walk_a.z << ")\n";
+                map_dirty = true;
+            }
+            if (u_down && !s_u_last && editor.placement_valid){
+                o.npc_walk_b = editor.ghost_pos;
+                std::cout << "[npc] walk_b set to ("
+                          << o.npc_walk_b.x << ", " << o.npc_walk_b.z << ")\n";
+                map_dirty = true;
+            }
+            if (x_down && !s_x_last && editor.placement_valid){
+                o.npc_drop_point = editor.ghost_pos;
+                std::cout << "[npc] drop_point set to ("
+                          << o.npc_drop_point.x << ", " << o.npc_drop_point.z << ")\n";
+                map_dirty = true;
+            }
+            s_i_last = i_down;
+            s_u_last = u_down;
+            s_x_last = x_down;
+            break;
+        }
+    }
+
+
     // B cycle behavior on selected object
     bool b_down = glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS;
     if (b_down && !s_b_last && editor.selected_id != -1){

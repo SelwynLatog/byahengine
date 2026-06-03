@@ -41,7 +41,7 @@ static std::string fmt(const char* format, ...){
 }
 
 // hud_draw
-void hud_draw(const Hud& h, const TrikeState& trike){
+void hud_draw(const Hud& h, const TrikeState& trike, bool has_passenger, float fare){
     const int SCALE= 2;   // 16x16px glyphs
     const int LEFT= 20;  // left margin px
     const int TOP= 20;  // top margin px
@@ -108,11 +108,14 @@ void hud_draw(const Hud& h, const TrikeState& trike){
                   heading_to_compass(trike.heading), hdg_deg), 1.0f, 1.0f, 1.0f);
     draw_line(fmt("STEER %s", steer_str.c_str()), 1.0f, 1.0f, 1.0f);
     draw_line(fmt("STATE %s", state_str), sr, sg, sb);
+    
+    if (trike.impact_timer > 0.0f){
+        float fade = glm::clamp(trike.impact_timer / 0.35f, 0.0f, 1.0f);
+        draw_line(fmt("IMPACT %.f N", trike.last_impact_force * Const::TRIKE_MASS), 1.0f, 0.2f * fade, 0.2f * fade);
+    }
 
-    // impact readout
-    // fades with timer so it naturally disappears
-    if (trike.impact_timer > 0.0f ){
-        float fade= glm::clamp(trike.impact_timer / 0.35f, 0.0f, 1.0f);
-        draw_line(fmt("IMPACT %.f N", trike.last_impact_force * Const::TRIKE_MASS), 1.0F, 0.2f * fade, 0.2f * fade);
+    if (has_passenger){
+        draw_line(fmt("PASSENGER  FARE: P%.2f", Const::FARE_BASE + fare), 1.0f, 0.9f, 0.2f);
+        draw_line("DRIVE TO DESTINATION", 0.4f, 1.0f, 0.4f);
     }
 }

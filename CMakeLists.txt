@@ -30,6 +30,7 @@ add_executable(tricycle-sim
     src/world/height_field.cpp
     src/world/road_spline.cpp
     src/world/ocean.cpp
+    src/world/npc.cpp
     vendor/glad/src/glad.c
 )
 

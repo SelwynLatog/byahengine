@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include "../physics/dynamic_sim.hpp"
 #include "player_state.hpp"
+#include "../world/npc.hpp"
 
 
 struct App {
@@ -34,6 +35,16 @@ struct App {
     std::unordered_map<int, DynamicSim> dynamic_sims;
     std::unordered_map<int, const WorldObject*> wo_by_id;
     bool obstacles_dirty = true;
+
+    // NPC system
+    std::vector<NpcState> npcs;
+    int passenger_npc_id = -1; // -1 = no passenger
+    float passenger_fare = 0.0f; // accumulated fare for current ride
+
+    // one DriverModel per NpcType indexed by NpcType enum
+    // 0=PERSON, 1=CHICKEN, 2=COW, 3=DOG
+    // person reuses scene.driver_model, others loaded separately when assets exist
+    DriverModel* npc_models[4] = {};
 };
 
 void app_init(App& app);
