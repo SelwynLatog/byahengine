@@ -1070,6 +1070,13 @@
             driver_model_draw(app.scene.driver_model, app.player, app.trike,
                 app.scene.shadow_shader, app.scene.light_space_mat, glm::mat4(1.0f),
                 app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
+            for (const auto& npc : app.npcs) {
+                auto it = app.npc_model_cache.find(npc.model_path);
+                DriverModel* mdl = (it != app.npc_model_cache.end())
+                    ? &it->second : &app.scene.driver_model;
+                npc_draw(npc, *mdl, app.scene.shadow_shader,
+                    app.scene.light_space_mat, glm::mat4(1.0f));
+            }
             glCullFace(GL_BACK);
             glDisable(GL_CULL_FACE);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
