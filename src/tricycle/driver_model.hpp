@@ -19,6 +19,9 @@
         glm::vec3 model_center = glm::vec3(0.0f); // XZ center for alignment
         float model_foot_z = 0.0f;  // min Z in model space, for foot anchoring
         float half_height = 1.0f;
+
+        // for npc since we reuse the same model
+        float forward_offset = -glm::half_pi<float>(); // yaw correction: model forward vs world +X
         std::unordered_map<std::string, GLuint> tex_cache;
     };
 

@@ -126,6 +126,19 @@
                 o.npc_can_hail, o.npc_drop_point,
                 o.npc_weight);
             npc.model_path = o.model_path;
+            npc.editor_scale = o.scale;
+            npc.editor_yaw = o.rotation.y;
+            npc.editor_y_floor_offset = editor_get_y_floor_offset(app.editor_renderer, o.model_path);
+            std::cout << "[npc] id=" << npc.id
+                << " scale=(" << npc.editor_scale.x << "," << npc.editor_scale.y << "," << npc.editor_scale.z << ")"
+                << " yfloor=" << npc.editor_y_floor_offset
+                << " yaw=" << npc.editor_yaw
+                << "\n";
+            auto mit = app.npc_model_cache.find(npc.model_path);
+            if (mit != app.npc_model_cache.end())
+                std::cout << "[npc] model_scale=" << mit->second.model_scale
+                    << " foot_z=" << mit->second.model_foot_z
+                    << " half_height=" << mit->second.half_height << "\n";
             app.npcs.push_back(npc);
         }
         std::cout << "[npc] spawned " << app.npcs.size() << " npcs\n";
@@ -1090,7 +1103,7 @@
                 app.map.terrain.origin.z,
                 app.map.terrain.origin.z + app.map.terrain.rows * app.map.terrain.cell_size);
             editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj, app.map.ocean);
-            editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims, app.map.lights);
+            editor_renderer_draw_props(app.editor_renderer, app.map, view, proj, flash_map, app.dynamic_sims, app.map.lights, true);
             scene_draw_driver(app.scene, app.player, app.trike, view, proj, app.editor_renderer.obj_shader,  app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
             
             for (const auto& npc : app.npcs){

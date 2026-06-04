@@ -72,6 +72,10 @@ struct NpcState {
     // future
     int voiceline_id = -1;
     std::string model_path = ""; // filename from WorldObject, used to look up model in app
+    glm::vec3 editor_scale = glm::vec3(1.0f);
+    float editor_yaw = 0.0f;
+    float editor_y_floor_offset = 0.0f;
+    float spawn_yaw = 0.0f; // yaw at init time, used to compute facing offset
 };
 
 void npc_init(NpcState& npc, int id, NpcType type, glm::vec3 pos, float yaw,

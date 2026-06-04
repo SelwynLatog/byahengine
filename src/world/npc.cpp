@@ -5,6 +5,10 @@
 #include "../tricycle/driver_anim.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glad/glad.h>
+#include "../renderer/obj_mesh.hpp"
+#include "../renderer/obj_loader.hpp"
 #include <cmath>
 
 static constexpr float NPC_WALK_SPEED = 1.4f;
@@ -24,6 +28,7 @@ void npc_init(NpcState& npc, int id, NpcType type, glm::vec3 pos, float yaw,
     npc.type = type;
     npc.position = pos;
     npc.yaw = yaw;
+    npc.spawn_yaw = npc.yaw;
     npc.walk_a = walk_a;
     npc.walk_b = walk_b;
     npc.can_hail = can_hail && (type == NPC_TYPE_PERSON);
@@ -32,6 +37,10 @@ void npc_init(NpcState& npc, int id, NpcType type, glm::vec3 pos, float yaw,
     npc.mode = (glm::length(walk_b - walk_a) > 0.1f) ? NPC_WALK : NPC_IDLE;
     npc.walk_forward = true;
     npc.anim_timer = 0.0f;
+    glm::vec3 walk_dir = walk_b - walk_a;
+    walk_dir.y = 0.0f;
+    if (glm::length(walk_dir) > 0.1f)
+        npc.yaw = std::atan2(walk_dir.z, walk_dir.x);
     // stagger hail timers so npcs don't all hail at once
     npc.hail_timer= NPC_HAIL_TIMER_MIN + (float)(id % 7) * 1.8f;
 }
@@ -100,7 +109,7 @@ void npc_update(NpcState& npc, const HeightField& terrain, float dt) {
         } 
         else {
             glm::vec3 dir = delta / dist;
-            npc.yaw = std::atan2(dir.z, dir.x);
+            npc.yaw = std::atan2(-dir.z, -dir.x);
             npc.position += dir * NPC_WALK_SPEED * dt;
         }
         npc.speed = NPC_WALK_SPEED;
@@ -120,7 +129,7 @@ void npc_update(NpcState& npc, const HeightField& terrain, float dt) {
         } 
         else {
             glm::vec3 dir = delta / dist;
-            npc.yaw = std::atan2(dir.z, dir.x);
+            npc.yaw = std::atan2(-dir.z, -dir.x);
             npc.position += dir * NPC_WALK_SPEED * dt;
         }
         npc.speed = NPC_WALK_SPEED;
@@ -155,31 +164,86 @@ void npc_draw(
     const glm::mat4& view,
     const glm::mat4& proj)
 {
-    PlayerState fake;
-    fake.mode = PLAYER_FOOT;
-    fake.pos = npc.position;
-    fake.yaw = npc.yaw;
-    fake.speed = npc.speed;
-    fake.anim_timer = npc.anim_timer;
+    // build base matrix the same way editor_renderer_draw_props does:
+    // translate to position, rotate by placed yaw, apply y_floor_offset, scale
+    // then append the Z-up OBJ correction and bone scale on top
+    glm::mat4 base = glm::mat4(1.0f);
+    base = glm::translate(base, npc.position);
+
+    // facing: patrol walk overwrites yaw each frame, editor_yaw is the initial facing
+    // use npc.yaw for live direction, but keep editor_yaw as the neutral rest facing
+    float draw_yaw = npc.yaw + model.forward_offset;
+    base = glm::rotate(base, draw_yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+    base = glm::translate(base, glm::vec3(0.0f, npc.editor_y_floor_offset, 0.0f));
+
+    if (npc.mode == NPC_RAGDOLL) {
+        base = glm::rotate(base, npc.ragdoll_pitch, glm::vec3(1.0f, 0.0f, 0.0f));
+        base = glm::rotate(base, npc.ragdoll_roll,  glm::vec3(0.0f, 0.0f, 1.0f));
+    }
+
+
+    glm::vec3 center_off = glm::vec3(model.model_center.x, model.model_foot_z, 0.0f);
+    base = base
+        * glm::translate(glm::mat4(1.0f), -center_off)
+        * glm::scale(glm::mat4(1.0f), npc.editor_scale);
+    // compute walk/idle pose
+    int anim_mode = (npc.mode == NPC_RAGDOLL) ? 1 : 0; // sit pose freezes on ragdoll
+    DriverPose pose;
+    driver_pose_compute(pose, npc.anim_timer, npc.speed, anim_mode, 0.0f);
 
     static const glm::quat identity_quats[BONE_COUNT] = {
         glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0),
         glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0)
     };
     static const glm::vec3 zero_offsets[BONE_COUNT] = {};
-    static const glm::vec3 no_seat = glm::vec3(0.0f);
 
-    TrikeState fake_trike{};
-    if (npc.mode == NPC_RAGDOLL) {
-        fake.mode = PLAYER_DRIVING; // use driving path so roll/pitch are applied
-        fake.speed = 0.0f;
-        fake.anim_timer = 0.0f;
-        fake_trike.position = npc.position;
-        fake_trike.heading = npc.yaw;
-        fake_trike.roll_angle = npc.ragdoll_roll;
-        fake_trike.pitch_angle = npc.ragdoll_pitch;
+    // set shared shader uniforms
+    glUniformMatrix4fv(glGetUniformLocation(shader.id, "u_view"), 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(glGetUniformLocation(shader.id, "u_proj"), 1, GL_FALSE, glm::value_ptr(proj));
+    glUniform1i(glGetUniformLocation(shader.id, "u_use_checker"), 0);
+
+    for (int b = 0; b < BONE_COUNT; b++) {
+        const ObjMesh& mesh = model.parts[b];
+        if (mesh.data.vertices.empty()) continue;
+
+        glm::vec3 piv = model.pivots[b].pivot;
+        glm::mat4 bone_local = glm::translate(glm::mat4(1.0f), piv);
+        bone_local = bone_local * pose.local[b];
+        bone_local = glm::translate(bone_local, -piv);
+
+        glm::mat4 final_model = base * bone_local;
+        glm::mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(final_model)));
+
+        glUniformMatrix4fv(glGetUniformLocation(shader.id, "u_model"), 1, GL_FALSE, glm::value_ptr(final_model));
+        glUniformMatrix3fv(glGetUniformLocation(shader.id, "u_normal_mat"), 1, GL_FALSE, glm::value_ptr(normal_mat));
+
+        glBindVertexArray(mesh.vao);
+        for (const auto& part : mesh.data.parts) {
+            for (const auto& grp : part.groups) {
+                if (grp.vertex_count <= 0) continue;
+                const ObjMaterial* mat = obj_find_material(mesh.data, grp.mat_name);
+                glm::vec3 kd = mat ? mat->kd : glm::vec3(0.8f);
+                glUniform3f(glGetUniformLocation(shader.id, "u_kd"), kd.r, kd.g, kd.b);
+                if (mat && !mat->tex_path.empty()) {
+                    // tex is already in model.tex_cache from driver_model_init
+                    auto it = model.tex_cache.find(mat->tex_path);
+                    GLuint tex = (it != model.tex_cache.end()) ? it->second : 0;
+                    if (tex) {
+                        glActiveTexture(GL_TEXTURE0);
+                        glBindTexture(GL_TEXTURE_2D, tex);
+                        glUniform1i(glGetUniformLocation(shader.id, "u_tex"), 0);
+                        glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 1);
+                    } else {
+                        glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 0);
+                    }
+                } else {
+                    glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 0);
+                }
+                glDrawArrays(GL_TRIANGLES, grp.vertex_start, grp.vertex_count);
+                if (mat && !mat->tex_path.empty())
+                    glBindTexture(GL_TEXTURE_2D, 0);
+            }
+        }
+        glBindVertexArray(0);
     }
-
-    driver_model_draw(model, fake, fake_trike, shader, view, proj,
-        identity_quats, zero_offsets, no_seat);
 }

@@ -135,7 +135,8 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj,
     const std::map<int,float>& flash_map = {},
     const std::unordered_map<int, DynamicSim>& dynamic_sims = {},
-    const std::vector<LightSource>& lights = {});
+    const std::vector<LightSource>& lights = {},
+    bool skip_pedestrians = false);
 
 void editor_renderer_shadow_pass(EditorRenderer& er, const WorldMap& map,
     const glm::mat4& light_space_mat,

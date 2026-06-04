@@ -1037,7 +1037,8 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj,
     const std::map<int,float>& flash_map,
     const std::unordered_map<int, DynamicSim>& dynamic_sims,
-    const std::vector<LightSource>& lights){
+    const std::vector<LightSource>& lights,
+    bool skip_pedestrians){
 
     glm::vec3 LIGHT_DIR = glm::normalize(er.sun_dir);
 
@@ -1085,6 +1086,7 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
 
     for (auto& o : map.objects){
         if (o.model_path.empty()) continue;
+        if (skip_pedestrians && o.behavior == PEDESTRIAN) continue;
 
         // distance cull
         glm::vec3 diff = o.position - cam_pos;
