@@ -150,13 +150,16 @@ namespace Const{
     inline constexpr float PROP_CULL_DIST = 150.0f;
     inline constexpr float PROP_CULL_DIST_SQ = PROP_CULL_DIST * PROP_CULL_DIST;
 
+    inline constexpr float NPC_CULL_DIST = 40.0f;
+    inline constexpr float NPC_CULL_DIST_SQ = NPC_CULL_DIST * NPC_CULL_DIST;
+
     // streetlight warm yellow
     inline constexpr float LIGHT_DEFAULT_R = 1.00f;
     inline constexpr float LIGHT_DEFAULT_G = 0.85f;
     inline constexpr float LIGHT_DEFAULT_B = 0.50f;
 
     // shadow
-    inline constexpr int SHADOW_MAP_SIZE = 4096;   // depth tex resolution, higher = sharper shadows
+    inline constexpr int SHADOW_MAP_SIZE = 2048;   // depth tex resolution, higher = sharper shadows
     inline constexpr float SHADOW_ORTHO_SIZE = 120.0f; // world units covered by shadow frustum
     inline constexpr float SHADOW_NEAR = 1.0f;
     inline constexpr float SHADOW_FAR  = 300.0f;

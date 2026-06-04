@@ -129,16 +129,6 @@
             npc.editor_scale = o.scale;
             npc.editor_yaw = o.rotation.y;
             npc.editor_y_floor_offset = editor_get_y_floor_offset(app.editor_renderer, o.model_path);
-            std::cout << "[npc] id=" << npc.id
-                << " scale=(" << npc.editor_scale.x << "," << npc.editor_scale.y << "," << npc.editor_scale.z << ")"
-                << " yfloor=" << npc.editor_y_floor_offset
-                << " yaw=" << npc.editor_yaw
-                << "\n";
-            auto mit = app.npc_model_cache.find(npc.model_path);
-            if (mit != app.npc_model_cache.end())
-                std::cout << "[npc] model_scale=" << mit->second.model_scale
-                    << " foot_z=" << mit->second.model_foot_z
-                    << " half_height=" << mit->second.half_height << "\n";
             app.npcs.push_back(npc);
         }
         std::cout << "[npc] spawned " << app.npcs.size() << " npcs\n";
@@ -860,6 +850,9 @@
             static constexpr float NPC_HAIL_RANGE_SQ = 36.0f; // 6m
 
             for (auto& npc : app.npcs){
+                glm::vec3 dnpc = npc.position - app.trike.position;
+                dnpc.y = 0.0f;
+                if (glm::dot(dnpc, dnpc) > Const::NPC_CULL_DIST_SQ) continue;
                 // passenger: lock to sidecar position
                 if (npc.mode == NPC_PASSENGER){
                     float c = std::cos(app.trike.heading);
@@ -1071,6 +1064,9 @@
                 app.scene.shadow_shader, app.scene.light_space_mat, glm::mat4(1.0f),
                 app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
             for (const auto& npc : app.npcs) {
+                glm::vec3 dnpc = npc.position - app.trike.position;
+                dnpc.y = 0.0f;
+                if (glm::dot(dnpc, dnpc) > Const::NPC_CULL_DIST_SQ) continue;
                 auto it = app.npc_model_cache.find(npc.model_path);
                 DriverModel* mdl = (it != app.npc_model_cache.end())
                     ? &it->second : &app.scene.driver_model;
@@ -1114,6 +1110,9 @@
             scene_draw_driver(app.scene, app.player, app.trike, view, proj, app.editor_renderer.obj_shader,  app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
             
             for (const auto& npc : app.npcs){
+                glm::vec3 d = npc.position - app.trike.position;
+                d.y = 0.0f;
+                if (glm::dot(d, d) > Const::NPC_CULL_DIST_SQ) continue;
                 auto it = app.npc_model_cache.find(npc.model_path);
                 DriverModel* mdl = (it != app.npc_model_cache.end())
                     ? &it->second : &app.scene.driver_model;

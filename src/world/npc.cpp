@@ -229,9 +229,19 @@ void npc_draw(
     static const glm::vec3 zero_offsets[BONE_COUNT] = {};
 
     // set shared shader uniforms
-    glUniformMatrix4fv(glGetUniformLocation(shader.id, "u_view"), 1, GL_FALSE, glm::value_ptr(view));
-    glUniformMatrix4fv(glGetUniformLocation(shader.id, "u_proj"), 1, GL_FALSE, glm::value_ptr(proj));
-    glUniform1i(glGetUniformLocation(shader.id, "u_use_checker"), 0);
+    GLuint sid = shader.id;
+    GLint loc_view     = glGetUniformLocation(sid, "u_view");
+    GLint loc_proj     = glGetUniformLocation(sid, "u_proj");
+    GLint loc_model    = glGetUniformLocation(sid, "u_model");
+    GLint loc_nmat     = glGetUniformLocation(sid, "u_normal_mat");
+    GLint loc_kd       = glGetUniformLocation(sid, "u_kd");
+    GLint loc_usetex   = glGetUniformLocation(sid, "u_use_texture");
+    GLint loc_tex      = glGetUniformLocation(sid, "u_tex");
+    GLint loc_checker  = glGetUniformLocation(sid, "u_use_checker");
+
+    glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(loc_proj, 1, GL_FALSE, glm::value_ptr(proj));
+    glUniform1i(loc_checker, 0);
 
     for (int b = 0; b < BONE_COUNT; b++) {
         const ObjMesh& mesh = model.parts[b];
@@ -257,10 +267,10 @@ void npc_draw(
         bone_local = glm::translate(bone_local, -piv);
 
         glm::mat4 final_model = base * bone_local;
-        glm::mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(final_model)));
+        glm::mat3 normal_mat = glm::mat3(final_model);
 
-        glUniformMatrix4fv(glGetUniformLocation(shader.id, "u_model"), 1, GL_FALSE, glm::value_ptr(final_model));
-        glUniformMatrix3fv(glGetUniformLocation(shader.id, "u_normal_mat"), 1, GL_FALSE, glm::value_ptr(normal_mat));
+        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm::value_ptr(final_model));
+        glUniformMatrix3fv(loc_nmat,  1, GL_FALSE, glm::value_ptr(normal_mat));
 
         glBindVertexArray(mesh.vao);
         for (const auto& part : mesh.data.parts) {
@@ -268,7 +278,7 @@ void npc_draw(
                 if (grp.vertex_count <= 0) continue;
                 const ObjMaterial* mat = obj_find_material(mesh.data, grp.mat_name);
                 glm::vec3 kd = mat ? mat->kd : glm::vec3(0.8f);
-                glUniform3f(glGetUniformLocation(shader.id, "u_kd"), kd.r, kd.g, kd.b);
+                glUniform3f(loc_kd, kd.r, kd.g, kd.b);
                 if (mat && !mat->tex_path.empty()) {
                     // tex is already in model.tex_cache from driver_model_init
                     auto it = model.tex_cache.find(mat->tex_path);
@@ -276,13 +286,15 @@ void npc_draw(
                     if (tex) {
                         glActiveTexture(GL_TEXTURE0);
                         glBindTexture(GL_TEXTURE_2D, tex);
-                        glUniform1i(glGetUniformLocation(shader.id, "u_tex"), 0);
-                        glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 1);
-                    } else {
-                        glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 0);
+                        glUniform1i(loc_tex, 0);
+                        glUniform1i(loc_usetex, 1);
+                    } 
+                    else {
+                        glUniform1i(loc_usetex, 0);
                     }
-                } else {
-                    glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 0);
+                } 
+                else {
+                    glUniform1i(loc_usetex, 0);
                 }
                 glDrawArrays(GL_TRIANGLES, grp.vertex_start, grp.vertex_count);
                 if (mat && !mat->tex_path.empty())
