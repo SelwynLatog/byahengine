@@ -68,6 +68,15 @@ struct NpcState {
     float ragdoll_roll = 0.0f;
     float ragdoll_pitch_vel = 0.0f;
     float ragdoll_roll_vel = 0.0f;
+    float ragdoll_yaw_vel = 0.0f;
+    float ragdoll_yaw = 0.0f;
+
+    // per-limb flop 
+    // only arms and legs, torso/head stay with root
+    float limb_pitch[4] = {};     // LEG_L, LEG_R, ARM_L, ARM_R
+    float limb_roll[4] = {};
+    float limb_pitch_vel[4] = {};
+    float limb_roll_vel[4] = {};
 
     // future
     int voiceline_id = -1;

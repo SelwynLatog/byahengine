@@ -68,12 +68,31 @@ void npc_update(NpcState& npc, const HeightField& terrain, float dt) {
         if (std::abs(npc.ragdoll_pitch_vel) < 0.05f) npc.ragdoll_pitch *= (1.0f - 4.0f * dt);
         if (std::abs(npc.ragdoll_roll_vel)  < 0.05f) npc.ragdoll_roll  *= (1.0f - 4.0f * dt);
 
+        npc.ragdoll_yaw_vel *= ang_drag;
+        npc.ragdoll_yaw += npc.ragdoll_yaw_vel * dt;
+        if (std::abs(npc.ragdoll_yaw_vel) < 0.05f) npc.ragdoll_yaw *= (1.0f - 4.0f * dt);
+
         if (npc.ragdoll_timer >= NPC_RAGDOLL_DURATION) {
             npc.ragdoll_timer = 0.0f;
             npc.ragdoll_pitch = npc.ragdoll_roll     = 0.0f;
             npc.ragdoll_pitch_vel = npc.ragdoll_roll_vel = 0.0f;
             npc.ragdoll_vel = glm::vec3(0.0f);
+            npc.ragdoll_yaw = npc.ragdoll_yaw_vel = 0.0f;
+            for (int i = 0; i < 4; i++)
+                npc.limb_pitch[i] = npc.limb_roll[i] = npc.limb_pitch_vel[i] = npc.limb_roll_vel[i] = 0.0f;
             npc.mode = (glm::length(npc.walk_b - npc.walk_a) > 0.1f) ? NPC_WALK : NPC_IDLE;
+            return;
+        }
+        // limb flop: spring-damper chasing zero (gravity pulls them down)
+        // indices: 0=LEG_L, 1=LEG_R, 2=ARM_L, 3=ARM_R
+        static constexpr float limb_stiff[4] = { 2.5f, 2.5f, 3.5f, 3.5f };
+        static constexpr float limb_damp[4]  = { 1.2f, 1.2f, 1.8f, 1.8f };
+        for (int i = 0; i < 4; i++) {
+            // spring toward zero (rest pose) with damping
+            npc.limb_pitch_vel[i] += (-npc.limb_pitch[i] * limb_stiff[i] - npc.limb_pitch_vel[i] * limb_damp[i]) * dt;
+            npc.limb_roll_vel[i]  += (-npc.limb_roll[i]  * limb_stiff[i] - npc.limb_roll_vel[i]  * limb_damp[i]) * dt;
+            npc.limb_pitch[i] += npc.limb_pitch_vel[i] * dt;
+            npc.limb_roll[i]  += npc.limb_roll_vel[i]  * dt;
         }
         return;
     }
@@ -154,7 +173,19 @@ void npc_hit(NpcState& npc, glm::vec3 impulse) {
     npc.ragdoll_vel = impulse;
     float speed = glm::length(impulse);
     npc.ragdoll_pitch_vel = speed * 1.2f;
-    npc.ragdoll_roll_vel  = speed * 0.6f * (impulse.x >= 0.0f ? 1.0f : -1.0f);
+    npc.ragdoll_roll_vel = speed * 0.6f * (impulse.x >= 0.0f ? 1.0f : -1.0f);
+    npc.ragdoll_yaw_vel = speed * 0.4f * (impulse.z >= 0.0f ? 1.0f : -1.0f);
+
+    // kick limbs outward — arms fly up, legs splay
+    float side = (impulse.x >= 0.0f ? 1.0f : -1.0f);
+    npc.limb_pitch_vel[0] =  speed * 2.8f;  // LEG_L forward
+    npc.limb_pitch_vel[1] =  speed * 2.2f;  // LEG_R forward
+    npc.limb_roll_vel[0]  = -speed * 1.5f * side;
+    npc.limb_roll_vel[1]  =  speed * 1.5f * side;
+    npc.limb_pitch_vel[2] =  speed * 3.5f;  // ARM_L flings up
+    npc.limb_pitch_vel[3] =  speed * 3.0f;  // ARM_R flings up
+    npc.limb_roll_vel[2]  = -speed * 2.0f * side;
+    npc.limb_roll_vel[3]  =  speed * 2.0f * side;   
 }
 
 void npc_draw(
@@ -209,6 +240,20 @@ void npc_draw(
         glm::vec3 piv = model.pivots[b].pivot;
         glm::mat4 bone_local = glm::translate(glm::mat4(1.0f), piv);
         bone_local = bone_local * pose.local[b];
+
+        // limb flop in ragdoll — rotate around pivot, body stays connected
+        if (npc.mode == NPC_RAGDOLL) {
+            int li = -1;
+            if (b == BONE_LEG_L) li = 0;
+            else if (b == BONE_LEG_R) li = 1;
+            else if (b == BONE_ARM_L) li = 2;
+            else if (b == BONE_ARM_R) li = 3;
+            if (li >= 0) {
+                bone_local = glm::rotate(bone_local, npc.limb_pitch[li], glm::vec3(1,0,0));
+                bone_local = glm::rotate(bone_local, npc.limb_roll[li],  glm::vec3(0,0,1));
+            }
+        }
+
         bone_local = glm::translate(bone_local, -piv);
 
         glm::mat4 final_model = base * bone_local;
