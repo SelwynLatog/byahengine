@@ -101,10 +101,11 @@ void npc_update(NpcState& npc, const HeightField& terrain, float dt) {
     if (npc.mode == NPC_PASSENGER) return;
 
     if (npc.mode == NPC_HAILING) {
-        // stand and face the trike direction 
-        // handled in app via yaw update
+        // stand still, face trike (yaw set in app)
+        // hail_wave_timer drives the para po arm wave independently
         npc.speed = 0.0f;
         npc.anim_timer += dt;
+        npc.hail_wave_timer += dt;
         return;
     }
 
@@ -216,16 +217,30 @@ void npc_draw(
     base = base
         * glm::translate(glm::mat4(1.0f), -center_off)
         * glm::scale(glm::mat4(1.0f), npc.editor_scale);
-    // compute walk/idle pose
-    int anim_mode = (npc.mode == NPC_RAGDOLL) ? 1 : 0; // sit pose freezes on ragdoll
     DriverPose pose;
-    driver_pose_compute(pose, npc.anim_timer, npc.speed, anim_mode, 0.0f);
+    const glm::quat* override_quat   = nullptr;
+    const glm::vec3* override_offset = nullptr;
+    glm::vec3 override_seat = glm::vec3(0.0f);
+    bool use_override = false;
 
-    static const glm::quat identity_quats[BONE_COUNT] = {
-        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0),
-        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0)
-    };
-    static const glm::vec3 zero_offsets[BONE_COUNT] = {};
+    if (npc.mode == NPC_HAILING){
+        driver_pose_compute(pose, npc.anim_timer, 0.0f, 1, 0.0f); // sit base
+        override_quat   = npc.hail_pose_quat;
+        override_offset = npc.hail_pose_offset;
+        override_seat   = npc.hail_pose_seat;
+        use_override    = true;
+    }
+    else if (npc.mode == NPC_PASSENGER || npc.mode == NPC_MOUNTING){
+        driver_pose_compute(pose, npc.anim_timer, 0.0f, 1, 0.0f); // sit base
+        override_quat   = npc.mount_pose_quat;
+        override_offset = npc.mount_pose_offset;
+        override_seat   = npc.mount_pose_seat;
+        use_override    = true;
+    }
+    else {
+        int anim_mode = (npc.mode == NPC_RAGDOLL) ? 1 : 0;
+        driver_pose_compute(pose, npc.anim_timer, npc.speed, anim_mode, 0.0f);
+    }
 
     // set shared shader uniforms
     GLuint sid = shader.id;
@@ -248,7 +263,17 @@ void npc_draw(
 
         glm::vec3 piv = model.pivots[b].pivot;
         glm::mat4 bone_local = glm::translate(glm::mat4(1.0f), piv);
-        bone_local = bone_local * pose.local[b];
+
+        if (use_override){
+            // apply sit base then override quat and offset from saved pose
+            bone_local = bone_local * pose.local[b];
+            bone_local = bone_local * glm::mat4_cast(override_quat[b]);
+            if (glm::length(override_offset[b]) > 0.0001f)
+                bone_local = glm::translate(bone_local, override_offset[b]);
+        }
+        else {
+            bone_local = bone_local * pose.local[b];
+        }
 
         // limb flop in ragdoll — rotate around pivot, body stays connected
         if (npc.mode == NPC_RAGDOLL) {

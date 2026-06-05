@@ -79,6 +79,28 @@ void world_map_save(const WorldMap& map, const std::string& path){
     road_splines_save(map.roads, roads_path);
     std::string ocean_path = (base.parent_path() / (base.stem().string() + "_ocean.oc")).string();
     ocean_save(map.ocean, ocean_path);
+
+    // save per-NPC poses to sibling file
+    std::string poses_path = (base.parent_path() / (base.stem().string() + "_npc_poses.np")).string();
+    {
+        std::ofstream pf(poses_path);
+        for (const auto& o : map.objects){
+            if (o.behavior != PEDESTRIAN) continue;
+            pf << o.id;
+            for (int i = 0; i < 6; i++)
+                pf << " " << o.npc_hail_quat[i].w << " " << o.npc_hail_quat[i].x
+                   << " " << o.npc_hail_quat[i].y << " " << o.npc_hail_quat[i].z;
+            for (int i = 0; i < 6; i++)
+                pf << " " << o.npc_hail_offset[i].x << " " << o.npc_hail_offset[i].y << " " << o.npc_hail_offset[i].z;
+            pf << " " << o.npc_hail_seat.x << " " << o.npc_hail_seat.y << " " << o.npc_hail_seat.z;
+            for (int i = 0; i < 6; i++)
+                pf << " " << o.npc_mount_quat[i].w << " " << o.npc_mount_quat[i].x
+                   << " " << o.npc_mount_quat[i].y << " " << o.npc_mount_quat[i].z;
+            for (int i = 0; i < 6; i++)
+                pf << " " << o.npc_mount_offset[i].x << " " << o.npc_mount_offset[i].y << " " << o.npc_mount_offset[i].z;
+            pf << " " << o.npc_mount_seat.x << " " << o.npc_mount_seat.y << " " << o.npc_mount_seat.z << "\n";
+        }
+    }
 }
 
 bool world_map_load(WorldMap& map, const std::string& path){
@@ -132,9 +154,38 @@ bool world_map_load(WorldMap& map, const std::string& path){
     if (std::filesystem::exists(roads_path))
         road_splines_load(map.roads, roads_path);
     std::string ocean_path = (base.parent_path() / (base.stem().string() + "_ocean.oc")).string();
-
     if (std::filesystem::exists(ocean_path))
         ocean_load(map.ocean, ocean_path);
+
+    // load per-NPC poses, optional 
+    // missing file means all poses stay default
+    std::string poses_path = (base.parent_path() / (base.stem().string() + "_npc_poses.np")).string();
+    if (std::filesystem::exists(poses_path)){
+        std::ifstream pf(poses_path);
+        std::string pline;
+        while (std::getline(pf, pline)){
+            if (pline.empty()) continue;
+            std::istringstream ps(pline);
+            int id; ps >> id;
+            for (auto& o : map.objects){
+                if (o.id != id) continue;
+                for (int i = 0; i < 6; i++)
+                    ps >> o.npc_hail_quat[i].w >> o.npc_hail_quat[i].x
+                       >> o.npc_hail_quat[i].y >> o.npc_hail_quat[i].z;
+                for (int i = 0; i < 6; i++)
+                    ps >> o.npc_hail_offset[i].x >> o.npc_hail_offset[i].y >> o.npc_hail_offset[i].z;
+                ps >> o.npc_hail_seat.x >> o.npc_hail_seat.y >> o.npc_hail_seat.z;
+                for (int i = 0; i < 6; i++)
+                    ps >> o.npc_mount_quat[i].w >> o.npc_mount_quat[i].x
+                       >> o.npc_mount_quat[i].y >> o.npc_mount_quat[i].z;
+                for (int i = 0; i < 6; i++)
+                    ps >> o.npc_mount_offset[i].x >> o.npc_mount_offset[i].y >> o.npc_mount_offset[i].z;
+                ps >> o.npc_mount_seat.x >> o.npc_mount_seat.y >> o.npc_mount_seat.z;
+                break;
+            }
+        }
+        std::cout << "world_map loaded npc poses from " << poses_path << "\n";
+    }
 
     map.lights.clear();
     map.next_light_id = 0;

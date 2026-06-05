@@ -85,6 +85,21 @@ struct NpcState {
     float editor_yaw = 0.0f;
     float editor_y_floor_offset = 0.0f;
     float spawn_yaw = 0.0f; // yaw at init time, used to compute facing offset
+    
+    float hail_wave_timer = 0.0f;
+    glm::vec3 hail_pose_seat = glm::vec3(0.0f);
+    glm::quat hail_pose_quat[6] = {
+        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0),
+        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0)
+    };
+    glm::vec3 hail_pose_offset[6] = {};
+
+    glm::vec3 mount_pose_seat = glm::vec3(0.0f);
+    glm::quat mount_pose_quat[6] = {
+        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0),
+        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0)
+    };
+    glm::vec3 mount_pose_offset[6] = {};
 };
 
 void npc_init(NpcState& npc, int id, NpcType type, glm::vec3 pos, float yaw,

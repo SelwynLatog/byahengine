@@ -1,5 +1,6 @@
 #pragma once
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <string>
 
 // behavior types defined here
@@ -46,4 +47,19 @@ struct WorldObject{
     glm::vec3 npc_walk_b = glm::vec3(0.0f); // patrol end
     glm::vec3 npc_drop_point = glm::vec3(0.0f); // passenger destination
     float npc_weight = 60.0f; // kg, affects trike physics when riding configurable in editor
+
+     // per NPC saved poses, tuned in pose mode
+    glm::quat npc_hail_quat[6] = {
+        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0),
+        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0)
+    };
+    glm::vec3 npc_hail_offset[6] = {};
+    glm::vec3 npc_hail_seat = glm::vec3(0.0f);
+
+    glm::quat npc_mount_quat[6] = {
+        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0),
+        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0)
+    };
+    glm::vec3 npc_mount_offset[6] = {};
+    glm::vec3 npc_mount_seat = glm::vec3(0.0f);
 };

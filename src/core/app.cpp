@@ -130,6 +130,14 @@
             npc.editor_scale = o.scale;
             npc.editor_yaw = o.rotation.y;
             npc.editor_y_floor_offset = editor_get_y_floor_offset(app.editor_renderer, o.model_path);
+            for (int i = 0; i < 6; i++){
+                npc.hail_pose_quat[i] = o.npc_hail_quat[i];
+                npc.hail_pose_offset[i] = o.npc_hail_offset[i];
+                npc.mount_pose_quat[i] = o.npc_mount_quat[i];
+                npc.mount_pose_offset[i]= o.npc_mount_offset[i];
+            }
+            npc.hail_pose_seat  = o.npc_hail_seat;
+            npc.mount_pose_seat = o.npc_mount_seat;
             app.npcs.push_back(npc);
         }
         std::cout << "[npc] spawned " << app.npcs.size() << " npcs\n";
@@ -232,12 +240,14 @@
                 while (pf >> tag) {
                     if (tag == "seat") {
                         pf >> app.editor.pose_seat.x >> app.editor.pose_seat.y >> app.editor.pose_seat.z;
-                    } else if (tag == "quat") {
+                    } 
+                    else if (tag == "quat") {
                         int idx; pf >> idx;
                         if (idx >= 0 && idx < 6)
                             pf >> app.editor.pose_quat[idx].w >> app.editor.pose_quat[idx].x
                                >> app.editor.pose_quat[idx].y >> app.editor.pose_quat[idx].z;
-                    } else if (tag == "offset") {
+                    } 
+                    else if (tag == "offset") {
                         int idx; pf >> idx;
                         if (idx >= 0 && idx < 6)
                             pf >> app.editor.pose_offset[idx].x >> app.editor.pose_offset[idx].y
@@ -505,7 +515,13 @@
             if (f_down && !s_f_pressed_last) s_free_cam = !s_free_cam;
             s_f_pressed_last = f_down;
 
-            // E key: mount / dismount
+            // Q key: confirm passenger pickup
+            static bool s_q_last = false;
+            bool q_down = glfwGetKey(app.window.handle, GLFW_KEY_Q) == GLFW_PRESS;
+            bool s_q_pickup = (q_down && !s_q_last);
+            s_q_last = q_down;
+
+             // E key: mount / dismount
             static bool s_e_last = false;
             bool e_down = glfwGetKey(app.window.handle, GLFW_KEY_E) == GLFW_PRESS;
             if (e_down && !s_e_last && app.player.mode != PLAYER_MOUNTING){
@@ -937,43 +953,22 @@
                     if (glm::length(d) > 0.1f)
                         npc.yaw = std::atan2(d.z, d.x);
 
-                    // player stops near hailing npc 
-                    // start mounting
+                    // Q key confirm pickup 
+                    // driver must be slow and close
                     glm::vec3 to_npc = npc.position - app.trike.position;
                     to_npc.y = 0.0f;
-                    if (glm::dot(to_npc, to_npc) < 4.0f
-                        && std::abs(app.trike.speed) < 1.0f
-                        && app.passenger_npc_id == -1)
+                    if (glm::dot(to_npc, to_npc) < 9.0f
+                        && std::abs(app.trike.speed) < 1.5f
+                        && app.passenger_npc_id == -1
+                        && s_q_pickup)
                     {
-                        npc.mode = NPC_MOUNTING;
-                        app.passenger_npc_id = npc.id;
-                        std::cout << "[npc] id=" << npc.id << " mounting\n";
-                    }
-                }
-
-                // mounting: walk toward sidecar, snap when close
-                if (npc.mode == NPC_MOUNTING){
-                    float c = std::cos(app.trike.heading);
-                    float s = std::sin(app.trike.heading);
-                    glm::vec3 sidecar_off = glm::vec3(0.2f, 0.0f, 0.6f);
-                    glm::vec3 mount_target = app.trike.position + glm::vec3(
-                        c * sidecar_off.x - s * sidecar_off.z,
-                        sidecar_off.y,
-                        s * sidecar_off.x + c * sidecar_off.z);
-
-                    glm::vec3 to_mount = mount_target - npc.position;
-                    to_mount.y = 0.0f;
-                    float dist = glm::length(to_mount);
-
-                    if (dist < 0.4f){
                         npc.mode = NPC_PASSENGER;
-                    } 
-                    else {
-                        glm::vec3 dir = to_mount / dist;
-                        npc.yaw = std::atan2(dir.z, dir.x);
-                        npc.position += dir * 2.5f * dt; // walk faster to mount
+                        app.passenger_npc_id = npc.id;
+                        std::cout << "[npc] id=" << npc.id << " picked up\n";
                     }
                 }
+
+
 
                 // RAGDOLL
                 // trike vs NPC collision 
@@ -1159,6 +1154,40 @@
                 DriverModel* mdl = (it != app.npc_model_cache.end())
                     ? &it->second : &app.scene.driver_model;
                 npc_draw(npc, *mdl, app.editor_renderer.obj_shader, view, proj);
+            }
+
+            // destination marker 
+            // glowing ring above drop point while passenger is riding
+            if (app.passenger_npc_id != -1){
+                for (const auto& npc : app.npcs){
+                    if (npc.id != app.passenger_npc_id) continue;
+
+                    glm::vec3 drop = npc.drop_point;
+                    drop.y = heightfield_sample(app.map.terrain, drop.x, drop.z);
+
+                    // pulsing scale
+                    float pulse = 0.85f + 0.15f * std::sin((float)glfwGetTime() * 3.0f);
+
+                    // draw ring as line loop in screen space via shader
+                    // reuse the flat line shader already in scene
+                    scene_draw_drop_marker(app.scene, drop, pulse, view, proj);
+
+                    // HUD directional arrow if facing away from drop point
+                    glm::vec3 to_drop = drop - app.trike.position;
+                    to_drop.y = 0.0f;
+                    float dist_to_drop = glm::length(to_drop);
+                    if (dist_to_drop > 5.0f){
+                        glm::vec3 trike_fwd = {
+                            std::cos(app.trike.heading), 0.0f,
+                            std::sin(app.trike.heading) };
+                        glm::vec3 dir_to_drop = to_drop / dist_to_drop;
+                        float dot = glm::dot(trike_fwd, dir_to_drop);
+                        // cross product Y tells us left or right
+                        float cross_y = trike_fwd.x * dir_to_drop.z - trike_fwd.z * dir_to_drop.x;
+                        hud_draw_direction_arrow(app.hud, dot, cross_y, dist_to_drop);
+                    }
+                    break;
+                }
             }
 
             hud_draw(app.hud, app.trike, app.passenger_npc_id != -1, app.passenger_fare);

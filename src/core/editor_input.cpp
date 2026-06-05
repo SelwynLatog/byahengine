@@ -518,8 +518,45 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
 
         s_pose_enter_last = enter;
 
-        // Ctrl+S saves pose to file
         bool ctrl = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+
+        // Ctrl+H  save current pose as hail pose for selected NPC
+        static bool s_pose_h_last = false;
+        bool h_down = glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS;
+        if (ctrl && h_down && !s_pose_h_last && editor.selected_id != -1){
+            for (auto& o : map.objects){
+                if (o.id != editor.selected_id || o.behavior != PEDESTRIAN) continue;
+                for (int i = 0; i < 6; i++){
+                    o.npc_hail_quat[i]   = editor.pose_quat[i];
+                    o.npc_hail_offset[i] = editor.pose_offset[i];
+                }
+                o.npc_hail_seat = editor.pose_seat;
+                map_dirty = true;
+                std::cout << "[pose] hail pose saved to npc id=" << o.id << "\n";
+                break;
+            }
+        }
+        s_pose_h_last = h_down;
+
+        // Ctrl+M save current pose as mount/passenger pose for selected NPC
+        static bool s_pose_m_last = false;
+        bool pose_m_down = glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS;
+        if (ctrl && pose_m_down && !s_pose_m_last && editor.selected_id != -1){
+            for (auto& o : map.objects){
+                if (o.id != editor.selected_id || o.behavior != PEDESTRIAN) continue;
+                for (int i = 0; i < 6; i++){
+                    o.npc_mount_quat[i]   = editor.pose_quat[i];
+                    o.npc_mount_offset[i] = editor.pose_offset[i];
+                }
+                o.npc_mount_seat = editor.pose_seat;
+                map_dirty = true;
+                std::cout << "[pose] mount pose saved to npc id=" << o.id << "\n";
+                break;
+            }
+        }
+        s_pose_m_last = pose_m_down;
+
+        // Ctrl+S saves driver pose to file
         static bool s_pose_s_last = false;
         bool s_down = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
         if (ctrl && s_down && !s_pose_s_last) {

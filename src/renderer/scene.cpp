@@ -4,6 +4,7 @@
 #include "../core/const.hpp"
 #include "../physics/trike_aabb.hpp"
 #include <glad/glad.h>
+#include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/constants.hpp>
@@ -876,6 +877,64 @@ void scene_draw_driver(
          pose_quats, pose_offsets, pose_seat);
  }
 
+
+void scene_draw_drop_marker(SceneState& scene, glm::vec3 pos, float pulse, const glm::mat4& view, const glm::mat4& proj){
+    // glowing ring as line loop around drop point
+    static constexpr int SEGMENTS = 24;
+    static constexpr float RADIUS = 1.5f;
+    float r = RADIUS * pulse;
+
+    std::vector<float> verts;
+    verts.reserve(SEGMENTS * 2 * 6);
+
+    // pulsing yellow-green color
+    float t = (float)glfwGetTime();
+    float glow = 0.7f + 0.3f * std::sin(t * 4.0f);
+    glm::vec3 col = {0.3f, 1.0f * glow, 0.2f};
+
+    for (int i = 0; i < SEGMENTS; i++){
+        float a0 = (float)i       / SEGMENTS * glm::two_pi<float>();
+        float a1 = (float)(i + 1) / SEGMENTS * glm::two_pi<float>();
+        glm::vec3 p0 = pos + glm::vec3(std::cos(a0) * r, 0.05f, std::sin(a0) * r);
+        glm::vec3 p1 = pos + glm::vec3(std::cos(a1) * r, 0.05f, std::sin(a1) * r);
+        verts.insert(verts.end(), {p0.x, p0.y, p0.z, col.r, col.g, col.b});
+        verts.insert(verts.end(), {p1.x, p1.y, p1.z, col.r, col.g, col.b});
+    }
+
+    // second ring elevated
+    float up = 1.2f * pulse;
+    for (int i = 0; i < SEGMENTS; i++){
+        float a0 = (float)i       / SEGMENTS * glm::two_pi<float>();
+        float a1 = (float)(i + 1) / SEGMENTS * glm::two_pi<float>();
+        glm::vec3 p0 = pos + glm::vec3(std::cos(a0) * r, up, std::sin(a0) * r);
+        glm::vec3 p1 = pos + glm::vec3(std::cos(a1) * r, up, std::sin(a1) * r);
+        verts.insert(verts.end(), {p0.x, p0.y, p0.z, col.r, col.g, col.b});
+        verts.insert(verts.end(), {p1.x, p1.y, p1.z, col.r, col.g, col.b});
+    }
+
+    // vertical bars connecting the two rings
+    for (int i = 0; i < SEGMENTS; i += 3){
+        float a = (float)i / SEGMENTS * glm::two_pi<float>();
+        glm::vec3 bot = pos + glm::vec3(std::cos(a) * r, 0.05f, std::sin(a) * r);
+        glm::vec3 top = pos + glm::vec3(std::cos(a) * r, up,    std::sin(a) * r);
+        verts.insert(verts.end(), {bot.x, bot.y, bot.z, col.r, col.g, col.b});
+        verts.insert(verts.end(), {top.x, top.y, top.z, col.r, col.g, col.b});
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, scene.line_batch.vbo);
+    glBufferData(GL_ARRAY_BUFFER,
+        verts.size() * sizeof(float), verts.data(), GL_DYNAMIC_DRAW);
+    scene.line_batch.count = (int)verts.size() / 6;
+
+    glm::mat4 identity = glm::mat4(1.0f);
+    shader_bind(scene.gizmo_shader);
+    glUniformMatrix4fv(scene.gizmo_loc.view,  1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(scene.gizmo_loc.proj,  1, GL_FALSE, glm::value_ptr(proj));
+    glUniformMatrix4fv(scene.gizmo_loc.model, 1, GL_FALSE, glm::value_ptr(identity));
+    glBindVertexArray(scene.line_batch.vao);
+    glDrawArrays(GL_LINES, 0, scene.line_batch.count);
+    glBindVertexArray(0);
+}
 
 void scene_destroy(SceneState& scene){
     if (scene.sky_tex) glDeleteTextures(1, &scene.sky_tex);

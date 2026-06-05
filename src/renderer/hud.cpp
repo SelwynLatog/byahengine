@@ -119,3 +119,28 @@ void hud_draw(const Hud& h, const TrikeState& trike, bool has_passenger, float f
         draw_line("DRIVE TO DESTINATION", 0.4f, 1.0f, 0.4f);
     }
 }
+
+void hud_draw_direction_arrow(const Hud& h, float dot, float cross_y, float dist){
+    // only show when facing significantly away from destination
+    if (dot > 0.6f) return;
+
+    // arrow character points left or right based on cross product sign
+    // if dot is negative (facing away), show a U-turn indicator instead
+    std::string arrow;
+    if (dot < -0.5f)
+        arrow = "^ TURN AROUND ^";
+    else if (cross_y > 0.0f)
+        arrow = ">> DESTINATION";
+    else
+        arrow = "DESTINATION <<";
+
+    // blink using time
+    float t = (float)glfwGetTime();
+    float blink = std::sin(t * 4.0f);
+    if (blink < 0.0f) return; // off half of blink cycle
+
+    int cx = Const::WINDOW_WIDTH / 2 - 80;
+    int cy = Const::WINDOW_HEIGHT / 2 - 60;
+    font_draw(h.font, fmt("%s  %.0fm", arrow.c_str(), dist),
+        cx, cy, 2, 1.0f, 0.85f, 0.2f);
+}
