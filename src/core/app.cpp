@@ -29,6 +29,7 @@
     static glm::vec3 s_cam_pos = glm::vec3(-6.0f, 3.0f, 0.0f);
     static bool s_free_cam = false;
     static bool s_f_pressed_last = false;
+    static bool s_cam_needs_snap = true;
 
     // map editor toggle
     // edge trigger so a single tab press flips mode once
@@ -250,6 +251,18 @@
 
         hud_init(app.hud, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
 
+        // seed cam to actual player spawn so first-frame lerp has no jump
+        {
+            s_cam_yaw = 0.0f; 
+            float cam_world_angle = glm::radians(s_cam_yaw) + glm::radians(180.0f);
+            float pitch_r = glm::radians(s_cam_pitch);
+            float foot_dist = 4.0f;
+            glm::vec3 foot_origin = app.player.pos + glm::vec3(0.0f, 1.0f, 0.0f);
+            s_cam_pos = foot_origin + glm::vec3(
+                foot_dist * cosf(pitch_r) * cosf(cam_world_angle),
+                foot_dist * sinf(pitch_r),
+                foot_dist * cosf(pitch_r) * sinf(cam_world_angle));
+        }
         app.last_time = (float)glfwGetTime();
         app.accumulator = 0.0f;
         app.running = true;
@@ -445,24 +458,32 @@
                 // FOOT mode walking
                 // WASD moves relative to camera facing
                 // arrows orbit the camera (handled in CAM ORBIT INPUT below)
-                float move = 0.0f, strafe = 0.0f;
-                if (glfwGetKey(app.window.handle, GLFW_KEY_W) == GLFW_PRESS) move   =  1.0f;
-                if (glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS) move   = -1.0f;
-                if (glfwGetKey(app.window.handle, GLFW_KEY_A) == GLFW_PRESS) strafe = -1.0f;
-                if (glfwGetKey(app.window.handle, GLFW_KEY_D) == GLFW_PRESS) strafe =  1.0f;
+                float move = 0.0f;
+                bool a_held = glfwGetKey(app.window.handle, GLFW_KEY_A) == GLFW_PRESS;
+                bool d_held = glfwGetKey(app.window.handle, GLFW_KEY_D) == GLFW_PRESS;
+                if (glfwGetKey(app.window.handle, GLFW_KEY_W) == GLFW_PRESS) move =  1.0f;
+                if (glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS) move = -1.0f;
 
-                // cam faces player from s_cam_yaw world angle
+                // A/D rotate cam yaw so character turns in place, W/S moves along facing
+                if (a_held) s_cam_yaw -= 120.0f * dt;
+                if (d_held) s_cam_yaw += 120.0f * dt;
+
+                
+                // cam_world_angle drives movement AND visual facing
+                // +180 so W moves away from camera (toward where you're looking)
                 float cam_world_angle = glm::radians(s_cam_yaw) + glm::radians(180.0f);
                 glm::vec3 fwd_dir = { std::cos(cam_world_angle), 0.0f, std::sin(cam_world_angle) };
-                glm::vec3 rgt_dir = { -std::sin(cam_world_angle), 0.0f, std::cos(cam_world_angle) };
 
                 float walk_speed = 4.0f;
-                glm::vec3 walk_vel = fwd_dir * move + rgt_dir * strafe;
+                glm::vec3 walk_vel = glm::vec3(0.0f);
 
-                if (glm::length(walk_vel) > 0.001f){
-                    walk_vel = glm::normalize(walk_vel) * walk_speed;
+                if (move != 0.0f){
+                    walk_vel = fwd_dir * (move * walk_speed);
+                    // lock player facing to movement direction immediately, no lerp here
+                    // visual_yaw lerp below handles the smooth turn
                     app.player.yaw = std::atan2(walk_vel.z, walk_vel.x);
                 }
+
                 // smooth visual yaw toward logical yaw
                 float yaw_diff = app.player.yaw - app.player.visual_yaw;
                 // wrap to [-pi, pi] so we always take the short arc
@@ -472,6 +493,7 @@
 
 
                 app.player.pos += walk_vel * dt;
+
                 app.player.speed = glm::length(walk_vel);
                 app.player.pos.y = heightfield_sample(app.map.terrain,
                     app.player.pos.x, app.player.pos.z);
@@ -493,6 +515,10 @@
                     app.player.pos = app.trike.position
                         + glm::vec3(std::cos(side), 0.0f, std::sin(side)) * 1.2f;
                     app.player.yaw = app.trike.heading;
+                    app.player.visual_yaw = app.trike.heading;
+                    s_cam_yaw = 0.0f; // reset cam behind player on dismount
+                    s_cam_pos = app.player.pos + glm::vec3(0.0f, 4.0f, 0.0f); // prevent lerp jump
+                    s_cam_needs_snap = true;
                     app.player.mode = PLAYER_FOOT;
                 }
                 else {
@@ -984,17 +1010,23 @@
                 pitch_r = glm::clamp(pitch_r, glm::radians(Const::CAM_PITCH_MIN),
                                             glm::radians(Const::CAM_PITCH_MAX));
                 float foot_dist = 4.0f;
-                 // orbit target leads slightly ahead of visual facing so cam doesn't lag behind turns
-                glm::vec3 look_ahead = glm::vec3(std::cos(app.player.visual_yaw), 0.0f, std::sin(app.player.visual_yaw)) * 0.4f;
-                glm::vec3 foot_origin = app.player.pos + glm::vec3(0.0f, 1.0f, 0.0f) + look_ahead;
+                glm::vec3 foot_origin = app.player.pos + glm::vec3(0.0f, 1.0f, 0.0f);
                 glm::vec3 ideal_eye = foot_origin + glm::vec3(
                     foot_dist * cosf(pitch_r) * cosf(cam_world_yaw),
                     foot_dist * sinf(pitch_r),
                     foot_dist * cosf(pitch_r) * sinf(cam_world_yaw));
                 // tweak/remove 0.25f multiplier if you want a more snappier lerp in walk mode
                 // personally prefer delay as it looks smoother
-                s_cam_pos = glm::mix(s_cam_pos, ideal_eye, Const::CAM_LERP_SPEED * 0.25f * dt);
+                if (s_cam_needs_snap){
+                    s_cam_pos = ideal_eye;
+                    s_cam_needs_snap = false;
+                }
+                else {
+                    s_cam_pos = glm::mix(s_cam_pos, ideal_eye, Const::CAM_LERP_SPEED * 0.25f * dt);
+                }
                 view = glm::lookAt(s_cam_pos, foot_origin, glm::vec3(0,1,0));
+
+
             }
             else {
                 float yaw_r = glm::radians(s_cam_yaw);
