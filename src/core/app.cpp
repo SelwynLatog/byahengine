@@ -412,9 +412,23 @@
                 editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj, app.editor.show_hitboxes, app.map.lights);
 
                 // pose mode: draw driver + trike at origin for live tuning
-                if (app.editor.mode == MODE_POSE)
+                // + draw npc + trike
+                if (app.editor.mode == MODE_POSE){
+                    DriverModel* pose_npc_model = nullptr;
+                    if (app.editor.pose_npc_id != -1){
+                        auto it = app.npc_model_cache.find("");
+                        // find the world object to get model_path
+                        for (const auto& o : app.map.objects){
+                            if (o.id != app.editor.pose_npc_id) continue;
+                            auto mit = app.npc_model_cache.find(o.model_path);
+                            if (mit != app.npc_model_cache.end())
+                                pose_npc_model = &mit->second;
+                            break;
+                        }
+                    }
                     editor_renderer_draw_pose_mode(app.editor_renderer, app.editor,
-                        app.scene.driver_model, app.scene.trike_model, view, proj);
+                        app.scene.driver_model, app.scene.trike_model, view, proj, pose_npc_model);
+                }
 
                 // temp editor control hud
                 font_draw(app.editor_renderer.font,"[TAB] drive  [L CLICK] place/select  [DEL] delete  [B] behavior  [Ctrl+S] save",

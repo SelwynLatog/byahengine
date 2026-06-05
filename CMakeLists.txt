@@ -32,6 +32,7 @@ add_executable(tricycle-sim
     src/world/ocean.cpp
     src/world/npc.cpp
     vendor/glad/src/glad.c
+    src/stb_impl.cpp
 )
 
 target_include_directories(tricycle-sim PRIVATE

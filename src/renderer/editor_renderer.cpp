@@ -4,6 +4,7 @@
 #include "../core/const.hpp"
 #include "../world/world_object.hpp"
 #include "../world/ocean.hpp"
+#include "../world/npc.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -14,7 +15,6 @@
 #include <cmath>
 #include <cstdio>
 #include <map>
-#define STB_IMAGE_IMPLEMENTATION
 #include "../../vendor/stb/stb_image.h"
 #include <iostream>
 
@@ -1059,10 +1059,6 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     glUniform1i(OL.shadow_map, 1);
     glActiveTexture(GL_TEXTURE0);
 
-    // upload point lights
-    
-    // cpu cull
-
     // cpu cull: only upload lights within draw distance of camera
     glm::vec3 cam_pos = glm::vec3(glm::inverse(view)[3]);
     int active_lcount = 0;
@@ -1618,10 +1614,9 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
 
 void editor_renderer_draw_pose_mode(EditorRenderer& er, const EditorState& editor,
     const DriverModel& driver, const TrikeModel& trike,
-    const glm::mat4& view, const glm::mat4& proj)
+    const glm::mat4& view, const glm::mat4& proj,
+    const DriverModel* npc_model)
 {
-    // prime obj_shader with lighting state — same setup as draw_props
-    // without this the shader has uninitialized uniforms and draws black/nothing
     auto& OL = er.obj_loc;
     glm::vec3 ld = glm::normalize(er.sun_dir);
     shader_bind(er.obj_shader);
@@ -1637,23 +1632,49 @@ void editor_renderer_draw_pose_mode(EditorRenderer& er, const EditorState& edito
     glBindTexture(GL_TEXTURE_2D, er.shadow_depth_tex);
     glUniform1i(OL.shadow_map, 1);
     glUniform1i(OL.use_texture, 0);
-    glUniform1i(er.pt_light_loc.count, 0); // no point lights in pose mode
+    glUniform1i(er.pt_light_loc.count, 0);
     glActiveTexture(GL_TEXTURE0);
 
     TrikeState dummy_trike;
     memset(&dummy_trike, 0, sizeof(dummy_trike));
 
+    // trike always renders as reference 
+    // same origin regardless of npc or driver
     trike_model_draw(trike, dummy_trike, er.obj_shader, view, proj);
 
-    driver_model_draw_pose(
-        driver,
-        editor.pose_seat,
-        editor.pose_quat,
-        editor.pose_offset,
-        editor.pose_bone,
-        er.obj_shader,
-        view,
-        proj);
+    if (editor.pose_npc_id != -1 && npc_model){
+        // build a scratch NpcState that holds the current editor pose
+        // position at world origin so it renders relative to the trike reference
+        NpcState scratch;
+        scratch.position = glm::vec3(0.0f);
+        scratch.yaw = 0.0f;
+        scratch.editor_scale = glm::vec3(1.0f);
+        scratch.mode = NPC_HAILING; // drives hail_pose branch in npc_draw
+
+        // load whichever pose is being edited into the scratch state
+        // Ctrl+H edits hail, Ctrl+M edits mount — we mirror that here
+        // for now always preview as hail since that's what loads on K entry
+        // mount preview would need a separate toggle — add later if needed
+        for (int i = 0; i < 6; i++){
+            scratch.hail_pose_quat[i]   = editor.pose_quat[i];
+            scratch.hail_pose_offset[i] = editor.pose_offset[i];
+        }
+        scratch.hail_pose_seat = editor.pose_seat;
+
+        npc_draw(scratch, *npc_model, er.obj_shader, view, proj);
+    }
+    else {
+        // driver pose
+        driver_model_draw_pose(
+            driver,
+            editor.pose_seat,
+            editor.pose_quat,
+            editor.pose_offset,
+            editor.pose_bone,
+            er.obj_shader,
+            view,
+            proj);
+    }
 }
 
 void editor_renderer_destroy(EditorRenderer& er){

@@ -61,6 +61,24 @@
   [CTRL+SHIFT+W]  wipes out entire canvas to blank 
   [M]             exit road mode
 
+ --- POSE MODE [K] ---
+ [F]             cycle active bone: TORSO > HEAD > LEG_L > LEG_R > ARM_L > ARM_R
+ [ARROWS]        rotate active bone X/Y axis
+ [PgUp / PgDn]   rotate active bone Z axis
+ [SHIFT+any]     fine mode (10x slower)
+ [NP0]           toggle numpad between SEAT mode and BONE TRANSLATE mode
+  SEAT mode:
+    [NP8/2]     move seat Z (fwd/back)
+    [NP4/6]     move seat X (left/right)
+    [NP+/-]     move seat Y (up/down)
+  BONE TRANSLATE mode: same keys, moves active bone mesh offset
+ [ENTER]         dump current pose as code (paste into driver_anim.cpp)
+ [LMB]           click pedestrian to switch pose target
+ [Ctrl+H]        save current pose as HAIL pose on selected NPC
+ [Ctrl+M]        save current pose as MOUNT pose on selected NPC
+ [Ctrl+S]        save driver pose to driver_pose.txt (driver only)
+ [K]             exit pose mode
+
 =============================================================
 */
 
@@ -369,37 +387,57 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         } 
         else {
                 editor.mode = MODE_POSE;
-                editor.pose_numpad_translate = false;
-                // reset to defaults first, then try to load saved pose
-                for (int i = 0; i < 6; i++) editor.pose_quat[i] = glm::quat(1,0,0,0);
-                for (int i = 0; i < 6; i++) editor.pose_offset[i] = glm::vec3(0.0f);
-                editor.pose_seat = glm::vec3(
-                    Const::DRIVER_SEAT_OFFSET_X,
-                    Const::DRIVER_SEAT_OFFSET_Y,
-                    Const::DRIVER_SEAT_OFFSET_Z);
-                {
-                    std::ifstream pf("../assets/entity/driver_pose.txt");
-                    if (pf.is_open()) {
-                        std::string tag;
-                        while (pf >> tag) {
-                            if (tag == "seat") {
-                                pf >> editor.pose_seat.x >> editor.pose_seat.y >> editor.pose_seat.z;
-                            } else if (tag == "quat") {
-                                int idx; pf >> idx;
-                                if (idx >= 0 && idx < 6)
-                                    pf >> editor.pose_quat[idx].w >> editor.pose_quat[idx].x
-                                       >> editor.pose_quat[idx].y >> editor.pose_quat[idx].z;
-                            } else if (tag == "offset") {
-                                int idx; pf >> idx;
-                                if (idx >= 0 && idx < 6)
-                                    pf >> editor.pose_offset[idx].x >> editor.pose_offset[idx].y
-                                       >> editor.pose_offset[idx].z;
-                            }
-                        }
-                        std::cout << "[pose] loaded ../assets/entity/driver_pose.txt\n";
-                    }
+            editor.pose_numpad_translate = false;
+            for (int i = 0; i < 6; i++) editor.pose_quat[i] = glm::quat(1,0,0,0);
+            for (int i = 0; i < 6; i++) editor.pose_offset[i] = glm::vec3(0.0f);
+            editor.pose_seat = glm::vec3(
+                Const::DRIVER_SEAT_OFFSET_X,
+                Const::DRIVER_SEAT_OFFSET_Y,
+                Const::DRIVER_SEAT_OFFSET_Z);
+
+            // check if a pedestrian is selected 
+            // auto-load it as pose target
+            editor.pose_npc_id = -1;
+            for (const auto& o : map.objects){
+                if (o.id == editor.selected_id && o.behavior == PEDESTRIAN){
+                    editor.pose_npc_id = o.id;
+                    // load hail pose as starting point (most commonly edited)
+                    for (int i = 0; i < 6; i++) editor.pose_quat[i] = o.npc_hail_quat[i];
+                    for (int i = 0; i < 6; i++) editor.pose_offset[i] = o.npc_hail_offset[i];
+                    editor.pose_seat = o.npc_hail_seat;
+                    std::cout << "[pose] loaded hail pose from npc id=" << o.id << "\n";
+                    break;
                 }
-            std::cout << "[editor] mode -> POSE\n";
+            }
+
+            // no npc selected 
+            // fall back to driver pose file
+            if (editor.pose_npc_id == -1){
+                std::ifstream pf("../assets/entity/driver_pose.txt");
+                if (pf.is_open()) {
+                    std::string tag;
+                    while (pf >> tag) {
+                        if (tag == "seat") {
+                            pf >> editor.pose_seat.x >> editor.pose_seat.y >> editor.pose_seat.z;
+                        } 
+                        else if (tag == "quat") {
+                            int idx; pf >> idx;
+                            if (idx >= 0 && idx < 6)
+                                pf >> editor.pose_quat[idx].w >> editor.pose_quat[idx].x
+                                   >> editor.pose_quat[idx].y >> editor.pose_quat[idx].z;
+                        } 
+                        else if (tag == "offset") {
+                            int idx; pf >> idx;
+                            if (idx >= 0 && idx < 6)
+                                pf >> editor.pose_offset[idx].x >> editor.pose_offset[idx].y
+                                   >> editor.pose_offset[idx].z;
+                        }
+                    }
+                    std::cout << "[pose] loaded ../assets/entity/driver_pose.txt\n";
+                }
+            }
+            std::cout << "[editor] mode -> POSE (target=" 
+                      << (editor.pose_npc_id == -1 ? "driver" : "npc") << ")\n";
         }
     }
     s_k_last = k_down;
@@ -408,6 +446,26 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     // POSE MODE
     // *******************************
     if (editor.mode == MODE_POSE){
+
+        // LMB: click a pedestrian to switch pose target mid-session
+        bool lmb = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+        if (lmb && !s_lmb_last){
+            int hit = editor_raycast_objects(mx, my, view, proj, screen_w, screen_h, map, er, false);
+            if (hit != -1){
+                for (const auto& o : map.objects){
+                    if (o.id != hit || o.behavior != PEDESTRIAN) continue;
+                    editor.pose_npc_id = o.id;
+                    editor.selected_id = o.id;
+                    for (int i = 0; i < 6; i++) editor.pose_quat[i]   = o.npc_hail_quat[i];
+                    for (int i = 0; i < 6; i++) editor.pose_offset[i] = o.npc_hail_offset[i];
+                    editor.pose_seat = o.npc_hail_seat;
+                    std::cout << "[pose] switched to npc id=" << o.id << "\n";
+                    break;
+                }
+            }
+        }
+        s_lmb_last = lmb;
+
         bool shift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
         float rot_speed = glm::radians(60.0f * dt);
         if (shift) rot_speed *= 0.1f;
@@ -523,11 +581,10 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         // Ctrl+H  save current pose as hail pose for selected NPC
         static bool s_pose_h_last = false;
         bool h_down = glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS;
-        if (ctrl && h_down && !s_pose_h_last && editor.selected_id != -1){
+        if (ctrl && h_down && !s_pose_h_last && editor.pose_npc_id != -1){
             for (auto& o : map.objects){
-                if (o.id != editor.selected_id || o.behavior != PEDESTRIAN) continue;
-                for (int i = 0; i < 6; i++){
-                    o.npc_hail_quat[i]   = editor.pose_quat[i];
+                if (o.id != editor.pose_npc_id || o.behavior != PEDESTRIAN) continue;                for (int i = 0; i < 6; i++){
+                    o.npc_hail_quat[i] = editor.pose_quat[i];
                     o.npc_hail_offset[i] = editor.pose_offset[i];
                 }
                 o.npc_hail_seat = editor.pose_seat;
@@ -541,10 +598,9 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         // Ctrl+M save current pose as mount/passenger pose for selected NPC
         static bool s_pose_m_last = false;
         bool pose_m_down = glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS;
-        if (ctrl && pose_m_down && !s_pose_m_last && editor.selected_id != -1){
+        if (ctrl && pose_m_down && !s_pose_m_last && editor.pose_npc_id != -1){
             for (auto& o : map.objects){
-                if (o.id != editor.selected_id || o.behavior != PEDESTRIAN) continue;
-                for (int i = 0; i < 6; i++){
+                if (o.id != editor.pose_npc_id || o.behavior != PEDESTRIAN) continue;                for (int i = 0; i < 6; i++){
                     o.npc_mount_quat[i]   = editor.pose_quat[i];
                     o.npc_mount_offset[i] = editor.pose_offset[i];
                 }
@@ -559,7 +615,7 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         // Ctrl+S saves driver pose to file
         static bool s_pose_s_last = false;
         bool s_down = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
-        if (ctrl && s_down && !s_pose_s_last) {
+        if (ctrl && s_down && !s_pose_s_last && editor.pose_npc_id == -1) {
             std::ofstream pf("../assets/entity/driver_pose.txt");
             if (pf.is_open()) {
                 pf << "seat " << editor.pose_seat.x << " "
