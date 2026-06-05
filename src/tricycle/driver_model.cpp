@@ -183,7 +183,7 @@ void driver_model_draw(
     } 
     else {
         draw_pos = player.pos;
-        draw_yaw = player.yaw;
+        draw_yaw = player.visual_yaw;
     }
 
     float foot_lift = -d.model_foot_z * d.model_scale;

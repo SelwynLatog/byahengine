@@ -461,9 +461,15 @@
 
                 if (glm::length(walk_vel) > 0.001f){
                     walk_vel = glm::normalize(walk_vel) * walk_speed;
-                    // character faces direction of travel, independent of cam
                     app.player.yaw = std::atan2(walk_vel.z, walk_vel.x);
                 }
+                // smooth visual yaw toward logical yaw
+                float yaw_diff = app.player.yaw - app.player.visual_yaw;
+                // wrap to [-pi, pi] so we always take the short arc
+                while (yaw_diff > glm::pi<float>()) yaw_diff -= glm::two_pi<float>();
+                while (yaw_diff < -glm::pi<float>()) yaw_diff += glm::two_pi<float>();
+                app.player.visual_yaw += yaw_diff * glm::clamp(12.0f * dt, 0.0f, 1.0f);
+
 
                 app.player.pos += walk_vel * dt;
                 app.player.speed = glm::length(walk_vel);
@@ -828,7 +834,7 @@
                     sim_a.position -= mtv * (wo_b->mass / total_mass);
                     sim_b.position += mtv * (wo_a->mass / total_mass);
 
-                    // exchange velocity scaled by mass — simple elastic collision
+                    // exchange velocity scaled by mass
                     float restitution = (wo_a->restitution + wo_b->restitution) * 0.5f;
                     float rel_vel = glm::dot(sim_a.velocity - sim_b.velocity, hit_normal);
                     if (rel_vel > 0.0f){
@@ -978,12 +984,16 @@
                 pitch_r = glm::clamp(pitch_r, glm::radians(Const::CAM_PITCH_MIN),
                                             glm::radians(Const::CAM_PITCH_MAX));
                 float foot_dist = 4.0f;
-                glm::vec3 foot_origin = app.player.pos + glm::vec3(0.0f, 1.0f, 0.0f);
+                 // orbit target leads slightly ahead of visual facing so cam doesn't lag behind turns
+                glm::vec3 look_ahead = glm::vec3(std::cos(app.player.visual_yaw), 0.0f, std::sin(app.player.visual_yaw)) * 0.4f;
+                glm::vec3 foot_origin = app.player.pos + glm::vec3(0.0f, 1.0f, 0.0f) + look_ahead;
                 glm::vec3 ideal_eye = foot_origin + glm::vec3(
                     foot_dist * cosf(pitch_r) * cosf(cam_world_yaw),
                     foot_dist * sinf(pitch_r),
                     foot_dist * cosf(pitch_r) * sinf(cam_world_yaw));
-                s_cam_pos = glm::mix(s_cam_pos, ideal_eye, Const::CAM_LERP_SPEED * dt);
+                // tweak/remove 0.25f multiplier if you want a more snappier lerp in walk mode
+                // personally prefer delay as it looks smoother
+                s_cam_pos = glm::mix(s_cam_pos, ideal_eye, Const::CAM_LERP_SPEED * 0.25f * dt);
                 view = glm::lookAt(s_cam_pos, foot_origin, glm::vec3(0,1,0));
             }
             else {

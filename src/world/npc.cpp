@@ -205,7 +205,6 @@ void npc_draw(
     // use npc.yaw for live direction, but keep editor_yaw as the neutral rest facing
     float draw_yaw = npc.yaw + model.forward_offset;
     base = glm::rotate(base, draw_yaw, glm::vec3(0.0f, 1.0f, 0.0f));
-    base = glm::translate(base, glm::vec3(0.0f, npc.editor_y_floor_offset, 0.0f));
 
     if (npc.mode == NPC_RAGDOLL) {
         base = glm::rotate(base, npc.ragdoll_pitch, glm::vec3(1.0f, 0.0f, 0.0f));
@@ -213,7 +212,7 @@ void npc_draw(
     }
 
 
-    glm::vec3 center_off = glm::vec3(model.model_center.x, model.model_foot_z, 0.0f);
+    glm::vec3 center_off = glm::vec3(model.model_center.x, 0.0f, 0.0f);
     base = base
         * glm::translate(glm::mat4(1.0f), -center_off)
         * glm::scale(glm::mat4(1.0f), npc.editor_scale);

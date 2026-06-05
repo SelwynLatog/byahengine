@@ -10,6 +10,7 @@ enum PlayerMode {
 struct PlayerState {
     glm::vec3 pos = glm::vec3(2.0f, 0.0f, 0.0f); // spawn slightly off trike
     float yaw = 0.0f; // radians, matches heading convention
+    float visual_yaw = 0.0f; // smoothed yaw for rendering that lerps towards yaw
     float speed = 0.0f; // m/s scalar, for anim
     PlayerMode mode = PLAYER_FOOT;
 

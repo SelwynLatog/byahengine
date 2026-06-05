@@ -144,7 +144,7 @@ void editor_scan_props(EditorState& editor, const char* assets_dir){
             editor.entity_list.push_back(entry.path().filename().string());
         }
         std::sort(editor.entity_list.begin(), editor.entity_list.end());
-    }
+    }   
     // also merge entity list into prop list with entity/ prefix
     // so they appear in the normal object mode palette
     for (const auto& e : editor.entity_list)
@@ -1025,6 +1025,8 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
                 if (pgup && !s_pgup_last) o.position.y += step;
                 if (pgdn && !s_pgdn_last) o.position.y -= step;
 
+
+                if (al || ar || au || ad || pgup || pgdn) map_dirty = true;
                 s_arr_left_last = al;
                 s_arr_right_last = ar;
                 s_arr_up_last = au;
@@ -1034,17 +1036,19 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             }
 
             if (editor.tool == TOOL_ROTATE){
-                if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) o.rotation.y -= Const::EDITOR_ROTATE_SPEED * dt;
-                if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) o.rotation.y += Const::EDITOR_ROTATE_SPEED * dt;
+                if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) { o.rotation.y -= Const::EDITOR_ROTATE_SPEED * dt; map_dirty = true; }
+                if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) { o.rotation.y += Const::EDITOR_ROTATE_SPEED * dt; map_dirty = true; }
             }
 
-            if (editor.tool == TOOL_SCALE){
-                // alt held = fine scale: slow creep for small prop tuning
+           if (editor.tool == TOOL_SCALE){
                 bool alt = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
                 float sspeed = alt ? Const::EDITOR_SCALE_SPEED_FINE : Const::EDITOR_SCALE_SPEED;
-                if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) o.scale -= sspeed * dt;
-                if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) o.scale += sspeed * dt;
+                bool sl = glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS;
+                bool sr = glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS;
+                if (sl) o.scale -= sspeed * dt;
+                if (sr) o.scale += sspeed * dt;
                 o.scale = glm::max(o.scale, glm::vec3(0.005f));
+                if (sl || sr) map_dirty = true;
             }
             break;
         }
