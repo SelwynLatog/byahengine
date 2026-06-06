@@ -261,7 +261,7 @@ void npc_draw(
         const ObjMesh& mesh = model.parts[b];
         if (mesh.data.vertices.empty()) continue;
 
-        glm::vec3 piv = model.pivots[b].pivot;
+        glm::vec3 piv = model.pivots[b].pivot * npc.editor_scale;
         glm::mat4 bone_local = glm::translate(glm::mat4(1.0f), piv);
 
         if (use_override){

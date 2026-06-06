@@ -165,4 +165,5 @@ void editor_renderer_draw_ocean(EditorRenderer& er, Ocean& ocean, const glm::mat
 
 void editor_renderer_draw_pose_mode(EditorRenderer& er, const EditorState& editor,
     const DriverModel& driver, const TrikeModel& trike,
-    const glm::mat4& view, const glm::mat4& proj, const DriverModel* npc_model = nullptr);
+    const glm::mat4& view, const glm::mat4& proj,
+    const DriverModel* npc_model, const WorldMap& map = WorldMap{});

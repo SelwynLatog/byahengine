@@ -427,7 +427,7 @@
                         }
                     }
                     editor_renderer_draw_pose_mode(app.editor_renderer, app.editor,
-                        app.scene.driver_model, app.scene.trike_model, view, proj, pose_npc_model);
+                        app.scene.driver_model, app.scene.trike_model, view, proj, pose_npc_model, app.map);
                 }
 
                 // temp editor control hud
@@ -917,15 +917,26 @@
                 if (glm::dot(dnpc, dnpc) > Const::NPC_CULL_DIST_SQ) continue;
                 // passenger: lock to sidecar position
                 if (npc.mode == NPC_PASSENGER){
+                    auto npc_mdl_it = app.npc_model_cache.find(npc.model_path);
+                    const DriverModel& npc_mdl = (npc_mdl_it != app.npc_model_cache.end())
+                        ? npc_mdl_it->second : app.scene.driver_model;
                     float c = std::cos(app.trike.heading);
                     float s = std::sin(app.trike.heading);
-                    // sidecar offset — right side of trike
-                    glm::vec3 sidecar_off = glm::vec3(0.2f, 0.0f, 0.6f);
+                    // sidecar offset
+                    // note: this is npc sidecar pos
+                    // x forward/backward
+                    // y up/down
+                    // z right/left
+                    // npc in drive does not use the same cord plane as in editor k mode
+                    // editor needs a offset object feature
+                    // for now there's no reason to put different pos offsets
+                    // as it is a one seater trike
+                    glm::vec3 sidecar_off = glm::vec3(0.2f, 0.0f, 0.1f);
                     npc.position = app.trike.position + glm::vec3(
                         c * sidecar_off.x - s * sidecar_off.z,
                         sidecar_off.y,
                         s * sidecar_off.x + c * sidecar_off.z);
-                    npc.yaw = app.trike.heading;
+                    npc.yaw = -app.trike.heading + glm::radians(90.0f) - npc_mdl.forward_offset + glm::pi<float>();
                     // accumulate fare distance
                     app.passenger_fare += std::abs(app.trike.speed) * dt
                         * Const::FARE_RATE_PER_METRE;

@@ -1615,7 +1615,7 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
 void editor_renderer_draw_pose_mode(EditorRenderer& er, const EditorState& editor,
     const DriverModel& driver, const TrikeModel& trike,
     const glm::mat4& view, const glm::mat4& proj,
-    const DriverModel* npc_model)
+    const DriverModel* npc_model, const WorldMap& map)
 {
     auto& OL = er.obj_loc;
     glm::vec3 ld = glm::normalize(er.sun_dir);
@@ -1648,7 +1648,16 @@ void editor_renderer_draw_pose_mode(EditorRenderer& er, const EditorState& edito
         NpcState scratch;
         scratch.position = glm::vec3(0.0f);
         scratch.yaw = 0.0f;
+
+        // find the WorldObject for this NPC to grab its editor scale
+        // without this, pose mode always renders at scale 1
         scratch.editor_scale = glm::vec3(1.0f);
+        for (const auto& o : map.objects){
+            if (o.id == editor.pose_npc_id){
+                scratch.editor_scale = o.scale;
+                break;
+            }
+        }
         scratch.mode = NPC_HAILING; // drives hail_pose branch in npc_draw
 
         // load whichever pose is being edited into the scratch state

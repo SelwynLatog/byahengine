@@ -351,7 +351,8 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
 
     // M to toggle to raod spline mode
     bool m_down = glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS;
-    if (m_down && !s_m_last){
+    bool ctrl_m = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+    if (m_down && !s_m_last && !ctrl_m){
         editor.mode = (editor.mode == MODE_ROAD) ? MODE_OBJECT : MODE_ROAD;
         editor.road_placing = (editor.mode == MODE_ROAD);
         std::cout << "[editor] mode -> " << (editor.mode == MODE_ROAD ? "ROAD" : "OBJECT") << "\n";
@@ -401,11 +402,12 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             for (const auto& o : map.objects){
                 if (o.id == editor.selected_id && o.behavior == PEDESTRIAN){
                     editor.pose_npc_id = o.id;
-                    // load hail pose as starting point (most commonly edited)
-                    for (int i = 0; i < 6; i++) editor.pose_quat[i] = o.npc_hail_quat[i];
-                    for (int i = 0; i < 6; i++) editor.pose_offset[i] = o.npc_hail_offset[i];
-                    editor.pose_seat = o.npc_hail_seat;
-                    std::cout << "[pose] loaded hail pose from npc id=" << o.id << "\n";
+                    // load mount pose as starting point 
+                    // Ctrl+H overwrites with hail if needed
+                    for (int i = 0; i < 6; i++) editor.pose_quat[i] = o.npc_mount_quat[i];
+                    for (int i = 0; i < 6; i++) editor.pose_offset[i] = o.npc_mount_offset[i];
+                    editor.pose_seat = o.npc_mount_seat;
+                    std::cout << "[pose] loaded mount pose from npc id=" << o.id << "\n";
                     break;
                 }
             }
@@ -456,9 +458,9 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
                     if (o.id != hit || o.behavior != PEDESTRIAN) continue;
                     editor.pose_npc_id = o.id;
                     editor.selected_id = o.id;
-                    for (int i = 0; i < 6; i++) editor.pose_quat[i]   = o.npc_hail_quat[i];
-                    for (int i = 0; i < 6; i++) editor.pose_offset[i] = o.npc_hail_offset[i];
-                    editor.pose_seat = o.npc_hail_seat;
+                    for (int i = 0; i < 6; i++) editor.pose_quat[i] = o.npc_mount_quat[i];
+                    for (int i = 0; i < 6; i++) editor.pose_offset[i] = o.npc_mount_offset[i];
+                    editor.pose_seat = o.npc_mount_seat;
                     std::cout << "[pose] switched to npc id=" << o.id << "\n";
                     break;
                 }
