@@ -224,7 +224,7 @@ void npc_draw(
     bool use_override = false;
 
     if (npc.mode == NPC_HAILING){
-        driver_pose_compute(pose, npc.anim_timer, 0.0f, 1, 0.0f); // sit base
+        driver_pose_compute(pose, npc.anim_timer, 0.0f, 0, 0.0f); // idle/stand base as default
         override_quat   = npc.hail_pose_quat;
         override_offset = npc.hail_pose_offset;
         override_seat   = npc.hail_pose_seat;

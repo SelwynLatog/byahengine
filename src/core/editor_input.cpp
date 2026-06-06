@@ -342,7 +342,8 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
 
     // H to toggle terain sculpt mode
     bool h_down = glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS;
-    if (h_down && !s_h_last){
+    bool ctrl_h = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+    if (h_down && !s_h_last && !ctrl_h){
         editor.mode = (editor.mode == MODE_TERRAIN) ? MODE_OBJECT : MODE_TERRAIN;
         er.terrain_surface_dirty = true;
         std::cout << "[editor] mode -> " << (editor.mode == MODE_TERRAIN ? "TERRAIN" : "OBJECT") << "\n";
@@ -483,6 +484,51 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
             std::cout << "[pose] bone -> " << bone_names[editor.pose_bone] << "\n";
         }
         s_pose_f_last = f_down;
+
+        // V toggles between hail and mount pose editing
+        static bool s_pose_v_last = false;
+        bool v_down = glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS;
+        if (v_down && !s_pose_v_last && editor.pose_npc_id != -1){
+            editor.pose_editing_hail = !editor.pose_editing_hail;
+            // load the target pose so you start from existing saved data
+            for (const auto& o : map.objects){
+                if (o.id != editor.pose_npc_id) continue;
+                if (editor.pose_editing_hail){
+                    // if no hail pose saved yet, start from identity (standing)
+                    // seat at NPC's editor position so it renders in place
+                    bool hail_empty = (glm::length(o.npc_hail_seat) < 0.001f);
+                    if (hail_empty){
+                        for (int i = 0; i < 6; i++) editor.pose_quat[i]   = glm::quat(1,0,0,0);
+                        for (int i = 0; i < 6; i++) editor.pose_offset[i] = glm::vec3(0.0f);
+                        editor.pose_seat = o.position;
+                        std::cout << "[pose] HAIL pose empty, starting from standing at editor pos\n";
+                    } 
+                    else {
+                        for (int i = 0; i < 6; i++) editor.pose_quat[i] = o.npc_hail_quat[i];
+                        for (int i = 0; i < 6; i++) editor.pose_offset[i] = o.npc_hail_offset[i];
+                        editor.pose_seat = o.npc_hail_seat;
+                    }
+                    std::cout << "[pose] switched to HAIL pose\n";
+                } 
+                else {
+                    bool mount_empty = (glm::length(o.npc_mount_seat) < 0.001f);
+                    if (mount_empty){
+                        for (int i = 0; i < 6; i++) editor.pose_quat[i]   = glm::quat(1,0,0,0);
+                        for (int i = 0; i < 6; i++) editor.pose_offset[i] = glm::vec3(0.0f);
+                        editor.pose_seat = o.position;
+                        std::cout << "[pose] MOUNT pose empty, starting from standing at editor pos\n";
+                    } 
+                    else {
+                        for (int i = 0; i < 6; i++) editor.pose_quat[i]   = o.npc_mount_quat[i];
+                        for (int i = 0; i < 6; i++) editor.pose_offset[i] = o.npc_mount_offset[i];
+                        editor.pose_seat = o.npc_mount_seat;
+                    }
+                    std::cout << "[pose] switched to MOUNT pose\n";
+                }
+                break;
+            }
+        }
+        s_pose_v_last = v_down;
 
         glm::quat& q = editor.pose_quat[editor.pose_bone];
 

@@ -719,7 +719,11 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
         font_draw(er.font, "[ POSE MODE ]", 180, 16, 3, 1.0f, 0.60f, 0.10f);
         font_draw(er.font, "F=next bone  Arrows=rot XY  PgUp/Dn=rot Z  NP8/2=seat Z  NP4/6=seat X  NP+/-=seat Y",
             220, 40, 2, 1.0f, 0.60f, 0.10f);
-        font_draw(er.font, "SHIFT=fine  ENTER=dump values  K=exit", 220, 58, 2, 1.0f, 0.60f, 0.10f);
+        font_draw(er.font, "SHIFT=fine  ENTER=dump values  V=hail/mount toggle  K=exit", 220, 58, 2, 1.0f, 0.60f, 0.10f);
+        if (editor.pose_npc_id != -1){
+            const char* pose_label = editor.pose_editing_hail ? "EDITING: HAIL  [Ctrl+H to save]" : "EDITING: MOUNT  [Ctrl+M to save]";
+            font_draw(er.font, pose_label, 220, 112, 2, editor.pose_editing_hail ? 0.4f : 0.2f, 1.0f, 0.4f);
+        }
 
         // convert active bone quat to axis-angle for HUD display
         const glm::quat& bq = editor.pose_quat[editor.pose_bone];
@@ -1083,7 +1087,8 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     for (auto& o : map.objects){
         if (o.model_path.empty()) continue;
         if (skip_pedestrians && o.behavior == PEDESTRIAN) continue;
-
+        if (o.behavior == PEDESTRIAN && o.id == er.pose_npc_id) continue;
+        
         // distance cull
         glm::vec3 diff = o.position - cam_pos;
         if (glm::dot(diff, diff) > Const::PROP_CULL_DIST_SQ) continue;
@@ -1658,17 +1663,22 @@ void editor_renderer_draw_pose_mode(EditorRenderer& er, const EditorState& edito
                 break;
             }
         }
-        scratch.mode = NPC_HAILING; // drives hail_pose branch in npc_draw
+         scratch.mode = editor.pose_editing_hail ? NPC_HAILING : NPC_PASSENGER;
+        // hail pose: render at world position, not trike-relative origin
+        if (editor.pose_editing_hail)
+            scratch.position = editor.pose_seat;
 
         // load whichever pose is being edited into the scratch state
-        // Ctrl+H edits hail, Ctrl+M edits mount — we mirror that here
-        // for now always preview as hail since that's what loads on K entry
-        // mount preview would need a separate toggle — add later if needed
+        // Ctrl+H edits hail, Ctrl+M edits mount we mirror that here
         for (int i = 0; i < 6; i++){
-            scratch.hail_pose_quat[i]   = editor.pose_quat[i];
-            scratch.hail_pose_offset[i] = editor.pose_offset[i];
+            scratch.hail_pose_quat[i]    = editor.pose_quat[i];
+            scratch.hail_pose_offset[i]  = editor.pose_offset[i];
+            scratch.mount_pose_quat[i]   = editor.pose_quat[i];
+            scratch.mount_pose_offset[i] = editor.pose_offset[i];
         }
-        scratch.hail_pose_seat = editor.pose_seat;
+        scratch.hail_pose_seat  = editor.pose_seat;
+        scratch.mount_pose_seat = editor.pose_seat;
+        
 
         npc_draw(scratch, *npc_model, er.obj_shader, view, proj);
     }

@@ -291,7 +291,8 @@
             // H key hitbox toggle universal
             static bool s_h_last = false;
             bool h_down = glfwGetKey(app.window.handle, GLFW_KEY_H) == GLFW_PRESS;
-            if (h_down && !s_h_last) app.editor.show_hitboxes = !app.editor.show_hitboxes;
+            bool ctrl_h = glfwGetKey(app.window.handle, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
+            if (h_down && !s_h_last && !ctrl_h) app.editor.show_hitboxes = !app.editor.show_hitboxes;
             s_h_last = h_down;
 
             // tab toggle
@@ -369,6 +370,7 @@
                 app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
                 app.editor_renderer.light_space_mat = app.scene.light_space_mat;
                 app.editor_renderer.night_factor = app.scene.night_factor;
+                app.editor_renderer.pose_npc_id = (app.editor.mode == MODE_POSE)  ? app.editor.pose_npc_id : -1;
 
 
 

@@ -97,5 +97,6 @@ struct EditorState{
     glm::vec3 pose_offset[6] = {};       // per bone translation in model space
     bool pose_numpad_translate = false;
     int pose_npc_id = -1; // -1 = driver, else npc world object id
+    bool pose_editing_hail = false; // true = editing hail pose, false = mount
 
 };

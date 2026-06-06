@@ -112,6 +112,7 @@ struct EditorRenderer{
 
     std::vector<LightSource> last_lights;
     float night_factor = 1.0f;
+    int pose_npc_id = -1; // set during pose mode to suppress world render of that npc
 };
 
 // builds the static grid mesh and compiles the flat shader
