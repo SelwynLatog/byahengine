@@ -385,6 +385,33 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
     if (k_down && !s_k_last){
         if (editor.mode == MODE_POSE){
             editor.mode = MODE_OBJECT;
+            // if we were editing an npc, restore driver pose seat
+            // npc world pos gets written to pose_seat for hail preview
+            // which corrupts the driver seat on return to drive mode
+            if (editor.pose_npc_id != -1){
+                std::ifstream pf("../assets/entity/driver_pose.txt");
+                if (pf.is_open()){
+                    std::string tag;
+                    while (pf >> tag){
+                        if (tag == "seat")
+                            pf >> editor.pose_seat.x >> editor.pose_seat.y >> editor.pose_seat.z;
+                        else if (tag == "quat"){
+                            int idx; pf >> idx;
+                            if (idx >= 0 && idx < 6)
+                                pf >> editor.pose_quat[idx].w >> editor.pose_quat[idx].x
+                                   >> editor.pose_quat[idx].y >> editor.pose_quat[idx].z;
+                        }
+                        else if (tag == "offset"){
+                            int idx; pf >> idx;
+                            if (idx >= 0 && idx < 6)
+                                pf >> editor.pose_offset[idx].x >> editor.pose_offset[idx].y
+                                   >> editor.pose_offset[idx].z;
+                        }
+                    }
+                }
+            }
+            editor.pose_npc_id = -1;
+            editor.pose_editing_hail = false;
             std::cout << "[editor] mode -> OBJECT\n";
         } 
         else {

@@ -317,7 +317,7 @@ namespace Const{
     inline constexpr float DRIVER_SEAT_OFFSET_Z = -0.3f;  // lateral
 
     // fare system
-    inline constexpr float FARE_RATE_PER_METRE = 0.05f; // pesos per metre
+    inline constexpr float FARE_RATE_PER_METRE = 0.00001f; // pesos per metre
     inline constexpr float FARE_BASE = 10.0f; // base fare on pickup
 
 }

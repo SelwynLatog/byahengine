@@ -408,6 +408,19 @@
                 // solid terrain surface
                 editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj, app.map.ocean);
 
+                
+                // draw npcs in editor at their last known state
+                // frozen since npc_update doesn't run in editor
+                // useful for checking mount/hail pose placement
+                if (app.editor.mode != MODE_POSE){
+                    for (const auto& npc : app.npcs){
+                        if (npc.id == app.editor_renderer.pose_npc_id) continue;
+                        auto it = app.npc_model_cache.find(npc.model_path);
+                        DriverModel* mdl = (it != app.npc_model_cache.end())
+                            ? &it->second : &app.scene.driver_model;
+                        npc_draw(npc, *mdl, app.editor_renderer.obj_shader, view, proj);
+                    }
+                }
 
                 // draw editor overlays:
                 // grid, ghost, selection highlight
