@@ -12,27 +12,82 @@
 #include <iostream>
 #include <cmath>
 #include "../../vendor/stb/stb_image.h"
+#include "../world/npc.hpp"
 
-static void set_mat4(const Shader& s, const char* n, const glm::mat4& m) {
-    glUniformMatrix4fv(glGetUniformLocation(s.id, n), 1, GL_FALSE, glm::value_ptr(m));
-}
-static void set_mat3(const Shader& s, const char* n, const glm::mat3& m) {
-    glUniformMatrix3fv(glGetUniformLocation(s.id, n), 1, GL_FALSE, glm::value_ptr(m));
-}
-static void set_vec3(const Shader& s, const char* n, glm::vec3 v) {
-    glUniform3f(glGetUniformLocation(s.id, n), v.x, v.y, v.z);
+// cached uniform locations for driver shader
+// avoids glGetUniformLocation string lookup every bone every frame
+struct DriverShaderLocs {
+    GLuint sid = 0;
+    GLint view, proj, model, nmat, kd, usetex, tex, checker;
+};
+static DriverShaderLocs s_drv_locs;
+
+static void driver_locs_update(GLuint sid){
+    if (sid == s_drv_locs.sid) return;
+    s_drv_locs.sid     = sid;
+    s_drv_locs.view    = glGetUniformLocation(sid, "u_view");
+    s_drv_locs.proj    = glGetUniformLocation(sid, "u_proj");
+    s_drv_locs.model   = glGetUniformLocation(sid, "u_model");
+    s_drv_locs.nmat    = glGetUniformLocation(sid, "u_normal_mat");
+    s_drv_locs.kd      = glGetUniformLocation(sid, "u_kd");
+    s_drv_locs.usetex  = glGetUniformLocation(sid, "u_use_texture");
+    s_drv_locs.tex     = glGetUniformLocation(sid, "u_tex");
+    s_drv_locs.checker = glGetUniformLocation(sid, "u_use_checker");
 }
 
 // maps bone index to the OBJ part name
-static const char* bone_part_name(int bone) {
-    switch (bone) {
-        case BONE_TORSO: return "driver_torso";
-        case BONE_HEAD: return "driver_head";
-        case BONE_LEG_L: return "driver_leg_l";
-        case BONE_LEG_R: return "driver_leg_r";
-        case BONE_ARM_L: return "driver_upper_arm_l";
-        case BONE_ARM_R: return "driver_upper_arm_r";
-        default: return "";
+static const char* bone_part_name(int bone, NpcType type) {
+    switch (type) {
+        case NPC_TYPE_CHICKEN:
+            switch (bone) {
+                case BONE_TORSO: return "chicken_body";
+                case BONE_HEAD:  return "chicken_head";
+                case BONE_LEG_L: return "chicken_leg_l";
+                case BONE_LEG_R: return "chicken_leg_r";
+                case BONE_ARM_L: return "chicken_wing_l";
+                case BONE_ARM_R: return "chicken_wing_r";
+                default: return "";
+            }
+        case NPC_TYPE_COW:
+            switch (bone) {
+                case BONE_TORSO: return "cow_body";
+                case BONE_HEAD:  return "cow_head";
+                case BONE_LEG_L: return "cow_leg_fl";
+                case BONE_LEG_R: return "cow_leg_fr";
+                case BONE_ARM_L: return "cow_leg_rl";
+                case BONE_ARM_R: return "cow_leg_rr";
+                default: return "";
+            }
+        case NPC_TYPE_CAT:
+            switch (bone) {
+                case BONE_TORSO: return "cat_body";
+                case BONE_HEAD:  return "cat_head";
+                case BONE_LEG_L: return "cat_leg_fl";
+                case BONE_LEG_R: return "cat_leg_fr";
+                case BONE_ARM_L: return "cat_leg_rl";
+                case BONE_ARM_R: return "cat_leg_rr";
+                default: return "";
+            }
+        case NPC_TYPE_DOG:
+            switch (bone) {
+                case BONE_TORSO: return "dog_body";
+                case BONE_HEAD:  return "dog_head";
+                case BONE_LEG_L: return "dog_leg_fl";
+                case BONE_LEG_R: return "dog_leg_fr";
+                case BONE_ARM_L: return "dog_leg_rl";
+                case BONE_ARM_R: return "dog_leg_rr";
+                default: return "";
+            }
+        default: // NPC_TYPE_PERSON and fallback
+            switch (bone) {
+                case BONE_TORSO: return "driver_torso";
+                case BONE_HEAD:  return "driver_head";
+                case BONE_LEG_L: return "driver_leg_l";
+                case BONE_LEG_R: return "driver_leg_r";
+                case BONE_ARM_L: return "driver_upper_arm_l";
+                case BONE_ARM_R: return "driver_upper_arm_r";
+                default: return "";
+            }
     }
 }
 
@@ -83,7 +138,7 @@ static ObjData slice_part(const ObjData& full, const ObjPart& part) {
     return out;
 }
 
-void driver_model_init(DriverModel& d, const char* path) {
+void driver_model_init(DriverModel& d, const char* path, NpcType type) {
     ObjData full;
     if (!obj_load(path, full))
         std::cerr << "[driver_model] failed to load " << path << "\n";
@@ -109,7 +164,7 @@ void driver_model_init(DriverModel& d, const char* path) {
 
     // slice and upload each bone part
     for (int b = 0; b < BONE_COUNT; b++) {
-        const char* name = bone_part_name(b);
+        const char* name = bone_part_name(b, type);
         const ObjPart* part = obj_find_part(full, name);
         if (!part) {
             std::cerr << "[driver_model] missing part: " << name << "\n";
@@ -244,11 +299,15 @@ void driver_model_draw(
     }
 
 
-    set_mat4(shader, "u_view", view);
-    set_mat4(shader, "u_proj", proj);
-    glUniform1i(glGetUniformLocation(shader.id, "u_use_checker"), 0);
+    driver_locs_update(shader.id);
+    glUniformMatrix4fv(s_drv_locs.view, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(s_drv_locs.proj, 1, GL_FALSE, glm::value_ptr(proj));
+    glUniform1i(s_drv_locs.checker, 0);
 
-    // draw each bone part with its own model matrix
+    // normal matrix base: inverse-transpose of base, computed once not per bone
+    // bone_local is rotation only so combining is exact and cheap
+    glm::mat3 base_normal = glm::mat3(glm::transpose(glm::inverse(base)));
+
     for (int b = 0; b < BONE_COUNT; b++) {
         const ObjMesh& mesh = d.parts[b];
         if (mesh.data.vertices.empty()) continue;
@@ -265,18 +324,20 @@ void driver_model_draw(
             bone_local = glm::translate(bone_local, pose_offsets[b]);
 
         glm::mat4 model = base * bone_local;
-        glm::mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
+        // bone_local is pure rotation+translation so base_normal * bone rotation is exact
+        // full inverse-transpose only needed on base (handles non-uniform editor_scale)
+        glm::mat3 normal_mat = base_normal * glm::mat3(bone_local);
 
-        set_mat4(shader, "u_model", model);
-        set_mat3(shader, "u_normal_mat", normal_mat);
+        glUniformMatrix4fv(s_drv_locs.model, 1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix3fv(s_drv_locs.nmat, 1, GL_FALSE, glm::value_ptr(normal_mat));
 
-       glBindVertexArray(mesh.vao);
+        glBindVertexArray(mesh.vao);
         for (const auto& part : mesh.data.parts) {
             for (const auto& grp : part.groups) {
                 if (grp.vertex_count <= 0) continue;
                 const ObjMaterial* mat = obj_find_material(mesh.data, grp.mat_name);
                 glm::vec3 kd = mat ? mat->kd : glm::vec3(0.6f, 0.4f, 0.25f);
-                set_vec3(shader, "u_kd", kd);
+                glUniform3f(s_drv_locs.kd, kd.r, kd.g, kd.b);
                 if (mat && !mat->tex_path.empty()) {
                     GLuint tex = 0;
                     auto it = d.tex_cache.find(mat->tex_path);
@@ -284,15 +345,15 @@ void driver_model_draw(
                     if (tex) {
                         glActiveTexture(GL_TEXTURE0);
                         glBindTexture(GL_TEXTURE_2D, tex);
-                        glUniform1i(glGetUniformLocation(shader.id, "u_tex"), 0);
-                        glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 1);
+                        glUniform1i(s_drv_locs.tex,    0);
+                        glUniform1i(s_drv_locs.usetex, 1);
                     } 
                     else {
-                        glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 0);
+                        glUniform1i(s_drv_locs.usetex, 0);
                     }
                 } 
                 else {
-                    glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 0);
+                    glUniform1i(s_drv_locs.usetex, 0);
                 }
                 glDrawArrays(GL_TRIANGLES, grp.vertex_start, grp.vertex_count);
                 if (mat && !mat->tex_path.empty())
@@ -306,8 +367,8 @@ void driver_model_draw(
 void driver_model_draw_pose(
     const DriverModel& d,
     glm::vec3 seat_offset,
-    const glm::quat bone_quats[6],
-    const glm::vec3 bone_offsets[6],
+    const glm::quat bone_quats[BONE_COUNT],
+    const glm::vec3 bone_offsets[BONE_COUNT],
     int highlight_bone,
     const Shader& shader,
     const glm::mat4& view,
@@ -328,6 +389,8 @@ void driver_model_draw_pose(
     DriverPose pose;
     driver_pose_compute(pose, 0.0f, 0.0f, 1, 0.0f);
 
+    glm::mat3 base_normal = glm::mat3(glm::transpose(glm::inverse(base)));
+
     // apply quat overrides on top of pose_sit() per bone
     // quat_mat is pre-multiplied so it rotates in bone local space
     for (int b = 0; b < BONE_COUNT; b++){
@@ -335,9 +398,10 @@ void driver_model_draw_pose(
         pose.local[b] = pose.local[b] * extra;
     }
 
-    set_mat4(shader, "u_view", view);
-    set_mat4(shader, "u_proj", proj);
-    glUniform1i(glGetUniformLocation(shader.id, "u_use_checker"), 0);
+    driver_locs_update(shader.id);
+    glUniformMatrix4fv(s_drv_locs.view, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(s_drv_locs.proj, 1, GL_FALSE, glm::value_ptr(proj));
+    glUniform1i(s_drv_locs.checker, 0);
 
     for (int b = 0; b < BONE_COUNT; b++){
         const ObjMesh& mesh = d.parts[b];
@@ -353,21 +417,20 @@ void driver_model_draw_pose(
         bone_local = glm::translate(bone_local, bone_offsets[b]);
 
         glm::mat4 model = base * bone_local;
-        glm::mat3 normal_mat = glm::mat3(glm::transpose(glm::inverse(model)));
+        glm::mat3 normal_mat = base_normal * glm::mat3(bone_local);
 
-        set_mat4(shader, "u_model", model);
-        set_mat3(shader, "u_normal_mat", normal_mat);
+        glUniformMatrix4fv(s_drv_locs.model, 1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix3fv(s_drv_locs.nmat, 1, GL_FALSE, glm::value_ptr(normal_mat));
 
-         glBindVertexArray(mesh.vao);
+        glBindVertexArray(mesh.vao);
         for (const auto& part : mesh.data.parts){
             for (const auto& grp : part.groups){
                 if (grp.vertex_count <= 0) continue;
                 const ObjMaterial* mat = obj_find_material(mesh.data, grp.mat_name);
                 glm::vec3 kd = mat ? mat->kd : glm::vec3(0.6f, 0.4f, 0.25f);
                 if (b == highlight_bone) {
-                    // orange tint overrides texture so active bone is always visible
                     kd = glm::vec3(1.0f, 0.45f, 0.05f);
-                    glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 0);
+                    glUniform1i(s_drv_locs.usetex, 0);
                 } 
                 else if (mat && !mat->tex_path.empty()) {
                     GLuint tex = 0;
@@ -376,17 +439,17 @@ void driver_model_draw_pose(
                     if (tex) {
                         glActiveTexture(GL_TEXTURE0);
                         glBindTexture(GL_TEXTURE_2D, tex);
-                        glUniform1i(glGetUniformLocation(shader.id, "u_tex"), 0);
-                        glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 1);
+                        glUniform1i(s_drv_locs.tex,    0);
+                        glUniform1i(s_drv_locs.usetex, 1);
                     } 
                     else {
-                        glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 0);
+                        glUniform1i(s_drv_locs.usetex, 0);
                     }
                 } 
                 else {
-                    glUniform1i(glGetUniformLocation(shader.id, "u_use_texture"), 0);
+                    glUniform1i(s_drv_locs.usetex, 0);
                 }
-                set_vec3(shader, "u_kd", kd);
+                glUniform3f(s_drv_locs.kd, kd.r, kd.g, kd.b);
                 glDrawArrays(GL_TRIANGLES, grp.vertex_start, grp.vertex_count);
                 if (b != highlight_bone && mat && !mat->tex_path.empty())
                     glBindTexture(GL_TEXTURE_2D, 0);

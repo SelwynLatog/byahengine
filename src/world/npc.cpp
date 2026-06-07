@@ -1,6 +1,8 @@
 #include "npc.hpp"
 #include "../core/const.hpp"
 #include "../world/height_field.hpp"
+#include "../world/animal_behavior.hpp"
+#include "../world/animal_anim.hpp"
 #include "../tricycle/driver_model.hpp"
 #include "../tricycle/driver_anim.hpp"
 #include <glm/gtc/matrix_transform.hpp>
@@ -20,6 +22,95 @@ static constexpr float NPC_LIN_DRAG = 0.75f;
 static constexpr float NPC_HAIL_RANGE_SQ = 36.0f; // 6m radius, checked in app
 static constexpr float NPC_HAIL_TIMER_MIN = 8.0f;  // seconds between hail attempts
 static constexpr float NPC_HAIL_TIMER_MAX = 20.0f;
+
+
+static void animal_update(NpcState& npc, const HeightField& terrain,
+    const AnimalBehavior& b, float dt, glm::vec3 trike_pos)
+{
+    // startle check 
+    // any non-ragdoll animal flees if trike is too close
+    if (npc.mode != NPC_RAGDOLL && npc.mode != NPC_FLEE){
+        glm::vec3 d = npc.position - trike_pos;
+        d.y = 0.0f;
+        if (glm::dot(d, d) < b.startle_range * b.startle_range){
+            npc.mode = NPC_FLEE;
+            npc.flee_timer = b.startle_duration;
+            // flee direction: directly away from trike
+            float len = glm::length(d);
+            if (len > 0.1f){
+                glm::vec3 dir = d / len;
+                npc.yaw = std::atan2(dir.z, dir.x);
+            }
+        }
+    }
+
+    if (npc.mode == NPC_FLEE){
+        npc.flee_timer -= dt;
+        if (npc.flee_timer <= 0.0f){
+            // resume patrol or idle
+            npc.mode = (glm::length(npc.walk_b - npc.walk_a) > 0.1f)
+                ? NPC_WALK : NPC_IDLE;
+            npc.idle_vary_timer = b.idle_time_min
+                + (float)(npc.id % 7) / 7.0f * (b.idle_time_max - b.idle_time_min);
+        }
+        else {
+            // run in flee direction
+            glm::vec3 fwd = { std::cos(npc.yaw), 0.0f, std::sin(npc.yaw) };
+            npc.position += fwd * b.flee_speed * dt;
+            npc.speed = b.flee_speed;
+            npc.anim_timer += b.flee_speed * dt * 2.2f;
+            npc.position.y = heightfield_sample(terrain, npc.position.x, npc.position.z);
+        }
+        return;
+    }
+
+    if (npc.mode == NPC_GRAZE){
+        npc.speed = 0.0f;
+        npc.anim_timer += dt;
+        npc.idle_vary_timer -= dt;
+        if (npc.idle_vary_timer <= 0.0f){
+            // switch to walk for a bit then back
+            npc.mode = NPC_WALK;
+            npc.idle_vary_timer = b.idle_time_min
+                + (float)(npc.id % 5) / 5.0f * (b.idle_time_max - b.idle_time_min);
+        }
+        return;
+    }
+
+    if (npc.mode == NPC_WALK){
+        glm::vec3 target = npc.walk_forward ? npc.walk_b : npc.walk_a;
+        glm::vec3 delta = target - npc.position;
+        delta.y = 0.0f;
+        float dist = glm::length(delta);
+
+        if (dist < 0.6f){
+            npc.walk_forward = !npc.walk_forward;
+            // after arriving, idle for a bit before turning back
+            npc.mode = b.grazes ? NPC_GRAZE : NPC_IDLE;
+            npc.idle_vary_timer = b.idle_time_min
+                + (float)(npc.id % 7) / 7.0f * (b.idle_time_max - b.idle_time_min);
+        }
+        else {
+            glm::vec3 dir = delta / dist;
+            npc.yaw = std::atan2(-dir.z, -dir.x);
+            npc.position += dir * b.walk_speed * dt;
+        }
+        npc.speed = b.walk_speed;
+        npc.anim_timer += b.walk_speed * dt * 1.8f;
+        npc.position.y = heightfield_sample(terrain, npc.position.x, npc.position.z);
+        return;
+    }
+
+    // NPC_IDLE
+    npc.speed = 0.0f;
+    npc.anim_timer += dt;
+    npc.idle_vary_timer -= dt;
+    if (npc.idle_vary_timer <= 0.0f && glm::length(npc.walk_b - npc.walk_a) > 0.1f){
+        npc.mode = NPC_WALK;
+        npc.idle_vary_timer = b.idle_time_min
+            + (float)(npc.id % 7) / 7.0f * (b.idle_time_max - b.idle_time_min);
+    }
+}
 
 void npc_init(NpcState& npc, int id, NpcType type, glm::vec3 pos, float yaw,
               glm::vec3 walk_a, glm::vec3 walk_b,
@@ -43,9 +134,22 @@ void npc_init(NpcState& npc, int id, NpcType type, glm::vec3 pos, float yaw,
         npc.yaw = std::atan2(walk_dir.z, walk_dir.x);
     // stagger hail timers so npcs don't all hail at once
     npc.hail_timer= NPC_HAIL_TIMER_MIN + (float)(id % 7) * 1.8f;
+    for (int i = 0; i < BONE_COUNT; i++){
+        npc.hail_pose_quat[i]  = glm::quat(1,0,0,0);
+        npc.mount_pose_quat[i] = glm::quat(1,0,0,0);
+    }
 }
 
-void npc_update(NpcState& npc, const HeightField& terrain, float dt) {
+void npc_update(NpcState& npc, const HeightField& terrain, float dt,
+    glm::vec3 trike_pos)
+{
+    // animal dispatch 
+    // runs separate behavior from human NPCs
+    if (npc_type_is_animal(npc.type)){
+        const AnimalBehavior& b = ANIMAL_BEHAVIOR_TABLE[(int)npc.type];
+        animal_update(npc, terrain, b, dt, trike_pos);
+        return;
+    }
 
     if (npc.mode == NPC_RAGDOLL) {
         npc.ragdoll_timer += dt;
@@ -110,7 +214,7 @@ void npc_update(NpcState& npc, const HeightField& terrain, float dt) {
     }
 
     if (npc.mode == NPC_MOUNTING) {
-        // walk toward sidecar mount point — app sets target, we just walk
+        // walk toward sidecar mount point
         npc.speed = NPC_WALK_SPEED;
         npc.anim_timer += NPC_WALK_SPEED * dt * 1.8f;
         npc.position.y = heightfield_sample(terrain, npc.position.x, npc.position.z);
@@ -177,7 +281,10 @@ void npc_hit(NpcState& npc, glm::vec3 impulse) {
     npc.ragdoll_roll_vel = speed * 0.6f * (impulse.x >= 0.0f ? 1.0f : -1.0f);
     npc.ragdoll_yaw_vel = speed * 0.4f * (impulse.z >= 0.0f ? 1.0f : -1.0f);
 
-    // kick limbs outward — arms fly up, legs splay
+    // animal ragdoll
+    // generic ragdoll but works for now
+    // kick limbs outward 
+    // arms fly up, legs splay
     float side = (impulse.x >= 0.0f ? 1.0f : -1.0f);
     npc.limb_pitch_vel[0] =  speed * 2.8f;  // LEG_L forward
     npc.limb_pitch_vel[1] =  speed * 2.2f;  // LEG_R forward
@@ -237,21 +344,47 @@ void npc_draw(
         override_seat   = npc.mount_pose_seat;
         use_override    = true;
     }
+    else if (npc_type_is_animal(npc.type)){
+        bool fleeing = (npc.mode == NPC_FLEE);
+        bool grazing = (npc.mode == NPC_GRAZE);
+        switch (npc.type){
+            case NPC_TYPE_CHICKEN:
+                animal_anim_chicken(pose, npc.anim_timer, npc.speed, fleeing);
+                break;
+            case NPC_TYPE_COW:
+                animal_anim_cow(pose, npc.anim_timer, npc.speed, fleeing, grazing);
+                break;
+            case NPC_TYPE_CAT:
+                animal_anim_cat(pose, npc.anim_timer, npc.speed, fleeing);
+                break;
+            case NPC_TYPE_DOG:
+                animal_anim_dog(pose, npc.anim_timer, npc.speed, fleeing);
+                break;
+            default:
+                driver_pose_compute(pose, npc.anim_timer, npc.speed, 0, 0.0f);
+                break;
+        }
+    }
     else {
         int anim_mode = (npc.mode == NPC_RAGDOLL) ? 1 : 0;
         driver_pose_compute(pose, npc.anim_timer, npc.speed, anim_mode, 0.0f);
     }
 
-    // set shared shader uniforms
+    // cache uniform locations
     GLuint sid = shader.id;
-    GLint loc_view     = glGetUniformLocation(sid, "u_view");
-    GLint loc_proj     = glGetUniformLocation(sid, "u_proj");
-    GLint loc_model    = glGetUniformLocation(sid, "u_model");
-    GLint loc_nmat     = glGetUniformLocation(sid, "u_normal_mat");
-    GLint loc_kd       = glGetUniformLocation(sid, "u_kd");
-    GLint loc_usetex   = glGetUniformLocation(sid, "u_use_texture");
-    GLint loc_tex      = glGetUniformLocation(sid, "u_tex");
-    GLint loc_checker  = glGetUniformLocation(sid, "u_use_checker");
+    static GLuint cached_sid = 0;
+    static GLint loc_view, loc_proj, loc_model, loc_nmat, loc_kd, loc_usetex, loc_tex, loc_checker;
+    if (sid != cached_sid){
+        cached_sid  = sid;
+        loc_view    = glGetUniformLocation(sid, "u_view");
+        loc_proj    = glGetUniformLocation(sid, "u_proj");
+        loc_model   = glGetUniformLocation(sid, "u_model");
+        loc_nmat    = glGetUniformLocation(sid, "u_normal_mat");
+        loc_kd      = glGetUniformLocation(sid, "u_kd");
+        loc_usetex  = glGetUniformLocation(sid, "u_use_texture");
+        loc_tex     = glGetUniformLocation(sid, "u_tex");
+        loc_checker = glGetUniformLocation(sid, "u_use_checker");
+    }
 
     glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(loc_proj, 1, GL_FALSE, glm::value_ptr(proj));
@@ -275,7 +408,8 @@ void npc_draw(
             bone_local = bone_local * pose.local[b];
         }
 
-        // limb flop in ragdoll — rotate around pivot, body stays connected
+        // limb flop in ragdoll 
+        // rotate around pivot, body stays connected
         if (npc.mode == NPC_RAGDOLL) {
             int li = -1;
             if (b == BONE_LEG_L) li = 0;

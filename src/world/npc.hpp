@@ -6,7 +6,7 @@
 #include "../core/player_state.hpp"
 #include "../physics/trike_state.hpp"
 
-enum NpcType {
+enum NpcType : int {
     NPC_TYPE_PERSON,
     NPC_TYPE_CHICKEN,
     NPC_TYPE_COW,
@@ -35,7 +35,9 @@ enum NpcMode {
     NPC_MOUNTING,
     NPC_PASSENGER,
     NPC_DISMOUNTING,
-    NPC_RAGDOLL
+    NPC_RAGDOLL,
+    NPC_FLEE,
+    NPC_GRAZE
 };
 
 struct NpcState {
@@ -87,25 +89,23 @@ struct NpcState {
     float spawn_yaw = 0.0f; // yaw at init time, used to compute facing offset
     
     float hail_wave_timer = 0.0f;
+    float flee_timer = 0.0f; // countdown until animal resumes normal mode
+    float idle_vary_timer = 0.0f; // countdown until next idle->walk transition
+
     glm::vec3 hail_pose_seat = glm::vec3(0.0f);
-    glm::quat hail_pose_quat[6] = {
-        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0),
-        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0)
-    };
-    glm::vec3 hail_pose_offset[6] = {};
+    glm::quat hail_pose_quat[BONE_COUNT];
+    glm::vec3 hail_pose_offset[BONE_COUNT] = {};
 
     glm::vec3 mount_pose_seat = glm::vec3(0.0f);
-    glm::quat mount_pose_quat[6] = {
-        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0),
-        glm::quat(1,0,0,0), glm::quat(1,0,0,0), glm::quat(1,0,0,0)
-    };
-    glm::vec3 mount_pose_offset[6] = {};
+    glm::quat mount_pose_quat[BONE_COUNT];
+    glm::vec3 mount_pose_offset[BONE_COUNT] = {};
 };
 
 void npc_init(NpcState& npc, int id, NpcType type, glm::vec3 pos, float yaw,
               glm::vec3 walk_a, glm::vec3 walk_b,
               bool can_hail, glm::vec3 drop_point, float weight);
-void npc_update(NpcState& npc, const HeightField& terrain, float dt);
+void npc_update(NpcState& npc, const HeightField& terrain, float dt,
+    glm::vec3 trike_pos = glm::vec3(0.0f));
 void npc_hit(NpcState& npc, glm::vec3 impulse);
 void npc_draw(const NpcState& npc, const DriverModel& model,
               const Shader& shader, const glm::mat4& view, const glm::mat4& proj);

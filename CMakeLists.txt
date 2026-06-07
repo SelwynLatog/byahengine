@@ -31,6 +31,7 @@ add_executable(tricycle-sim
     src/world/road_spline.cpp
     src/world/ocean.cpp
     src/world/npc.cpp
+    src/world/animal_anim.cpp
     vendor/glad/src/glad.c
     src/stb_impl.cpp
 )
