@@ -408,20 +408,6 @@ void app_run(App& app){
             // solid terrain surface
             editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj, app.map.ocean);
 
-            
-            // draw npcs in editor at their last known state
-            // frozen since npc_update doesn't run in editor
-            // useful for checking mount/hail pose placement
-            if (app.editor.mode != MODE_POSE){
-                for (const auto& npc : app.npcs){
-                    if (npc.id == app.editor_renderer.pose_npc_id) continue;
-                    auto it = app.npc_model_cache.find(npc.model_path);
-                    DriverModel* mdl = (it != app.npc_model_cache.end())
-                        ? &it->second : &app.scene.driver_model;
-                    npc_draw(npc, *mdl, app.editor_renderer.obj_shader, view, proj);
-                }
-            }
-
             // draw editor overlays:
             // grid, ghost, selection highlight
             editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj, app.editor.show_hitboxes, app.map.lights);
@@ -613,9 +599,15 @@ void app_run(App& app){
         if (glfwGetKey(app.window.handle, GLFW_KEY_UP) == GLFW_PRESS) s_cam_pitch += Const::CAM_PITCH_SPEED * dt;
         if (glfwGetKey(app.window.handle, GLFW_KEY_DOWN) == GLFW_PRESS) s_cam_pitch -= Const::CAM_PITCH_SPEED * dt;
         s_cam_pitch = glm::clamp(s_cam_pitch, Const::CAM_PITCH_MIN, Const::CAM_PITCH_MAX);
-        // spring cam yaw back behind trike only while driving
-        if (app.player.mode == PLAYER_DRIVING && std::abs(app.trike.speed) > 0.3f)
+        
+        // spring cam yaw back behind trike only while driving and not manually orbiting
+        bool arrow_held = glfwGetKey(app.window.handle, GLFW_KEY_LEFT) == GLFW_PRESS
+                       || glfwGetKey(app.window.handle, GLFW_KEY_RIGHT) == GLFW_PRESS
+                       || glfwGetKey(app.window.handle, GLFW_KEY_UP) == GLFW_PRESS
+                       || glfwGetKey(app.window.handle, GLFW_KEY_DOWN)  == GLFW_PRESS;
+        if (app.player.mode == PLAYER_DRIVING && std::abs(app.trike.speed) > 0.3f && !arrow_held)
             s_cam_yaw = glm::mix(s_cam_yaw, 0.0f, 1.0f - std::exp(-3.5f * dt));
+
 
         // fixed timestep physics
         // physics will run constantly at 120 hz regardless if framerate is ass
@@ -959,8 +951,13 @@ void app_run(App& app){
                 glm::vec3 to_drop = npc.drop_point - app.trike.position;
                 to_drop.y = 0.0f;
                 if (glm::dot(to_drop, to_drop) < 4.0f){
-                    // arrived -> dismount
-                    npc.mode = NPC_DISMOUNTING;
+                    // arrived -> dropoff: push npc to trike side so it doesn't get hit
+                    float side_angle = app.trike.heading + glm::half_pi<float>();
+                    npc.position = app.trike.position
+                        + glm::vec3(std::cos(side_angle), 0.0f, std::sin(side_angle)) * 1.8f;
+                    npc.position.y = heightfield_sample(app.map.terrain,
+                        npc.position.x, npc.position.z);
+                    npc.mode = NPC_IDLE;
                     app.passenger_npc_id = -1;
                     std::cout << "[npc] dropoff fare=" << app.passenger_fare << "\n";
                     app.passenger_fare = 0.0f;
@@ -1026,6 +1023,10 @@ void app_run(App& app){
                         npc_hit(npc, impulse);
                         if (npc.id == app.passenger_npc_id)
                             app.passenger_npc_id = -1;
+                        if (closing > 1.0f){
+                            app.trike.last_impact_force = closing;
+                            app.trike.impact_timer = glm::clamp(closing * 0.08f, 0.15f, 0.35f);
+                        }
                     }
                 }
             }

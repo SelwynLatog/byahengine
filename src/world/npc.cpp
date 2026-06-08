@@ -311,7 +311,18 @@ void npc_draw(
 
     // facing: patrol walk overwrites yaw each frame, editor_yaw is the initial facing
     // use npc.yaw for live direction, but keep editor_yaw as the neutral rest facing
-    base = glm::rotate(base, -npc.yaw + glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    
+    float draw_yaw;
+    if (npc.mode == NPC_PASSENGER || npc.mode == NPC_MOUNTING){
+        // yaw already contains full facing formula, apply directly
+        draw_yaw = npc.yaw + model.forward_offset;
+    }
+    else {
+        // hail/walk/idle: npc.yaw is a world direction, flip for draw convention
+        draw_yaw = -npc.yaw + glm::radians(90.0f);
+    }
+    base = glm::rotate(base, draw_yaw, glm::vec3(0.0f, 1.0f, 0.0f));
+
     if (npc.mode == NPC_RAGDOLL) {
         base = glm::rotate(base, npc.ragdoll_pitch, glm::vec3(1.0f, 0.0f, 0.0f));
         base = glm::rotate(base, npc.ragdoll_roll,  glm::vec3(0.0f, 0.0f, 1.0f));
