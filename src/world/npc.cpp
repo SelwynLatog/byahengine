@@ -92,7 +92,7 @@ static void animal_update(NpcState& npc, const HeightField& terrain,
         }
         else {
             glm::vec3 dir = delta / dist;
-            npc.yaw = std::atan2(-dir.z, -dir.x);
+            npc.yaw = std::atan2(dir.z, dir.x);
             npc.position += dir * b.walk_speed * dt;
         }
         npc.speed = b.walk_speed;
@@ -233,7 +233,7 @@ void npc_update(NpcState& npc, const HeightField& terrain, float dt,
         } 
         else {
             glm::vec3 dir = delta / dist;
-            npc.yaw = std::atan2(-dir.z, -dir.x);
+            npc.yaw = std::atan2(dir.z, dir.x);
             npc.position += dir * NPC_WALK_SPEED * dt;
         }
         npc.speed = NPC_WALK_SPEED;
@@ -253,7 +253,7 @@ void npc_update(NpcState& npc, const HeightField& terrain, float dt,
         } 
         else {
             glm::vec3 dir = delta / dist;
-            npc.yaw = std::atan2(-dir.z, -dir.x);
+            npc.yaw = std::atan2(dir.z, dir.x);
             npc.position += dir * NPC_WALK_SPEED * dt;
         }
         npc.speed = NPC_WALK_SPEED;
@@ -311,9 +311,7 @@ void npc_draw(
 
     // facing: patrol walk overwrites yaw each frame, editor_yaw is the initial facing
     // use npc.yaw for live direction, but keep editor_yaw as the neutral rest facing
-    float draw_yaw = npc.yaw + model.forward_offset;
-    base = glm::rotate(base, draw_yaw, glm::vec3(0.0f, 1.0f, 0.0f));
-
+    base = glm::rotate(base, -npc.yaw + glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     if (npc.mode == NPC_RAGDOLL) {
         base = glm::rotate(base, npc.ragdoll_pitch, glm::vec3(1.0f, 0.0f, 0.0f));
         base = glm::rotate(base, npc.ragdoll_roll,  glm::vec3(0.0f, 0.0f, 1.0f));
