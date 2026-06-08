@@ -51,7 +51,154 @@ static bool load_mtl(const std::string& mtl_path, std::vector<ObjMaterial>& out_
     return true;
 }
 
+static std::string cache_path(const std::string& obj_path){
+    return obj_path + ".objcache";
+}
+
+// cache format (binary):
+// [uint64] source mtime
+// [uint32] vertex count (floats)
+// [float*] vertices
+// [uint32] material count
+//   per mat: [uint32] name len, name, [float*3] kd, [uint32] tex_path len, tex_path
+// [uint32] part count
+//   per part: [uint32] name len, name, [float*3] pivot, [uint32] group count
+//     per group: [uint32] mat_name len, mat_name, [int32] vertex_start, [int32] vertex_count
+// [uint32] flat group count (mirrors parts but kept for legacy out.groups)
+//   per group: same layout as above
+
+static void write_str(std::ofstream& f, const std::string& s){
+    uint32_t len = (uint32_t)s.size();
+    f.write((char*)&len, 4);
+    f.write(s.data(), len);
+}
+static bool read_str(std::ifstream& f, std::string& s){
+    uint32_t len = 0;
+    if (!f.read((char*)&len, 4)) return false;
+    s.resize(len);
+    return (bool)f.read(s.data(), len);
+}
+
+bool obj_cache_load(const std::string& obj_path, ObjData& out){
+    namespace fs = std::filesystem;
+    std::string cp = cache_path(obj_path);
+    if (!fs::exists(cp) || !fs::exists(obj_path)) return false;
+
+    // stale check: cache mtime must be newer than source
+    auto src_mtime = fs::last_write_time(obj_path).time_since_epoch().count();
+    std::ifstream f(cp, std::ios::binary);
+    if (!f.is_open()) return false;
+
+    uint64_t cached_mtime = 0;
+    f.read((char*)&cached_mtime, 8);
+    if (cached_mtime != (uint64_t)src_mtime) return false;
+
+    // vertices
+    uint32_t vcount = 0;
+    f.read((char*)&vcount, 4);
+    out.vertices.resize(vcount);
+    f.read((char*)out.vertices.data(), vcount * sizeof(float));
+
+    // materials
+    uint32_t mcount = 0;
+    f.read((char*)&mcount, 4);
+    out.materials.resize(mcount);
+    for (auto& m : out.materials){
+        if (!read_str(f, m.name)) return false;
+        f.read((char*)&m.kd.r, 4);
+        f.read((char*)&m.kd.g, 4);
+        f.read((char*)&m.kd.b, 4);
+        if (!read_str(f, m.tex_path)) return false;
+    }
+
+    // parts
+    uint32_t pcount = 0;
+    f.read((char*)&pcount, 4);
+    out.parts.resize(pcount);
+    for (auto& p : out.parts){
+        if (!read_str(f, p.part_name)) return false;
+        f.read((char*)&p.pivot_offset.x, 4);
+        f.read((char*)&p.pivot_offset.y, 4);
+        f.read((char*)&p.pivot_offset.z, 4);
+        uint32_t gcount = 0;
+        f.read((char*)&gcount, 4);
+        p.groups.resize(gcount);
+        for (auto& g : p.groups){
+            if (!read_str(f, g.mat_name)) return false;
+            f.read((char*)&g.vertex_start, 4);
+            f.read((char*)&g.vertex_count, 4);
+        }
+    }
+
+    // flat groups
+    uint32_t fgcount = 0;
+    f.read((char*)&fgcount, 4);
+    out.groups.resize(fgcount);
+    for (auto& g : out.groups){
+        if (!read_str(f, g.mat_name)) return false;
+        f.read((char*)&g.vertex_start, 4);
+        f.read((char*)&g.vertex_count, 4);
+    }
+
+    if (!f) return false;
+    std::cout << "[obj] cache hit: " << obj_path << "\n";
+    return true;
+}
+
+void obj_cache_save(const std::string& obj_path, const ObjData& out){
+    namespace fs = std::filesystem;
+    std::string cp = cache_path(obj_path);
+    std::ofstream f(cp, std::ios::binary);
+    if (!f.is_open()){
+        std::cerr << "[obj] cannot write cache: " << cp << "\n";
+        return;
+    }
+
+    uint64_t mtime = (uint64_t)fs::last_write_time(obj_path).time_since_epoch().count();
+    f.write((char*)&mtime, 8);
+
+    uint32_t vcount = (uint32_t)out.vertices.size();
+    f.write((char*)&vcount, 4);
+    f.write((char*)out.vertices.data(), vcount * sizeof(float));
+
+    uint32_t mcount = (uint32_t)out.materials.size();
+    f.write((char*)&mcount, 4);
+    for (const auto& m : out.materials){
+        write_str(f, m.name);
+        f.write((char*)&m.kd.r, 4);
+        f.write((char*)&m.kd.g, 4);
+        f.write((char*)&m.kd.b, 4);
+        write_str(f, m.tex_path);
+    }
+
+    uint32_t pcount = (uint32_t)out.parts.size();
+    f.write((char*)&pcount, 4);
+    for (const auto& p : out.parts){
+        write_str(f, p.part_name);
+        f.write((char*)&p.pivot_offset.x, 4);
+        f.write((char*)&p.pivot_offset.y, 4);
+        f.write((char*)&p.pivot_offset.z, 4);
+        uint32_t gcount = (uint32_t)p.groups.size();
+        f.write((char*)&gcount, 4);
+        for (const auto& g : p.groups){
+            write_str(f, g.mat_name);
+            f.write((char*)&g.vertex_start, 4);
+            f.write((char*)&g.vertex_count, 4);
+        }
+    }
+
+    uint32_t fgcount = (uint32_t)out.groups.size();
+    f.write((char*)&fgcount, 4);
+    for (const auto& g : out.groups){
+        write_str(f, g.mat_name);
+        f.write((char*)&g.vertex_start, 4);
+        f.write((char*)&g.vertex_count, 4);
+    }
+    std::cout << "[obj] cache saved: " << cp << "\n";
+}
+
 bool obj_load(const std::string& obj_path, ObjData& out){
+    if (obj_cache_load(obj_path, out)) return true;
     std::ifstream f(obj_path);
     if (!f.is_open()){ std::cerr << "[obj] cannot open: " << obj_path << "\n";
         return false;
@@ -217,7 +364,7 @@ bool obj_load(const std::string& obj_path, ObjData& out){
 
         out.parts.push_back(std::move(part));
     }
-
+    obj_cache_save(obj_path, out);
     std::cout << "[obj] loaded " << obj_path << "\n";
     std::cout << "[obj] " << positions.size() << " positions, "
               << out.vertices.size() / 8 / 3 << " triangles, "

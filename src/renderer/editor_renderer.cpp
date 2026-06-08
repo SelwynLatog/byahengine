@@ -17,6 +17,8 @@
 #include <map>
 #include "../../vendor/stb/stb_image.h"
 #include <iostream>
+#include <fstream>
+#include <filesystem>
 
 // lit shader - pos + normal layout
 // mirrors scene.cpp VERT_SRC/ FRAG_SRC
@@ -147,18 +149,59 @@ static void set_mat4(const Shader& s, const char* n, const glm::mat4& m){
 
 // loads a texture from disk into GL, caches by path
 // returns 0 on failure
+// cache format: [uint64 mtime][int32 w][int32 h][w*h*4 bytes RGBA]
+static bool tex_cache_load(const std::string& path, int& w, int& h, std::vector<unsigned char>& px){
+    namespace fs = std::filesystem;
+    std::string cp = path + ".texcache";
+    if (!fs::exists(cp) || !fs::exists(path)) return false;
+    uint64_t src_mtime = (uint64_t)fs::last_write_time(path).time_since_epoch().count();
+    std::ifstream f(cp, std::ios::binary);
+    if (!f.is_open()) return false;
+    uint64_t cached_mtime = 0;
+    f.read((char*)&cached_mtime, 8);
+    if (cached_mtime != src_mtime) return false;
+    f.read((char*)&w, 4);
+    f.read((char*)&h, 4);
+    px.resize(w * h * 4);
+    f.read((char*)px.data(), px.size());
+    return (bool)f;
+}
+
+static void tex_cache_save(const std::string& path, int w, int h, const unsigned char* px){
+    namespace fs = std::filesystem;
+    std::string cp = path + ".texcache";
+    std::ofstream f(cp, std::ios::binary);
+    if (!f.is_open()) return;
+    uint64_t mtime = (uint64_t)fs::last_write_time(path).time_since_epoch().count();
+    f.write((char*)&mtime, 8);
+    f.write((char*)&w, 4);
+    f.write((char*)&h, 4);
+    f.write((char*)px, w * h * 4);
+}
+
 static GLuint load_texture(EditorRenderer& er, const std::string& path){
     if (path.empty()) return 0;
     auto it = er.tex_cache.find(path);
     if (it != er.tex_cache.end()) return it->second;
 
-    stbi_set_flip_vertically_on_load(1); // OpenGL UVs are bottom-up
-    int w, h, ch;
-    unsigned char* px = stbi_load(path.c_str(), &w, &h, &ch, 4);
-    if (!px){
-        std::cerr << "[tex] failed to load: " << path << "\n";
-        er.tex_cache[path] = 0;
-        return 0;
+    int w = 0, h = 0;
+    std::vector<unsigned char> px_buf;
+    unsigned char* px = nullptr;
+    bool from_cache = tex_cache_load(path, w, h, px_buf);
+
+    if (from_cache){
+        px = px_buf.data();
+    }
+    else {
+        stbi_set_flip_vertically_on_load(1);
+        int ch;
+        px = stbi_load(path.c_str(), &w, &h, &ch, 4);
+        if (!px){
+            std::cerr << "[tex] failed to load: " << path << "\n";
+            er.tex_cache[path] = 0;
+            return 0;
+        }
+        tex_cache_save(path, w, h, px);
     }
 
     GLuint id;
@@ -166,16 +209,15 @@ static GLuint load_texture(EditorRenderer& er, const std::string& path){
     glBindTexture(GL_TEXTURE_2D, id);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
     glGenerateMipmap(GL_TEXTURE_2D);
-    // nearest filtering = PS1 look
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    stbi_image_free(px);
+    if (!from_cache) stbi_image_free(px);
     er.tex_cache[path] = id;
-    std::cout << "[tex] loaded " << w << "x" << h << " " << path << "\n";
+    std::cout << "[tex] " << (from_cache ? "cache hit" : "loaded") << " " << w << "x" << h << " " << path << "\n";
     return id;
 }
 

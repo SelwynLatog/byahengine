@@ -38,6 +38,9 @@ struct ObjData {
 };
 
 bool obj_load(const std::string& obj_path, ObjData& out);
+// returns false if cache is missing or stale (caller should re-parse and write)
+bool obj_cache_load(const std::string& obj_path, ObjData& out);
+void obj_cache_save(const std::string& obj_path, const ObjData& out);
 const ObjMaterial* obj_find_material(const ObjData& data, const std::string& name);
 
 // find a part by name
