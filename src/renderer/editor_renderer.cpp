@@ -1041,12 +1041,12 @@ void editor_renderer_shadow_pass(EditorRenderer& er, const WorldMap& map,
     glUniformMatrix4fv(er.depth_loc.light_space, 1, GL_FALSE, glm::value_ptr(light_space_mat));
     for (auto& o : map.objects){
         if (o.model_path.empty()) continue;
+        if (o.behavior == PEDESTRIAN) continue; // drawn separately as NPC with live position
 
         // shadow cull
         glm::vec3 diff = o.position - er.shadow_cull_center;
         static constexpr float SHADOW_CULL_SQ = 180.0f * 180.0f;
         if (glm::dot(diff, diff) > SHADOW_CULL_SQ) continue;
-
         ObjMesh& mesh = get_prop_mesh(er, o.model_path);
         if (mesh.data.vertices.empty()) continue;
 
