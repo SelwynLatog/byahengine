@@ -55,6 +55,12 @@ struct AudioSystem {
     float step_interval = 0.55f; // seconds between steps at walk speed
 
     bool initialized = false;
+
+    // impact spam prevention
+    // cull max audio to prevent multi layered audio triggers 
+    // especially on grouped objects
+    float impact_cooldown = 0.0f;
+    static constexpr float IMPACT_COOLDOWN_INTERVAL = 0.18f; // seconds
 };
 
 // lifecycle

@@ -173,6 +173,10 @@ void audio_update(AudioSystem& audio, float dt,
         audio_radio_next(audio);
     }
 
+    // tick impact cooldown
+    if (audio.impact_cooldown > 0.0f)
+        audio.impact_cooldown -= dt;
+
     // clean up finished one-shots
     for (int i = 0; i < AUDIO_IMPACT_VOICES; i++){
         auto& v = audio.impact_pool[i];
@@ -196,10 +200,11 @@ void audio_trigger_impact(AudioSystem& audio,
     const std::string& path, const glm::vec3& pos, float force)
 {
     if (!audio.initialized || path.empty()) return;
-    // scale volume by force, clamp to sane range
-    float vol = glm::clamp(0.6f + force * 0.1f, 0.5f, 1.0f);
+    if (audio.impact_cooldown > 0.0f) return;
+    float vol = glm::clamp(0.4f + force * 0.08f, 0.3f, 1.0f);
     play_oneshot(audio.engine, audio.impact_pool, AUDIO_IMPACT_VOICES,
         audio.impact_head, path, pos, vol);
+    audio.impact_cooldown = AudioSystem::IMPACT_COOLDOWN_INTERVAL;
 }
 
 void audio_trigger_voice(AudioSystem& audio,
