@@ -299,7 +299,7 @@ void app_run(App& app){
         // tab toggle
         // switch from editor/ drive mode
         bool tab_down = glfwGetKey(app.window.handle, GLFW_KEY_TAB) == GLFW_PRESS;
-        if (tab_down && !s_tab_pressed_last){
+        if (tab_down && !s_tab_pressed_last && app.editor.mode != MODE_AUDIO){
             app.editor.active = !app.editor.active;
             if (app.editor.active){
                 // entering editor

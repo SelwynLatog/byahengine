@@ -963,7 +963,9 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
 
     // 5. prop palette HUD
     // shows current page of props and highlights selected model
-    {
+    // audio mode has an audio list, unnecessary & messy to draw prop list here
+    // makes audio mode worklflow much cleaner and hud not messy
+    if (editor.mode != MODE_AUDIO){
         const int PAGE_SIZE = Const::EDITOR_PAGE_SIZE;
         int total = (int)editor.prop_list.size();
         int x = 16;

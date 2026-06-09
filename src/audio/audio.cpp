@@ -93,8 +93,11 @@ bool audio_init(AudioSystem& audio, const char* assets_dir){
 
     // ambient loop
     std::string amb = adir + "/audio/ambience/ambient_loop.wav";
-    audio.ambient = alloc_sound(audio.engine, amb, true, false, 0.5f);
+    audio.ambient = alloc_sound(audio.engine, amb, true, false, 1.0f);
     if (audio.ambient) ma_sound_start(audio.ambient);
+
+
+    ma_engine_set_volume(audio.engine, 3.0f);
 
     scan_radio(audio, adir);
 
@@ -194,7 +197,7 @@ void audio_trigger_impact(AudioSystem& audio,
 {
     if (!audio.initialized || path.empty()) return;
     // scale volume by force, clamp to sane range
-    float vol = glm::clamp(0.4f + force * 0.08f, 0.3f, 1.0f);
+    float vol = glm::clamp(0.6f + force * 0.1f, 0.5f, 1.0f);
     play_oneshot(audio.engine, audio.impact_pool, AUDIO_IMPACT_VOICES,
         audio.impact_head, path, pos, vol);
 }
