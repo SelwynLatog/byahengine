@@ -47,6 +47,7 @@ void hud_draw(const Hud& h, const TrikeState& trike, bool has_passenger, float f
     const int TOP= 20;  // top margin px
     const int LINE_H= 20;  // px between lines
 
+    /*
     // fps counter
     static float frame_times[60] = {};
     static int ft_idx = 0;
@@ -61,7 +62,8 @@ void hud_draw(const Hud& h, const TrikeState& trike, bool has_passenger, float f
     float fps = avg_dt > 0.0f ? 1.0f / avg_dt : 0.0f;
     font_draw(h.font, std::string("FPS ") + std::to_string((int)fps),
         Const::WINDOW_WIDTH - 120, 20, SCALE, 0.4f, 1.0f, 0.4f);
-
+    */
+    
     // speed in km/h
     float kmh = trike.speed * 3.6f;
 
@@ -106,13 +108,13 @@ void hud_draw(const Hud& h, const TrikeState& trike, bool has_passenger, float f
 
     draw_line(fmt("HEADING %s  (%.0f deg)",
                   heading_to_compass(trike.heading), hdg_deg), 1.0f, 1.0f, 1.0f);
-    draw_line(fmt("STEER %s", steer_str.c_str()), 1.0f, 1.0f, 1.0f);
-    draw_line(fmt("STATE %s", state_str), sr, sg, sb);
-    
+    //draw_line(fmt("STEER %s", steer_str.c_str()), 1.0f, 1.0f, 1.0f);
+    //draw_line(fmt("STATE %s", state_str), sr, sg, sb);
+    /*
     if (trike.impact_timer > 0.0f){
         float fade = glm::clamp(trike.impact_timer / 0.35f, 0.0f, 1.0f);
         draw_line(fmt("IMPACT %.f N", trike.last_impact_force * Const::TRIKE_MASS), 1.0f, 0.2f * fade, 0.2f * fade);
-    }
+    }*/
 
     if (has_passenger){
         draw_line(fmt("PASSENGER  FARE: P%.2f", Const::FARE_BASE + fare), 1.0f, 0.9f, 0.2f);
@@ -141,6 +143,6 @@ void hud_draw_direction_arrow(const Hud& h, float dot, float cross_y, float dist
 
     int cx = Const::WINDOW_WIDTH / 2 - 80;
     int cy = Const::WINDOW_HEIGHT / 2 - 60;
-    font_draw(h.font, fmt("%s  %.0fm", arrow.c_str(), dist),
-        cx, cy, 2, 1.0f, 0.85f, 0.2f);
+    /*font_draw(h.font, fmt("%s  %.0fm", arrow.c_str(), dist),
+        cx, cy, 2, 1.0f, 0.85f, 0.2f);*/
 }

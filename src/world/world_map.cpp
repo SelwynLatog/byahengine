@@ -80,6 +80,38 @@ void world_map_save(const WorldMap& map, const std::string& path){
     std::string ocean_path = (base.parent_path() / (base.stem().string() + "_ocean.oc")).string();
     ocean_save(map.ocean, ocean_path);
 
+    // save audio assignments to sibling file
+    std::string audio_path = (base.parent_path() / (base.stem().string() + "_audio.au")).string();
+    {
+        std::ofstream af(audio_path);
+        for (const auto& o : map.objects){
+            // only write objects that have at least one audio field set
+            bool has_audio = !o.audio_impact.empty()
+                || !o.audio_proximity.empty()
+                || !o.audio_hail.empty()
+                || !o.audio_pickup.empty()
+                || !o.audio_yap.empty()
+                || !o.audio_dropoff_good.empty()
+                || !o.audio_dropoff_bad.empty()
+                || !o.audio_crash_mild.empty()
+                || !o.audio_crash_heavy.empty()
+                || !o.audio_crash_rollover.empty();
+            if (!has_audio) continue;
+            af << o.id << " "
+               << "\"" << o.audio_impact << "\" "
+               << "\"" << o.audio_proximity << "\" "
+               << o.audio_radius << " "
+               << "\"" << o.audio_hail << "\" "
+               << "\"" << o.audio_pickup << "\" "
+               << "\"" << o.audio_yap << "\" "
+               << "\"" << o.audio_dropoff_good << "\" "
+               << "\"" << o.audio_dropoff_bad << "\" "
+               << "\"" << o.audio_crash_mild << "\" "
+               << "\"" << o.audio_crash_heavy << "\" "
+               << "\"" << o.audio_crash_rollover << "\"\n";
+        }
+    }
+
     // save per-NPC poses to sibling file
     std::string poses_path = (base.parent_path() / (base.stem().string() + "_npc_poses.np")).string();
     {
@@ -185,6 +217,41 @@ bool world_map_load(WorldMap& map, const std::string& path){
             }
         }
         std::cout << "world_map loaded npc poses from " << poses_path << "\n";
+    }
+
+    // load audio assignments
+    std::string audio_path = (base.parent_path() / (base.stem().string() + "_audio.au")).string();
+    if (std::filesystem::exists(audio_path)){
+        std::ifstream af(audio_path);
+        std::string aline;
+        while (std::getline(af, aline)){
+            if (aline.empty()) continue;
+            std::istringstream as(aline);
+            int id; as >> id;
+            for (auto& o : map.objects){
+                if (o.id != id) continue;
+                // quoted strings handle empty fields cleanly
+                auto read_quoted = [&](std::string& out){
+                    char c; std::string tmp;
+                    while (as.get(c) && c != '"');
+                    while (as.get(c) && c != '"') tmp += c;
+                    out = tmp;
+                };
+                read_quoted(o.audio_impact);
+                read_quoted(o.audio_proximity);
+                as >> o.audio_radius;
+                read_quoted(o.audio_hail);
+                read_quoted(o.audio_pickup);
+                read_quoted(o.audio_yap);
+                read_quoted(o.audio_dropoff_good);
+                read_quoted(o.audio_dropoff_bad);
+                read_quoted(o.audio_crash_mild);
+                read_quoted(o.audio_crash_heavy);
+                read_quoted(o.audio_crash_rollover);
+                break;
+            }
+        }
+        std::cout << "world_map loaded audio from " << audio_path << "\n";
     }
 
     map.lights.clear();

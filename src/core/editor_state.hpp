@@ -21,7 +21,8 @@ enum EditorMode{
     MODE_ROAD, // place/edit road spline control points
     MODE_OCEAN, // place/resize ocean zones
     MODE_LIGHT, // place light source, adjust intensity
-    MODE_POSE
+    MODE_POSE,
+    MODE_AUDIO
 };
 
 // editor mode state lives in App
@@ -98,5 +99,12 @@ struct EditorState{
     bool pose_numpad_translate = false;
     int pose_npc_id = -1; // -1 = driver, else npc world object id
     bool pose_editing_hail = false; // true = editing hail pose, false = mount
+
+
+    // audio editor
+    // active when MODE_AUDIO, requires selected_id != -1
+    int audio_slot = 0; // which slot is being edited, maps to AudioSlot enum
+    int audio_file_page = 0; // scroll offset in audio file list
+    std::vector<std::string> audio_file_list; // scanned from assets/audio/
 
 };

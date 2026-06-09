@@ -753,6 +753,104 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
         }
     }
 
+    if (editor.mode == MODE_AUDIO){
+        static const char* SLOT_NAMES[] = {
+            "impact", "proximity",
+            "hail", "pickup", "yap",
+            "dropoff_good", "dropoff_bad",
+            "crash_mild", "crash_heavy", "crash_rollover"
+        };
+        static constexpr int AUDIO_SLOT_COUNT = 10;
+        static constexpr int AUDIO_PAGE_SIZE  = 8;
+
+        font_draw(er.font, "[ AUDIO MODE ]", 180, 16, 3, 0.80f, 0.40f, 1.00f);
+        font_draw(er.font, "TAB=cycle slot  1-8=assign file  UP/DN=scroll  DEL=clear  Z=exit",
+            220, 40, 2, 0.80f, 0.40f, 1.00f);
+
+        // find selected object
+        const WorldObject* target = nullptr;
+        for (const auto& o : map.objects)
+            if (o.id == editor.selected_id){ target = &o; break; }
+
+        if (target){
+            // slot list on the left
+            int x = 16, y = 60;
+            font_draw(er.font, "SLOTS", x, y, 2, 0.9f, 0.9f, 0.9f);
+            y += 28;
+
+            auto get_slot_val = [&](const WorldObject& o, int slot) -> const std::string& {
+                switch(slot){
+                    case 0: return o.audio_impact;
+                    case 1: return o.audio_proximity;
+                    case 2: return o.audio_hail;
+                    case 3: return o.audio_pickup;
+                    case 4: return o.audio_yap;
+                    case 5: return o.audio_dropoff_good;
+                    case 6: return o.audio_dropoff_bad;
+                    case 7: return o.audio_crash_mild;
+                    case 8: return o.audio_crash_heavy;
+                    case 9: return o.audio_crash_rollover;
+                    default: return o.audio_impact;
+                }
+            };
+
+            for (int i = 0; i < AUDIO_SLOT_COUNT; i++){
+                bool active = (i == editor.audio_slot);
+                const std::string& val = get_slot_val(*target, i);
+                std::string label = std::string(active ? "> " : "  ")
+                    + SLOT_NAMES[i] + ": "
+                    + (val.empty() ? "(none)" : val.substr(val.find_last_of('/') + 1));
+                if (label.size() > 36) label = label.substr(0, 34) + "..";
+                float r = active ? 0.0f : 0.55f;
+                float g = active ? 1.0f : 0.55f;
+                float b = active ? 0.8f : 0.55f;
+                font_draw(er.font, label, x, y, active ? 2 : 1, r, g, b);
+                y += active ? 22 : 18;
+            }
+
+            // file list on the right
+            x = 340; y = 60;
+            font_draw(er.font, "FILES", x, y, 2, 0.9f, 0.9f, 0.9f);
+            y += 28;
+
+            int total = (int)editor.audio_file_list.size();
+            if (total == 0){
+                font_draw(er.font, "no .wav/.ogg in assets/audio/", x, y, 1, 0.5f, 0.5f, 0.5f);
+            }
+            else {
+                int end = std::min(editor.audio_file_page + AUDIO_PAGE_SIZE, total);
+                for (int i = editor.audio_file_page; i < end; i++){
+                    int slot_key = i - editor.audio_file_page + 1;
+                    std::string name = editor.audio_file_list[i];
+                    // trim to filename only for display
+                    name = name.substr(name.find_last_of('/') + 1);
+                    if (name.size() > 28) name = name.substr(0, 26) + "..";
+                    std::string line = std::to_string(slot_key) + " " + name;
+                    font_draw(er.font, line, x, y, 1, 0.75f, 0.75f, 0.75f);
+                    y += 18;
+                }
+                // scroll indicator
+                char pg[32];
+                snprintf(pg, sizeof(pg), "[%d-%d / %d]  UP/DN scroll",
+                    editor.audio_file_page + 1,
+                    std::min(editor.audio_file_page + AUDIO_PAGE_SIZE, total),
+                    total);
+                font_draw(er.font, pg, x, y + 4, 1, 0.4f, 0.4f, 0.4f);
+            }
+
+            // radius display if proximity slot is active
+            if (editor.audio_slot == 1){
+                char buf[64];
+                snprintf(buf, sizeof(buf), "RADIUS: %.1fm  ([/] to adjust)",
+                    target->audio_radius);
+                font_draw(er.font, buf, 16, Const::WINDOW_HEIGHT - 100, 2, 0.80f, 0.40f, 1.00f);
+            }
+        }
+        else {
+            font_draw(er.font, "no object selected", 220, 60, 2, 0.5f, 0.5f, 0.5f);
+        }
+    }
+
 
     if (editor.mode == MODE_POSE){
         static const char* bone_names[6] = {

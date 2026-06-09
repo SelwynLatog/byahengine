@@ -62,4 +62,23 @@ struct WorldObject{
     };
     glm::vec3 npc_mount_offset[6] = {};
     glm::vec3 npc_mount_seat = glm::vec3(0.0f);
+
+     // AUDIO
+    // impact: one-shot on collision/ragdoll hit, all behavior types
+    std::string audio_impact = "";
+
+    // proximity: looping ambient, triggers within audio_radius
+    std::string audio_proximity = "";
+    float audio_radius = 10.0f;
+
+    // NPC only voice slots
+    // triggered by game state transitions in app.cpp
+    std::string audio_hail = ""; // NPC_HAILING start
+    std::string audio_pickup = ""; // NPC_PASSENGER start
+    std::string audio_yap = ""; // loop while riding, walking, idle
+    std::string audio_dropoff_good = ""; // normal dropoff
+    std::string audio_dropoff_bad = ""; // complain
+    std::string audio_crash_mild = ""; // impact_force low while passenger
+    std::string audio_crash_heavy = ""; // impact_force high while passenger
+    std::string audio_crash_rollover= ""; // is_rolled_over while passenger
 };

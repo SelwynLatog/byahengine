@@ -32,6 +32,7 @@ add_executable(tricycle-sim
     src/world/ocean.cpp
     src/world/npc.cpp
     src/world/animal_anim.cpp
+    src/audio/audio.cpp
     vendor/glad/src/glad.c
     src/stb_impl.cpp
 )
@@ -42,6 +43,7 @@ target_include_directories(tricycle-sim PRIVATE
     vendor/glfw/include
     vendor/glm
     vendor/stb
+    vendor/miniaudio
 )
 
 target_link_libraries(tricycle-sim PRIVATE

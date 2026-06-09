@@ -17,7 +17,7 @@ namespace Const{
     // day cycle
     // 10 real minutes = 1 full in-game day
     inline constexpr float DAY_DURATION_SECONDS = 6000.0f;
-    inline constexpr float DAY_START_TIME = 7.0f; // start at 7am
+    inline constexpr float DAY_START_TIME = 15.0f; // start at 7am
 
     // time ranges (0-24)
     inline constexpr float DAY_MORNING_START = 5.0f;
@@ -319,5 +319,6 @@ namespace Const{
     // fare system
     inline constexpr float FARE_RATE_PER_METRE = 0.00001f; // pesos per metre
     inline constexpr float FARE_BASE = 10.0f; // base fare on pickup
+    inline constexpr float DROPOFF_SLOW_THRESHOLD = 120.0f; // seconds, 2 minutes
 
 }

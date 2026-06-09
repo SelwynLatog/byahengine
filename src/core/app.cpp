@@ -260,6 +260,7 @@ void app_init(App& app){
 
 
     hud_init(app.hud, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
+    audio_init(app.audio, "../assets");
 
     // seed cam to actual player spawn so first-frame lerp has no jump
     {
@@ -678,6 +679,12 @@ void app_run(App& app){
                 app.trike.last_impact_force = closing;
                 app.trike.impact_timer = (closing > 2.0f) ? 0.35f : 0.0f;
                 obs.hit_timer = 0.35f;
+                // find world object for this obstacle to get its audio_impact path
+                auto wit = app.wo_by_id.find(obs.world_id);
+                if (wit != app.wo_by_id.end() && !wit->second->audio_impact.empty())
+                    audio_trigger_impact(app.audio,
+                        "../assets/" + wit->second->audio_impact,
+                        obs.position, closing);
 
                 if (spd_along < 0.0f)
                     app.trike.speed += (-spd_along) * (1.0f + Const::RESTITUTION) * spd_dot;
@@ -947,11 +954,11 @@ void app_run(App& app){
                 // accumulate fare distance
                 app.passenger_fare += std::abs(app.trike.speed) * dt
                     * Const::FARE_RATE_PER_METRE;
+                app.passenger_time += dt; 
                 // check arrival at drop point
                 glm::vec3 to_drop = npc.drop_point - app.trike.position;
                 to_drop.y = 0.0f;
                 if (glm::dot(to_drop, to_drop) < 4.0f){
-                    // arrived -> dropoff: push npc to trike side so it doesn't get hit
                     float side_angle = app.trike.heading + glm::half_pi<float>();
                     npc.position = app.trike.position
                         + glm::vec3(std::cos(side_angle), 0.0f, std::sin(side_angle)) * 1.8f;
@@ -960,7 +967,19 @@ void app_run(App& app){
                     npc.mode = NPC_IDLE;
                     app.passenger_npc_id = -1;
                     std::cout << "[npc] dropoff fare=" << app.passenger_fare << "\n";
+                    // pick voice based on ride time
+                    for (const auto& o : app.map.objects){
+                        if (o.id != npc.id) continue;
+                        bool slow = (app.passenger_time > Const::DROPOFF_SLOW_THRESHOLD);
+                        const std::string& vpath = slow
+                            ? o.audio_dropoff_bad : o.audio_dropoff_good;
+                        if (!vpath.empty())
+                            audio_trigger_voice(app.audio,
+                                "../assets/" + vpath, npc.position);
+                        break;
+                    }
                     app.passenger_fare = 0.0f;
+                    app.passenger_time = 0.0f;
                 }
                 continue;
             }
@@ -981,6 +1000,13 @@ void app_run(App& app){
                 if (glm::dot(d, d) < NPC_HAIL_RANGE_SQ && npc.hail_timer <= 0.0f){
                     npc.mode = NPC_HAILING;
                     std::cout << "[npc] id=" << npc.id << " hailing\n";
+                    for (const auto& o : app.map.objects){
+                        if (o.id != npc.id) continue;
+                        if (!o.audio_hail.empty())
+                            audio_trigger_voice(app.audio,
+                                "../assets/" + o.audio_hail, npc.position);
+                        break;
+                    }
                 }
             }
 
@@ -1002,7 +1028,15 @@ void app_run(App& app){
                 {
                     npc.mode = NPC_PASSENGER;
                     app.passenger_npc_id = npc.id;
+                    app.passenger_time = 0.0f;
                     std::cout << "[npc] id=" << npc.id << " picked up\n";
+                    for (const auto& o : app.map.objects){
+                        if (o.id != npc.id) continue;
+                        if (!o.audio_pickup.empty())
+                            audio_trigger_voice(app.audio,
+                                "../assets/" + o.audio_pickup, npc.position);
+                        break;
+                    }
                 }
             }
 
@@ -1026,6 +1060,15 @@ void app_run(App& app){
                         if (closing > 1.0f){
                             app.trike.last_impact_force = closing;
                             app.trike.impact_timer = glm::clamp(closing * 0.08f, 0.15f, 0.35f);
+                            // find world object for npc audio_impact
+                            for (const auto& o : app.map.objects){
+                                if (o.id != npc.id) continue;
+                                if (!o.audio_impact.empty())
+                                    audio_trigger_impact(app.audio,
+                                        "../assets/" + o.audio_impact,
+                                        npc.position, closing);
+                                break;
+                            }
                         }
                     }
                 }
@@ -1115,7 +1158,17 @@ void app_run(App& app){
         }
 
 
-
+        // audio update
+        {
+            glm::vec3 lis_pos = (app.player.mode == PLAYER_FOOT)
+                ? app.player.pos : app.trike.position;
+            glm::vec3 lis_fwd = glm::vec3(
+                std::cos(app.trike.heading), 0.0f, std::sin(app.trike.heading));
+            bool driving = (app.player.mode == PLAYER_DRIVING
+                         || app.player.mode == PLAYER_MOUNTING);
+            audio_update(app.audio, dt, lis_pos, lis_fwd,
+                app.trike.speed, Const::TRIKE_MAX_SPEED, driving);
+        }
 
         // render
         glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);
@@ -1239,6 +1292,7 @@ void app_run(App& app){
 }
 
 void app_shutdown(App& app){
+    audio_shutdown(app.audio);
     hud_destroy(app.hud);
     scene_destroy(app.scene);
     window_destroy(app.window);

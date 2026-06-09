@@ -14,6 +14,7 @@
 #include "../physics/dynamic_sim.hpp"
 #include "player_state.hpp"
 #include "../world/npc.hpp"
+#include "../audio/audio.hpp"
 
 
 struct App {
@@ -45,6 +46,9 @@ struct App {
     // keyed by filename eg. "female_1.obj"
     // loaded once on init_npcs, reused across all npcs sharing the same model
     std::unordered_map<std::string, DriverModel> npc_model_cache;
+
+    AudioSystem audio;
+    float passenger_time = 0.0f; // accumulates while npc is passenger, drives slow dropoff
 };
 
 void app_init(App& app);
