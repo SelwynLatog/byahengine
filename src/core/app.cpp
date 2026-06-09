@@ -821,6 +821,10 @@ void app_run(App& app){
                         app.trike.last_impact_force = closing;
                         app.trike.impact_timer = glm::clamp(closing * 0.08f, 0.15f, 0.35f);
                     }
+                    if (!wo->audio_impact.empty())
+                        audio_trigger_impact(app.audio,
+                            "../assets/" + wo->audio_impact,
+                            sim.position, closing);
                 }
 
                 aabb_update(app.trike.aabb, app.trike.position, app.trike.heading);
