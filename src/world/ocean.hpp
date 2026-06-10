@@ -6,6 +6,7 @@
 struct Ocean {
     bool enabled = false;
     float y_level = -0.4f;
+    float time = 0.0f;
     Mesh mesh;
     bool mesh_dirty = true;
 };
