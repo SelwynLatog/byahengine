@@ -17,7 +17,7 @@ namespace Const{
     // day cycle
     // 10 real minutes = 1 full in-game day
     inline constexpr float DAY_DURATION_SECONDS = 6000.0f;
-    inline constexpr float DAY_START_TIME = 15.0f; // start at 7am
+    inline constexpr float DAY_START_TIME = 21.0f; // start at 7am
 
     // time ranges (0-24)
     inline constexpr float DAY_MORNING_START = 5.0f;
@@ -300,11 +300,11 @@ namespace Const{
 
     // ocean
     inline constexpr float OCEAN_Y_LEVEL = -0.4f; // world Y of water surface
-    inline constexpr float OCEAN_GRID_SPACING = 2.0f; // metres between wave verts
-    inline constexpr float OCEAN_WAVE_AMP = 0.22f; // metres, peak displacement
+    inline constexpr float OCEAN_GRID_SPACING = 0.35f; // metres between wave verts
+    inline constexpr float OCEAN_WAVE_AMP = 0.12f; // metres, peak displacement
     inline constexpr float OCEAN_WAVE_FREQ = 0.18f; // spatial frequency
     inline constexpr float OCEAN_WAVE_SPEED = 0.9f; // time multiplier
-    inline constexpr float OCEAN_WAVE_AMP2 = 0.12f; // second wave layer
+    inline constexpr float OCEAN_WAVE_AMP2 = 0.06f; // second wave layer
     inline constexpr float OCEAN_WAVE_FREQ2 = 0.27f; // second layer spatial freq
     inline constexpr float OCEAN_WAVE_SPEED2 = 1.3f; // second layer time mult
     inline constexpr float OCEAN_SHALLOW_DIST = 12.0f; // metres from shore edge for teal tint

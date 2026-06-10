@@ -60,7 +60,11 @@ struct EditorRenderer{
 
     // ocean wave shader + time accumulator
     Shader ocean_shader;
-    float ocean_time = 0.0f;
+     struct {
+        GLint view, proj, time, y_level;
+        GLint light_dir, cam_pos;
+        GLint light_color, ambient, diff_intensity;
+    } ocean_loc;
 
     // shadow map recevied from scene
     GLuint shadow_depth_tex = 0;

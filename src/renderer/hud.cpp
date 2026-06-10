@@ -47,7 +47,7 @@ void hud_draw(const Hud& h, const TrikeState& trike, bool has_passenger, float f
     const int TOP= 20;  // top margin px
     const int LINE_H= 20;  // px between lines
 
-    /*
+    
     // fps counter
     static float frame_times[60] = {};
     static int ft_idx = 0;
@@ -62,7 +62,7 @@ void hud_draw(const Hud& h, const TrikeState& trike, bool has_passenger, float f
     float fps = avg_dt > 0.0f ? 1.0f / avg_dt : 0.0f;
     font_draw(h.font, std::string("FPS ") + std::to_string((int)fps),
         Const::WINDOW_WIDTH - 120, 20, SCALE, 0.4f, 1.0f, 0.4f);
-    */
+    
     
     // speed in km/h
     float kmh = trike.speed * 3.6f;
