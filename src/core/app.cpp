@@ -371,6 +371,9 @@ void app_run(App& app){
             app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
             app.editor_renderer.light_space_mat = app.scene.light_space_mat;
             app.editor_renderer.night_factor = app.scene.night_factor;
+            app.editor_renderer.fog_color = app.scene.fog_color;
+            app.editor_renderer.fog_near  = app.scene.fog_near;
+            app.editor_renderer.fog_far   = app.scene.fog_far;
             app.editor_renderer.pose_npc_id = (app.editor.mode == MODE_POSE)  ? app.editor.pose_npc_id : -1;
 
 
@@ -1219,6 +1222,9 @@ void app_run(App& app){
         app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
         app.editor_renderer.light_space_mat = app.scene.light_space_mat;
         app.editor_renderer.night_factor = app.scene.night_factor;
+        app.editor_renderer.fog_color = app.scene.fog_color;
+        app.editor_renderer.fog_near = app.scene.fog_near;
+        app.editor_renderer.fog_far = app.scene.fog_far;
                 
         scene_draw_sky(app.scene, view, proj);
 

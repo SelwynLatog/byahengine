@@ -50,6 +50,10 @@ uniform float     u_ambient;
 uniform float     u_diff_intensity;
 uniform sampler2D u_shadow_map;
 uniform float     u_shadow_bias;
+uniform vec3      u_fog_color;
+uniform float     u_fog_near;
+uniform float     u_fog_far;
+uniform vec3      u_cam_pos_fog;
 
 #define MAX_LIGHTS 150
 uniform int   u_light_count;
@@ -98,7 +102,10 @@ void main(){
         lit += kd * u_light_color_pt[i] * ndotl * atten * u_light_intensity[i];
     }
 
-    frag_color = vec4(lit, 1.0);
+    float fog_dist = length(u_cam_pos_fog - v_world_pos);
+    float fog_t = clamp((fog_dist - u_fog_near) / (u_fog_far - u_fog_near), 0.0, 1.0);
+    fog_t = fog_t * fog_t;
+    frag_color = vec4(mix(lit, u_fog_color, fog_t), 1.0);
 }
 )";
 
@@ -417,6 +424,10 @@ void scene_init(SceneState& scene){
         L.kd_alt = glGetUniformLocation(id, "u_kd_alt");
         L.checker_scale = glGetUniformLocation(id, "u_checker_scale");
         L.use_checker = glGetUniformLocation(id, "u_use_checker");
+        L.fog_color = glGetUniformLocation(id, "u_fog_color");
+        L.fog_near = glGetUniformLocation(id, "u_fog_near");
+        L.fog_far = glGetUniformLocation(id, "u_fog_far");
+        L.fog_cam_pos = glGetUniformLocation(id, "u_cam_pos_fog");
     }
     {
         GLuint id = scene.gizmo_shader.id;
@@ -644,6 +655,41 @@ void scene_update_daytime(SceneState& scene, float dt){
         nf = 1.0f - glm::clamp((t - Const::DAY_MORNING_START) / Const::DAY_FADE_DURATION, 0.0f, 1.0f);
     scene.night_factor = nf;
 
+    // FOG DEFS HERE    
+    glm::vec3 fog_day = glm::vec3(0.68f, 0.78f, 0.90f); // pale blue sky haze
+    glm::vec3 fog_golden  = glm::vec3(0.95f, 0.45f, 0.10f); // deep warm orange
+    glm::vec3 fog_night = glm::vec3(0.04f, 0.05f, 0.10f); // deep night
+
+    // golden hour factor: peaks at DAY_AFTERNOON_START, fades by DAY_NIGHT_START
+    float golden_t = 0.0f;
+    if (t >= Const::DAY_AFTERNOON_START && t < Const::DAY_NIGHT_START) {
+        float span = Const::DAY_NIGHT_START - Const::DAY_AFTERNOON_START;
+        float mid  = Const::DAY_AFTERNOON_START + span * 0.5f;
+        golden_t = 1.0f - std::abs(t - mid) / (span * 0.5f);
+        golden_t = glm::clamp(golden_t, 0.0f, 1.0f);
+        golden_t = golden_t * golden_t; // ease in
+    }
+
+    float fog_blend = glm::clamp(scene.night_factor * 1.2f, 0.0f, 1.0f);
+    glm::vec3 fog_base = glm::mix(fog_day, fog_night, fog_blend);
+    fog_base = glm::mix(fog_base, fog_golden, golden_t * 0.85f);
+
+    scene.fog_color = fog_base * scene.light_color * 1.2f;
+    scene.fog_color = glm::clamp(scene.fog_color, glm::vec3(0.0f), glm::vec3(1.0f));
+
+    
+    float day_far_base = 520.0f;
+    float day_near_base = 180.0f;
+
+    float golden_pull_near = golden_t * 100.0f;
+    float golden_pull_far  = golden_t * 220.0f;
+
+    float night_pull_near = scene.night_factor * 160.0f;
+    float night_pull_far = scene.night_factor * 360.0f;
+
+    scene.fog_near = day_near_base - golden_pull_near - night_pull_near;
+    scene.fog_far  = day_far_base  - golden_pull_far  - night_pull_far;
+
     static float s_last_printed = -1.0f;
     if ((int)scene.day_time != (int)s_last_printed){
         std::cout << "[day] t=" << scene.day_time << " night_factor=" << nf << "\n";
@@ -713,11 +759,15 @@ void scene_draw(
     glUniform1f(L.ambient, scene.ambient);
     glUniform1f(L.diff_intensity, scene.diff_intensity);
     glUniform1f(L.shadow_bias, Const::SHADOW_BIAS);
+    glUniform3f(L.fog_color, scene.fog_color.r, scene.fog_color.g, scene.fog_color.b);
+    glUniform1f(L.fog_near, scene.fog_near);
+    glUniform1f(L.fog_far, scene.fog_far);
 
     // upload point lights 
     // cpu cull to camera distance
     glm::vec3 cam_pos = glm::vec3(glm::inverse(view)[3]);
     int active_lcount = 0;
+    glUniform3f(L.fog_cam_pos, cam_pos.x, cam_pos.y, cam_pos.z);
     if (scene.night_factor >= 0.01f){
         for (int i = 0; i < (int)lights.size() && active_lcount < Const::MAX_POINT_LIGHTS; i++){
             glm::vec3 d = lights[i].position - cam_pos;

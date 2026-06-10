@@ -16,8 +16,8 @@ namespace Const{
 
     // day cycle
     // 10 real minutes = 1 full in-game day
-    inline constexpr float DAY_DURATION_SECONDS = 6000.0f;
-    inline constexpr float DAY_START_TIME = 21.0f; // start at 7am
+    inline constexpr float DAY_DURATION_SECONDS = 600.0f;
+    inline constexpr float DAY_START_TIME = 15.0f; // start at 7am
 
     // time ranges (0-24)
     inline constexpr float DAY_MORNING_START = 5.0f;

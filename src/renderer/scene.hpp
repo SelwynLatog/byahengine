@@ -65,6 +65,7 @@ struct SceneState {
         GLint ambient, diff_intensity, shadow_bias;
         GLint shadow_map, kd, kd_alt;
         GLint checker_scale, use_checker;
+        GLint fog_color, fog_near, fog_far, fog_cam_pos;
     } shader_loc;
 
     struct {
@@ -90,6 +91,11 @@ struct SceneState {
     } light_loc;
 
     float night_factor = 1.0f;
+
+    glm::vec3 fog_color = glm::vec3(0.5f, 0.6f, 0.7f);
+    float fog_near = 60.0f;
+    float fog_far = 200.0f;
+    
     // persistent line batch for hitbox wireframes
     Mesh line_batch;
     std::vector<float> line_verts;

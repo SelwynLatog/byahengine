@@ -59,6 +59,10 @@ uniform sampler2D u_tex;
 uniform sampler2D u_shadow_map;
 uniform int       u_use_texture;
 uniform float     u_shadow_bias;
+uniform vec3  u_fog_color;
+uniform float u_fog_near;
+uniform float u_fog_far;
+uniform vec3  u_cam_pos_fog;
 uniform float     u_ambient;
 uniform float     u_diff_intensity;
 uniform vec3      u_light_color;
@@ -112,7 +116,10 @@ void main(){
         lit += tex_sample.rgb * u_light_color_pt[i] * ndotl * atten * u_light_intensity[i];
     }
 
-    frag_color = vec4(lit, 1.0);
+    float fog_dist = length(u_cam_pos_fog - v_world_pos);
+    float fog_t = clamp((fog_dist - u_fog_near) / (u_fog_far - u_fog_near), 0.0, 1.0);
+    fog_t = fog_t * fog_t;
+    frag_color = vec4(mix(lit, u_fog_color, fog_t), 1.0);
 }
 )";
 
@@ -298,6 +305,10 @@ uniform sampler2D u_tex;
 uniform sampler2D u_shadow_map;
 uniform int       u_use_texture;
 uniform float     u_shadow_bias;
+uniform vec3      u_fog_color;
+uniform float     u_fog_near;
+uniform float     u_fog_far;
+uniform vec3      u_cam_pos_fog;
 uniform float     u_ambient;
 uniform float     u_diff_intensity;
 uniform vec3      u_light_color;
@@ -343,7 +354,10 @@ void main(){
         lit += tex_col.rgb * u_light_color_pt[i] * ndotl * atten * u_light_intensity[i];
     }
 
-    frag_color = vec4(lit, 1.0);
+    float fog_dist = length(u_cam_pos_fog - v_world_pos);
+    float fog_t = clamp((fog_dist - u_fog_near) / (u_fog_far - u_fog_near), 0.0, 1.0);
+    fog_t = fog_t * fog_t;
+    frag_color = vec4(mix(lit, u_fog_color, fog_t), 1.0);
 }
 )";
 
@@ -626,6 +640,10 @@ void editor_renderer_init(EditorRenderer& er){
         L.tex = glGetUniformLocation(id, "u_tex");
         L.use_texture = glGetUniformLocation(id, "u_use_texture");
         L.kd = glGetUniformLocation(id, "u_kd");
+        L.fog_color = glGetUniformLocation(id, "u_fog_color");
+        L.fog_near = glGetUniformLocation(id, "u_fog_near");
+        L.fog_far = glGetUniformLocation(id, "u_fog_far");
+        L.fog_cam_pos = glGetUniformLocation(id, "u_cam_pos_fog");
     };
     auto cache_road = [&](){
         auto& L = er.road_loc;
@@ -644,6 +662,10 @@ void editor_renderer_init(EditorRenderer& er){
         L.tex = glGetUniformLocation(id, "u_tex");
         L.use_texture = glGetUniformLocation(id, "u_use_texture");
         L.kd = glGetUniformLocation(id, "u_kd");
+        L.fog_color = glGetUniformLocation(id, "u_fog_color");
+        L.fog_near = glGetUniformLocation(id, "u_fog_near");
+        L.fog_far = glGetUniformLocation(id, "u_fog_far");
+        L.fog_cam_pos = glGetUniformLocation(id, "u_cam_pos_fog");
     };
     cache_obj();
     cache_road();
@@ -1379,7 +1401,9 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glUniform3f(OL.light_dir, LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
     glUniformMatrix4fv(OL.light_space, 1, GL_FALSE, glm::value_ptr(er.light_space_mat));
-    glUniform1f(OL.shadow_bias, Const::SHADOW_BIAS);
+    glUniform3f(OL.fog_color, er.fog_color.r, er.fog_color.g, er.fog_color.b);
+    glUniform1f(OL.fog_near, er.fog_near);
+    glUniform1f(OL.fog_far, er.fog_far);
     glUniform1f(OL.ambient, er.ambient);
     glUniform1f(OL.diff_intensity, er.diff_intensity);
     glUniform3f(OL.light_color, er.light_color.r, er.light_color.g, er.light_color.b);
@@ -1391,6 +1415,7 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     // cpu cull: only upload lights within draw distance of camera
     glm::vec3 cam_pos = glm::vec3(glm::inverse(view)[3]);
     int active_lcount = 0;
+    glUniform3f(OL.fog_cam_pos, cam_pos.x, cam_pos.y, cam_pos.z);
     if (er.night_factor >= 0.01f){
         for (int i = 0; i < (int)lights.size() && active_lcount < Const::MAX_POINT_LIGHTS; i++){
             glm::vec3 d = lights[i].position - cam_pos;
@@ -1628,6 +1653,10 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
     GLuint rid = er.road_shader.id;
     glm::vec3 cam_pos_r = glm::vec3(glm::inverse(view)[3]);
     int active_lcount = 0;
+    glUniform3f(RL.fog_color, er.fog_color.r,  er.fog_color.g,  er.fog_color.b);
+    glUniform1f(RL.fog_near, er.fog_near);
+    glUniform1f(RL.fog_far, er.fog_far);
+    glUniform3f(RL.fog_cam_pos, cam_pos_r.x, cam_pos_r.y, cam_pos_r.z);
     char _buf[64];
     if (er.night_factor >= 0.01f){
         for (int i = 0; i < (int)er.last_lights.size() && active_lcount < Const::MAX_POINT_LIGHTS; i++){
@@ -1895,6 +1924,10 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
     GLuint rid = er.road_shader.id;
     glm::vec3 cam_pos_t = glm::vec3(glm::inverse(view)[3]);
     int active_lcount = 0;
+    glUniform3f(RL.fog_color, er.fog_color.r,  er.fog_color.g,  er.fog_color.b);
+    glUniform1f(RL.fog_near, er.fog_near);
+    glUniform1f(RL.fog_far, er.fog_far);
+    glUniform3f(RL.fog_cam_pos, cam_pos_t.x, cam_pos_t.y, cam_pos_t.z);
     char _buf[64];
     if (er.night_factor >= 0.01f){
         for (int i = 0; i < (int)er.last_lights.size() && active_lcount < Const::MAX_POINT_LIGHTS; i++){

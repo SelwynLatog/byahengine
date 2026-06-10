@@ -86,6 +86,7 @@ struct EditorRenderer{
         GLint light_dir, light_space, shadow_bias;
         GLint ambient, diff_intensity, light_color;
         GLint shadow_map, tex, use_texture, kd;
+        GLint fog_color, fog_near, fog_far, fog_cam_pos;
     } obj_loc;
 
     // road_shader (draw_roads + draw_terrain_surface)
@@ -94,6 +95,7 @@ struct EditorRenderer{
         GLint light_dir, light_space, shadow_bias;
         GLint ambient, diff_intensity, light_color;
         GLint shadow_map, tex, use_texture, kd;
+        GLint fog_color, fog_near, fog_far, fog_cam_pos;
     } road_loc;
 
     // depth_shader (shadow pass)
@@ -116,6 +118,9 @@ struct EditorRenderer{
 
     std::vector<LightSource> last_lights;
     float night_factor = 1.0f;
+    glm::vec3 fog_color = glm::vec3(0.5f, 0.6f, 0.7f);
+    float fog_near = 60.0f;
+    float fog_far  = 200.0f;
     int pose_npc_id = -1; // set during pose mode to suppress world render of that npc
 };
 
