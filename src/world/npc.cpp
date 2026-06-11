@@ -229,7 +229,9 @@ void npc_update(NpcState& npc, const HeightField& terrain, float dt,
         if (dist < NPC_ARRIVE_DIST) {
             npc.fare_distance = 0.0f;
             npc.mode = (glm::length(npc.walk_b - npc.walk_a) > 0.1f) ? NPC_WALK : NPC_IDLE;
-            npc.hail_timer = NPC_HAIL_TIMER_MIN; // reset hail cooldown
+            npc.walk_forward = true;
+            if (npc.hail_timer <= 0.0f)
+                npc.hail_timer = NPC_HAIL_TIMER_MIN;
         } 
         else {
             glm::vec3 dir = delta / dist;

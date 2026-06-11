@@ -89,6 +89,7 @@ struct NpcState {
     float spawn_yaw = 0.0f; // yaw at init time, used to compute facing offset
     
     float hail_wave_timer = 0.0f;
+    float yap_timer = 0.0f; // countdown until next idle ambient yapping
     float flee_timer = 0.0f; // countdown until animal resumes normal mode
     float idle_vary_timer = 0.0f; // countdown until next idle->walk transition
 

@@ -82,6 +82,10 @@ void audio_trigger_impact(AudioSystem& audio,
 void audio_trigger_voice(AudioSystem& audio,
     const std::string& path, const glm::vec3& pos);
 
+// non-spatial variant for passenger voices 
+// always full volume, no distance fade
+void audio_trigger_voice_local(AudioSystem& audio, const std::string& path);
+
 void audio_trigger_step(AudioSystem& audio,
     const std::string& path, float anim_timer_delta);
 

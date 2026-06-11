@@ -961,7 +961,38 @@ void app_run(App& app){
                 // accumulate fare distance
                 app.passenger_fare += std::abs(app.trike.speed) * dt
                     * Const::FARE_RATE_PER_METRE;
-                app.passenger_time += dt; 
+                app.passenger_time += dt;
+
+                // NPC VOICE TRIGGERS
+                // rollover takes priority, then heavy, then mild
+                // per-npc cooldown on npc.hail_wave_timer (reuse, it's idle during passenger)
+                bool fresh_crash = (app.trike.impact_timer > 0.28f);
+                bool genuinely_airborne = (app.trike.is_airborne && app.trike.air_time > 0.4f);
+                if ((fresh_crash || genuinely_airborne) && npc.hail_wave_timer <= 0.0f){
+                    for (const auto& o : app.map.objects){
+                        if (o.id != npc.id) continue;
+                        if ((app.trike.is_rolled_over || genuinely_airborne) && !o.audio_crash_rollover.empty()){
+                            audio_trigger_voice_local(app.audio,
+                                "../assets/" + o.audio_crash_rollover);
+                            npc.hail_wave_timer = 4.0f;
+                        }
+                        else if (app.trike.last_impact_force > 3.5f && !o.audio_crash_heavy.empty()){
+                            audio_trigger_voice_local(app.audio,
+                                "../assets/" + o.audio_crash_heavy);
+                            npc.hail_wave_timer = 2.5f;
+                        }
+                        else if (app.trike.last_impact_force > 1.0f && !o.audio_crash_mild.empty()){
+                            audio_trigger_voice_local(app.audio,
+                                "../assets/" + o.audio_crash_mild);
+                            npc.hail_wave_timer = 1.5f;
+                        }
+                        break;
+                    }
+                }
+                if (npc.hail_wave_timer > 0.0f) npc.hail_wave_timer -= dt;
+                if (npc.hail_wave_timer > 2.0f) app.trike.last_impact_force = 0.0f;
+
+
                 // check arrival at drop point
                 glm::vec3 to_drop = npc.drop_point - app.trike.position;
                 to_drop.y = 0.0f;
@@ -971,10 +1002,11 @@ void app_run(App& app){
                         + glm::vec3(std::cos(side_angle), 0.0f, std::sin(side_angle)) * 1.8f;
                     npc.position.y = heightfield_sample(app.map.terrain,
                         npc.position.x, npc.position.z);
-                    npc.mode = NPC_IDLE;
+                    npc.mode = NPC_DISMOUNTING;
+                    npc.walk_forward = false;
+                    npc.hail_timer = 15.0f;
                     app.passenger_npc_id = -1;
                     std::cout << "[npc] dropoff fare=" << app.passenger_fare << "\n";
-                    // pick voice based on ride time
                     for (const auto& o : app.map.objects){
                         if (o.id != npc.id) continue;
                         bool slow = (app.passenger_time > Const::DROPOFF_SLOW_THRESHOLD);
@@ -1047,7 +1079,21 @@ void app_run(App& app){
                 }
             }
 
-
+            // idle ambient chatter
+            if (npc.can_hail && (npc.mode == NPC_IDLE || npc.mode == NPC_WALK)
+                && npc.yap_timer <= 0.0f)
+            {
+                for (const auto& o : app.map.objects){
+                    if (o.id != npc.id) continue;
+                    if (!o.audio_yap.empty()){
+                        audio_trigger_voice(app.audio,
+                            "../assets/" + o.audio_yap, npc.position);
+                        npc.yap_timer = 8.0f + (float)(npc.id % 13) * 0.9f;
+                    }
+                    break;
+                }
+            }
+            if (npc.yap_timer > 0.0f) npc.yap_timer -= dt;
 
             // RAGDOLL
             // trike vs NPC collision 

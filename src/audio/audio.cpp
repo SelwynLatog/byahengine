@@ -215,6 +215,25 @@ void audio_trigger_voice(AudioSystem& audio,
         audio.voice_head, path, pos, 1.0f);
 }
 
+void audio_trigger_voice_local(AudioSystem& audio, const std::string& path){
+    if (!audio.initialized || path.empty()) return;
+    // non-spatial always full volume we use this for mount npc voices
+    glm::vec3 dummy = glm::vec3(0.0f);
+    ma_sound* s = alloc_sound(audio.engine, path, false, false, 1.0f);
+    if (!s) return;
+    AudioVoice& slot = audio.voice_pool[audio.voice_head];
+    if (slot.sound){
+        ma_sound_stop(slot.sound);
+        ma_sound_uninit(slot.sound);
+        delete slot.sound;
+        slot.sound = nullptr;
+    }
+    slot.sound = s;
+    ma_sound_start(slot.sound);
+    slot.in_use = true;
+    audio.voice_head = (audio.voice_head + 1) % AUDIO_VOICE_VOICES;
+}
+
 void audio_trigger_step(AudioSystem& audio,
     const std::string& path, float anim_timer_delta)
 {
