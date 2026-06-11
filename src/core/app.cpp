@@ -16,13 +16,13 @@
 #include <fstream>
 #include <filesystem>
 
-// this commit ver is much cleaner now. Used to be a horrendous god file
-// basically had shaders, draw calls, mesh uploads, everything
-// all now moved to scene.cpp
-// this file just loops input, physics, collisions, cam, render
+/*****************************************************
+MAIN APPLICATION LOOP
+input, physics, collision, npc, cam, audio, render
+******************************************************/
 
-
-// camera state
+// CAM STATE DEFS
+// yaw/pitch/dist are in degrees, converted to radians at use
 static float s_cam_yaw = Const::CAM_YAW_DEFAULT;
 static float s_cam_pitch = Const::CAM_PITCH_DEFAULT;
 static float s_cam_dist = Const::CAM_DIST_DEFAULT;
@@ -50,9 +50,10 @@ void world_map_to_obstacles(App& app){
         // then get real mesh bounds from editor renderer cache
         glm::vec3 world_min, world_max;
         auto bit = app.editor_renderer.prop_bounds.find(o.model_path);
+
         if (bit != app.editor_renderer.prop_bounds.end()){
-            float yoff = app.editor_renderer.prop_y_offset.count(o.model_path)
-                ? app.editor_renderer.prop_y_offset.at(o.model_path) : 0.0f;
+            float yoff = app.editor_renderer.prop_y_offset.count(o.model_path) ? app.editor_renderer.prop_y_offset.at(o.model_path) : 0.0f;
+            
             glm::vec3 lmin = bit->second.local_min;
             glm::vec3 lmax = bit->second.local_max;
             // scale and apply y offset, then rotate all 8 corners by object yaw
@@ -62,25 +63,27 @@ void world_map_to_obstacles(App& app){
             world_min = glm::vec3( 1e9f);
             world_max = glm::vec3(-1e9f);
 
+
+            // rotate all 8 AABB corners by object yaw to get tight world-space bounds
             for (int k = 0; k < 8; k++){
                 glm::vec3 corner = {
                     (k & 1) ? smax.x : smin.x,
                     (k & 2) ? smax.y : smin.y,
                     (k & 4) ? smax.z : smin.z,
                 };
-                glm::vec3 world = o.position + glm::vec3(
-                    c * corner.x - s * corner.z, corner.y, s * corner.x + c * corner.z);
+
+                glm::vec3 world = o.position + glm::vec3( c * corner.x - s * corner.z, corner.y, s * corner.x + c * corner.z);
                 world_min = glm::min(world_min, world);
                 world_max = glm::max(world_max, world);
             }
         }
         else{
+            // if no mesh bounds cached, fallback to scale based box
             glm::vec3 half = o.scale * 0.5f;
             world_min = o.position + glm::vec3(-half.x, 0.0f, -half.z);
             world_max = o.position + glm::vec3( half.x, o.scale.y, half.z);
         }
 
-        // world_min/max are already full world bounds from the corner loop
         glm::vec3 half = (world_max - world_min) * 0.5f;
         glm::vec3 center = (world_min + world_max) * 0.5f;
 
@@ -97,6 +100,8 @@ void world_map_to_obstacles(App& app){
         << " obstacles from world map\n";
 }
 
+// NPC RUNTIME
+// called on init and on every editor->drive switch if map_dirty
 void init_npcs(App& app){
     app.npcs.clear();
     app.passenger_npc_id = -1;
@@ -126,6 +131,8 @@ void init_npcs(App& app){
             o.npc_walk_a, o.npc_walk_b,
             o.npc_can_hail, o.npc_drop_point,
             o.npc_weight);
+
+
         npc.model_path = o.model_path;
         npc.editor_scale = o.scale;
         npc.editor_yaw = o.rotation.y;
@@ -143,8 +150,9 @@ void init_npcs(App& app){
     std::cout << "[npc] spawned " << app.npcs.size() << " npcs\n";
 }
 
-// rigid body dynamic sim init
-// called and loaded when returning from editor
+// RIGID BODY DYNAMICS INIT
+// builds init physics state for all DYNAMIC OBJECTS from their placed world positions
+// skip objects already in the sim map so editor->drive
 void init_dynamic_sims(App& app){
     for (const auto& o : app.map.objects){
         if (o.behavior !=DYNAMIC) continue;
@@ -158,14 +166,16 @@ void init_dynamic_sims(App& app){
         // builds initial AABB from prop bounds
         auto bit = app.editor_renderer.prop_bounds.find(o.model_path);
         if (bit != app.editor_renderer.prop_bounds.end()){
-            float yoff = app.editor_renderer.prop_y_offset.count(o.model_path)
-                ? app.editor_renderer.prop_y_offset.at(o.model_path) : 0.0f;
+            float yoff = app.editor_renderer.prop_y_offset.count(o.model_path) ? app.editor_renderer.prop_y_offset.at(o.model_path) : 0.0f;
+            
             glm::vec3 lmin = bit->second.local_min;
             glm::vec3 lmax = bit->second.local_max;
             glm::vec3 smin = { lmin.x*o.scale.x, (lmin.y + yoff)*o.scale.y, lmin.z*o.scale.z };
             glm::vec3 smax = { lmax.x*o.scale.x, (lmax.y + yoff)*o.scale.y, lmax.z*o.scale.z };
+            
             float c = std::cos(o.rotation.y), s = std::sin(o.rotation.y);
             glm::vec3 wmin( 1e9f), wmax(-1e9f);
+            
             for (int k = 0; k < 8; k++){
                 glm::vec3 corner = {
                     (k & 1) ? smax.x : smin.x,
@@ -187,9 +197,21 @@ void init_dynamic_sims(App& app){
     }
 }
 
+
+/********************************************
+ * APP_INIT
+ * subsystem init order:
+ * 1. window + gl
+ * 2. scene, editor, road_builder, terrain
+ * 3. prop bounds
+ * 4. obstacles , dynamic rigid body, npcs
+ * 5. id lookup
+ * 6. driver pose, hud, audio
+ * 7. cam seed
+ ******************************************/
 void app_init(App& app){
-    window_init(app.window,
-        Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, Const::WINDOW_TITLE);
+
+    window_init(app.window, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, Const::WINDOW_TITLE);
 
     glEnable(GL_DEPTH_TEST);
     int fb_w, fb_h;
@@ -279,25 +301,39 @@ void app_init(App& app){
     app.running = true;
 }
 
-// main loop app_run
-
+/********************************************
+ * MAIN LOOP
+ ******************************************/
 void app_run(App& app){
     while (!window_should_close(app.window)){
-        // delta time
+        
+        
+        /******************************************************************************
+        * DELTA TIME
+        * clamped so slow frame or debugger does not explode physics
+        ******************************************************************************/
         float now = (float)glfwGetTime();
-        float dt = now - app.last_time;
+        float dt = glm::min(now - app.last_time, Const::MAX_DELTA);
         app.last_time = now;
-        if (dt > Const::MAX_DELTA) dt = Const::MAX_DELTA;
 
-        // H key hitbox toggle universal
+        /******************************************************************************
+        * GLOBAL TOGGLE KEYS
+        * runs in both EDITOR & DRIVE mode
+        ******************************************************************************/
+        
+        // H key
+        // shows AABB hitboxes
+        // ctrl+ H reserved for editor mode
         static bool s_h_last = false;
         bool h_down = glfwGetKey(app.window.handle, GLFW_KEY_H) == GLFW_PRESS;
         bool ctrl_h = glfwGetKey(app.window.handle, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
         if (h_down && !s_h_last && !ctrl_h) app.editor.show_hitboxes = !app.editor.show_hitboxes;
         s_h_last = h_down;
 
-        // tab toggle
-        // switch from editor/ drive mode
+
+        // TAB key
+        // toggle EDITOR <- -> DRIVE mode
+        // blocked in Audio submode
         bool tab_down = glfwGetKey(app.window.handle, GLFW_KEY_TAB) == GLFW_PRESS;
         if (tab_down && !s_tab_pressed_last && app.editor.mode != MODE_AUDIO){
             app.editor.active = !app.editor.active;
@@ -322,9 +358,13 @@ void app_run(App& app){
         }
         s_tab_pressed_last = tab_down;
 
-        //******************************************************************************/
-        // EDITOR MODE
-        //******************************************************************************/
+
+
+        /******************************************************************************
+        * EDITOR MODE
+        * all editor logic and render
+        * continue at end skips the entire drive mode block
+        ******************************************************************************/
         
         if (app.editor.active){
             editor_cam_update(app.editor, app.window.handle, dt);
@@ -340,7 +380,7 @@ void app_run(App& app){
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
-            // shadow pass
+            // SHADOW PASS
             // render all props into depth buffer from sun POV
             scene_update_daytime(app.scene, dt);
             app.editor_renderer.sun_dir = app.scene.sun_dir;
@@ -354,8 +394,7 @@ void app_run(App& app){
             glClear(GL_DEPTH_BUFFER_BIT);
             glEnable(GL_CULL_FACE);
             glCullFace(GL_FRONT);
-            editor_renderer_shadow_pass(app.editor_renderer, app.map,
-                app.scene.light_space_mat, app.dynamic_sims);
+            editor_renderer_shadow_pass(app.editor_renderer, app.map, app.scene.light_space_mat, app.dynamic_sims);
             scene_trike_shadow_draw(app.scene, app.trike);
             driver_model_draw(app.scene.driver_model, app.player, app.trike,
             app.scene.shadow_shader, app.scene.light_space_mat, glm::mat4(1.0f),
@@ -367,25 +406,28 @@ void app_run(App& app){
             glfwGetFramebufferSize(app.window.handle, &fb_w, &fb_h);
             glViewport(0, 0, fb_w, fb_h);
 
-            // copy light data to editor_renderer for shadow sampling in draw_props
+            
+            // push scene lighting to editor_renderer
             app.editor_renderer.shadow_depth_tex = app.scene.shadow_depth_tex;
             app.editor_renderer.light_space_mat = app.scene.light_space_mat;
             app.editor_renderer.night_factor = app.scene.night_factor;
             app.editor_renderer.fog_color = app.scene.fog_color;
             app.editor_renderer.fog_near  = app.scene.fog_near;
             app.editor_renderer.fog_far   = app.scene.fog_far;
+            // -1 hides pose overlay unless we're actively in pose mode
             app.editor_renderer.pose_npc_id = (app.editor.mode == MODE_POSE)  ? app.editor.pose_npc_id : -1;
 
 
+            // MAIN DRAW
 
+            // SKY
             scene_draw_sky(app.scene, view, proj);
 
-            // draw world scene:
-            // ground, gizmo
-            // trike parked where it stopped last
+            // TRIKE
             scene_draw(app.scene, app.trike, app.obstacles, app.map.lights, view, proj, app.editor.show_hitboxes);
             
-            // draw driver in editor except pose mode (pose mode has its own draw)
+            // driver visible in editor except pose mode
+            // pose mode has its own isolated draw
             if (app.editor.mode != MODE_POSE) {
                 PlayerState fake_driving;
                 fake_driving.mode = PLAYER_DRIVING;
@@ -394,48 +436,44 @@ void app_run(App& app){
                     app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
             }
 
-            // terrain wireframe
+            // TERRAIN WIREFRAME
             if (app.editor.mode == MODE_TERRAIN || app.editor.mode == MODE_ROAD)
                 editor_renderer_draw_terrain(app.editor_renderer, app.map.terrain, view, proj,
                 app.editor.ghost_pos, app.editor.brush_radius, app.editor.placement_valid);
 
-            // road splines
+            // ROAD SPLINES
             editor_renderer_draw_roads(app.editor_renderer, app.map.roads, view, proj);
                     
-            // ocean
+            // OCEAN
             editor_renderer_draw_ocean(app.editor_renderer, app.map.ocean, view, proj, dt,
             app.map.terrain.origin.x,
             app.map.terrain.origin.x + app.map.terrain.cols * app.map.terrain.cell_size,
             app.map.terrain.origin.z,
             app.map.terrain.origin.z + app.map.terrain.rows * app.map.terrain.cell_size);
 
-            // solid terrain surface
+            // TERRAIN SURFACE
             editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj, app.map.ocean);
 
-            // draw editor overlays:
-            // grid, ghost, selection highlight
+            // EDITOR OVERLAYS
+            // grid, ghost prop, selection highlight, gizmos
             editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj, app.editor.show_hitboxes, app.map.lights);
 
-            // pose mode: draw driver + trike at origin for live tuning
-            // + draw npc + trike
+            // POSE MODE
+            // isolated draw of driver + trike at origin for live bone tuning
             if (app.editor.mode == MODE_POSE){
                 DriverModel* pose_npc_model = nullptr;
-                if (app.editor.pose_npc_id != -1){
-                    auto it = app.npc_model_cache.find("");
-                    // find the world object to get model_path
-                    for (const auto& o : app.map.objects){
-                        if (o.id != app.editor.pose_npc_id) continue;
-                        auto mit = app.npc_model_cache.find(o.model_path);
-                        if (mit != app.npc_model_cache.end())
-                            pose_npc_model = &mit->second;
-                        break;
-                    }
+                for (const auto& o : app.map.objects){
+                    if (o.id != app.editor.pose_npc_id) continue;
+                    auto mit = app.npc_model_cache.find(o.model_path);
+                    if (mit != app.npc_model_cache.end())
+                        pose_npc_model = &mit->second;
+                    break;
                 }
                 editor_renderer_draw_pose_mode(app.editor_renderer, app.editor,
                     app.scene.driver_model, app.scene.trike_model, view, proj, pose_npc_model, app.map);
             }
 
-            // temp editor control hud
+            // MAIN EDITOR HUD
             font_draw(app.editor_renderer.font,"[TAB] drive  [L CLICK] place/select  [DEL] delete  [B] behavior  [Ctrl+S] save",
                     10, Const::WINDOW_HEIGHT - 40, 2, 0.7f, 0.7f, 0.7f);
             font_draw(app.editor_renderer.font,"[T] translate  [R] rotate  [Y] scale  [PgUp/PgDn] Y nudge  [1-9] prop  [/] page",
@@ -468,15 +506,19 @@ void app_run(App& app){
             continue;
         }
 
-        //******************************************************************************/
-        // DRIVING MODE
-        //******************************************************************************/
 
-        // lock drive mode to player driving
+
+
+        /******************************************************************************
+        * DRIVE MODE
+        ******************************************************************************/
+
+        // TRIKE INPUT
+        // S: brake if moving forward, reverse if stopped
         TrikeInput input = {};
         if (app.player.mode == PLAYER_DRIVING || app.player.mode == PLAYER_MOUNTING){
             input.throttle = (glfwGetKey(app.window.handle, GLFW_KEY_W) == GLFW_PRESS) ? 1.0f : 0.0f;
-            bool s_held   = glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS;
+            bool s_held = glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS;
             input.brake   = (s_held && app.trike.speed >  0.5f) ? 1.0f : 0.0f;
             input.reverse = (s_held && app.trike.speed <= 0.5f) ? 1.0f : 0.0f;
             input.steer = 0.0f;
@@ -484,83 +526,72 @@ void app_run(App& app){
             if (glfwGetKey(app.window.handle, GLFW_KEY_D) == GLFW_PRESS) input.steer += 1.0f;
         }
         else {
-            // FOOT mode walking
-            // WASD moves relative to camera facing
-            // arrows orbit the camera (handled in CAM ORBIT INPUT below)
+            // FOOT MODE
+            // A/D orbit camera, W/S move along cam facing
+            // logical yaw insta snaps
             float move = 0.0f;
             bool a_held = glfwGetKey(app.window.handle, GLFW_KEY_A) == GLFW_PRESS;
             bool d_held = glfwGetKey(app.window.handle, GLFW_KEY_D) == GLFW_PRESS;
             if (glfwGetKey(app.window.handle, GLFW_KEY_W) == GLFW_PRESS) move =  1.0f;
             if (glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS) move = -1.0f;
 
-            // A/D rotate cam yaw so character turns in place, W/S moves along facing
             if (a_held) s_cam_yaw -= 120.0f * dt;
             if (d_held) s_cam_yaw += 120.0f * dt;
 
-            
-            // cam_world_angle drives movement AND visual facing
-            // +180 so W moves away from camera (toward where you're looking)
+            // +180 so W moves toward where the camera is looking
             float cam_world_angle = glm::radians(s_cam_yaw) + glm::radians(180.0f);
             glm::vec3 fwd_dir = { std::cos(cam_world_angle), 0.0f, std::sin(cam_world_angle) };
 
             float walk_speed = 4.0f;
             glm::vec3 walk_vel = glm::vec3(0.0f);
-
             if (move != 0.0f){
                 walk_vel = fwd_dir * (move * walk_speed);
-                // lock player facing to movement direction immediately, no lerp here
-                // visual_yaw lerp below handles the smooth turn
                 app.player.yaw = std::atan2(walk_vel.z, walk_vel.x);
             }
 
-            // smooth visual yaw toward logical yaw
+            // wrap yaw diff to [-pi, pi] to always take the short arc
             float yaw_diff = app.player.yaw - app.player.visual_yaw;
-            // wrap to [-pi, pi] so we always take the short arc
-            while (yaw_diff > glm::pi<float>()) yaw_diff -= glm::two_pi<float>();
+            while (yaw_diff >  glm::pi<float>()) yaw_diff -= glm::two_pi<float>();
             while (yaw_diff < -glm::pi<float>()) yaw_diff += glm::two_pi<float>();
             app.player.visual_yaw += yaw_diff * glm::clamp(12.0f * dt, 0.0f, 1.0f);
 
-
             app.player.pos += walk_vel * dt;
-
             app.player.speed = glm::length(walk_vel);
-            app.player.pos.y = heightfield_sample(app.map.terrain,
-                app.player.pos.x, app.player.pos.z);
+            app.player.pos.y = heightfield_sample(app.map.terrain, app.player.pos.x, app.player.pos.z);
             app.player.anim_timer += (app.player.speed > 0.1f ? app.player.speed * 1.8f : 1.0f) * dt;
         }
 
-        // PLAYER MOUNT
+        // F key - FREE CAM
         bool f_down = glfwGetKey(app.window.handle, GLFW_KEY_F) == GLFW_PRESS;
         if (f_down && !s_f_pressed_last) s_free_cam = !s_free_cam;
         s_f_pressed_last = f_down;
 
-        // Q key: confirm passenger pickup
+        // Q key - CONFIRM PASSENGER RIDE
         static bool s_q_last = false;
         bool q_down = glfwGetKey(app.window.handle, GLFW_KEY_Q) == GLFW_PRESS;
         bool s_q_pickup = (q_down && !s_q_last);
         s_q_last = q_down;
 
-            // E key: mount / dismount
+        // E key - MOUNT/DISMOUNT
         static bool s_e_last = false;
         bool e_down = glfwGetKey(app.window.handle, GLFW_KEY_E) == GLFW_PRESS;
         if (e_down && !s_e_last && app.player.mode != PLAYER_MOUNTING){
             if (app.player.mode == PLAYER_DRIVING){
-                // dismount: drop player beside trike
                 float side = app.trike.heading + glm::half_pi<float>();
                 app.player.pos = app.trike.position
                     + glm::vec3(std::cos(side), 0.0f, std::sin(side)) * 1.2f;
                 app.player.yaw = app.trike.heading;
                 app.player.visual_yaw = app.trike.heading;
-                s_cam_yaw = 0.0f; // reset cam behind player on dismount
-                s_cam_pos = app.player.pos + glm::vec3(0.0f, 4.0f, 0.0f); // prevent lerp jump
+                s_cam_yaw = 0.0f;
+                s_cam_pos = app.player.pos + glm::vec3(0.0f, 4.0f, 0.0f);
                 s_cam_needs_snap = true;
                 app.player.mode = PLAYER_FOOT;
             }
             else {
-                // mount: only if close enough
+                // 3m mount radius, stored as squared distance to avoid sqrt
                 glm::vec3 delta = app.trike.position - app.player.pos;
                 delta.y = 0.0f;
-                if (glm::dot(delta, delta) < 9.0f){ // 3m radius
+                if (glm::dot(delta, delta) < 9.0f){
                     app.player.mode = PLAYER_MOUNTING;
                     app.player.mount_timer = 0.3f;
                 }
@@ -568,55 +599,53 @@ void app_run(App& app){
         }
         s_e_last = e_down;
 
-        // mounting transition tick
+        // brief mount transition so the driver snap doesn't look instant
         if (app.player.mode == PLAYER_MOUNTING){
             app.player.mount_timer -= dt;
             if (app.player.mount_timer <= 0.0f)
                 app.player.mode = PLAYER_DRIVING;
         }
 
-        // RESET DRIVE
-        // R key resets trike and dynamic objects to initial state
+        // R key - FULL RESET
+        // player, dynamic objects, cam
         static bool s_r_last = false;
         bool r_down = glfwGetKey(app.window.handle, GLFW_KEY_R) == GLFW_PRESS;
         if (r_down && !s_r_last){
-            // reset trike to spawn
-            app.trike = TrikeState{};
+            app.trike  = TrikeState{};
             app.player = PlayerState{};
             s_cam_yaw   = Const::CAM_YAW_DEFAULT;
             s_cam_pitch = Const::CAM_PITCH_DEFAULT;
             s_cam_dist  = Const::CAM_DIST_DEFAULT;
-
-            // reset all dynamic sims to their placed world positions
             app.dynamic_sims.clear();
             init_dynamic_sims(app);
-
-            // clear all obstacle hit timers
             for (auto& obs : app.obstacles)
                 obs.hit_timer = 0.0f;
         }
         s_r_last = r_down;
 
-        // CAM ORBIT IMPUT
-        if (glfwGetKey(app.window.handle, GLFW_KEY_LEFT) == GLFW_PRESS) s_cam_yaw -= Const::CAM_YAW_SPEED * dt;
+        // CAM ORBIT
+        // arrows manually orbit
+        if (glfwGetKey(app.window.handle, GLFW_KEY_LEFT)  == GLFW_PRESS) s_cam_yaw -= Const::CAM_YAW_SPEED * dt;
         if (glfwGetKey(app.window.handle, GLFW_KEY_RIGHT) == GLFW_PRESS) s_cam_yaw += Const::CAM_YAW_SPEED * dt;
-        if (glfwGetKey(app.window.handle, GLFW_KEY_UP) == GLFW_PRESS) s_cam_pitch += Const::CAM_PITCH_SPEED * dt;
-        if (glfwGetKey(app.window.handle, GLFW_KEY_DOWN) == GLFW_PRESS) s_cam_pitch -= Const::CAM_PITCH_SPEED * dt;
+        if (glfwGetKey(app.window.handle, GLFW_KEY_UP)    == GLFW_PRESS) s_cam_pitch += Const::CAM_PITCH_SPEED * dt;
+        if (glfwGetKey(app.window.handle, GLFW_KEY_DOWN)  == GLFW_PRESS) s_cam_pitch -= Const::CAM_PITCH_SPEED * dt;
         s_cam_pitch = glm::clamp(s_cam_pitch, Const::CAM_PITCH_MIN, Const::CAM_PITCH_MAX);
-        
-        // spring cam yaw back behind trike only while driving and not manually orbiting
-        bool arrow_held = glfwGetKey(app.window.handle, GLFW_KEY_LEFT) == GLFW_PRESS
+
+        bool arrow_held = glfwGetKey(app.window.handle, GLFW_KEY_LEFT)  == GLFW_PRESS
                        || glfwGetKey(app.window.handle, GLFW_KEY_RIGHT) == GLFW_PRESS
-                       || glfwGetKey(app.window.handle, GLFW_KEY_UP) == GLFW_PRESS
+                       || glfwGetKey(app.window.handle, GLFW_KEY_UP)    == GLFW_PRESS
                        || glfwGetKey(app.window.handle, GLFW_KEY_DOWN)  == GLFW_PRESS;
+        // exp decay spring back
+        // tune or remove -3.5f if you want a faster snap orbit, add more if slower/smoother
         if (app.player.mode == PLAYER_DRIVING && std::abs(app.trike.speed) > 0.3f && !arrow_held)
             s_cam_yaw = glm::mix(s_cam_yaw, 0.0f, 1.0f - std::exp(-3.5f * dt));
+       
 
-
-        // fixed timestep physics
-        // physics will run constantly at 120 hz regardless if framerate is ass
-        // accumulate real tim & consume it in fixed chunks
-        // this prevents the sim from going insane in slow frames
+         /**************************************************************
+         * FIXED-TIMESTEP PHYSICS (120 Hz)
+         * real time is accumulated and consumed in fixed chunks so the sim
+         * stays stable regardless of framerate
+         **************************************************************/
         app.accumulator += dt;
         while (app.accumulator >= Const::FIXED_TIMESTEP){
             trike_physics_update(app.trike, input, app.map.terrain, Const::FIXED_TIMESTEP);
@@ -624,7 +653,7 @@ void app_run(App& app){
         }
         trike_model_update(app.scene.trike_model, app.trike.speed, dt);
 
-        // update trike AABB after physics
+        // AABB TRIKE UPDATE
         if (!app.trike.is_tipping && !app.trike.is_rolled_over)
             aabb_update(app.trike.aabb, app.trike.position, app.trike.heading);
 
@@ -636,8 +665,11 @@ void app_run(App& app){
         bool any_collision = false;
 
 
-        // COLLISION DETECTION + RESPONSE
-        // suspended during tumble
+        /**************************************************************
+         * STATIC COLLISION DETECTION + RESPONSE
+         * suspended during tumble 
+         * goto jumps over the entire block
+         **************************************************************/
         if (app.trike.is_tipping || app.trike.is_rolled_over) goto skip_collision;
         for (auto& obs : app.obstacles){
             if (obs.hit_timer > 0.0f) obs.hit_timer -= dt;
@@ -662,8 +694,7 @@ void app_run(App& app){
             glm::vec3 mtv = aabb_mtv(app.trike.aabb, obs.aabb);
             app.trike.position += mtv;
 
-            glm::vec3 mtv_normal = glm::length(mtv) > 0.0f
-                ? glm::normalize(mtv) : glm::vec3(0.0f);
+            glm::vec3 mtv_normal = glm::length(mtv) > 0.0f ? glm::normalize(mtv) : glm::vec3(0.0f);
 
             glm::vec3 fwd = {std::cos(app.trike.heading), 0.0f, std::sin(app.trike.heading)};
             glm::vec3 rgt = {std::cos(app.trike.heading + glm::half_pi<float>()), 0.0f,
@@ -707,6 +738,9 @@ void app_run(App& app){
                 if (spd_along < 0.0f) app.trike.speed -= spd_along;
                 if (lat_along < 0.0f) app.trike.lateral_speed -= lat_along;
             }
+
+
+
             glm::vec3 fwd2 = {std::cos(app.trike.heading), 0.0f, std::sin(app.trike.heading)};
             glm::vec3 rgt2 = {std::cos(app.trike.heading + glm::half_pi<float>()), 0.0f,
                             std::sin(app.trike.heading + glm::half_pi<float>())};
@@ -753,7 +787,9 @@ void app_run(App& app){
         }
             
 
-        // DYNAMIC object integration + collision
+         /**************************************************************
+         * DYNAMIC OBJECT INTEGRATION + COLLISION
+         **************************************************************/
         for (auto& [id, sim] : app.dynamic_sims){
             auto wit = app.wo_by_id.find(id);
             if (wit == app.wo_by_id.end()) continue;
@@ -803,16 +839,16 @@ void app_run(App& app){
                 float inertia = wo->mass * height * height * 0.3f; // approx rod inertia
                 float torque_mag = impulse * height * 0.5f / (inertia + 0.001f);
 
-                // hit from front/back -> pitch
+                // hit from front/back = pitch
                 sim.pitch_vel += torque_mag * glm::dot(-hit_normal, trike_fwd);
-                // hit from side → roll
+                // hit from side = roll
                 glm::vec3 trike_rgt = { std::cos(app.trike.heading + glm::half_pi<float>()), 0.0f,
                                         std::sin(app.trike.heading + glm::half_pi<float>()) };
-                sim.roll_vel  += torque_mag * glm::dot(-hit_normal, trike_rgt);
+                sim.roll_vel+= torque_mag * glm::dot(-hit_normal, trike_rgt);
 
                 // spin on Y
                 // glancing cause yaw spin
-                sim.yaw_vel   += torque_mag * 0.4f * (glm::dot(-hit_normal, trike_rgt));
+                sim.yaw_vel+= torque_mag * 0.4f * (glm::dot(-hit_normal, trike_rgt));
 
                 // trike loses speed proportional to object mass
                 app.trike.speed *= (1.0f - glm::clamp(wo->mass / total_mass * 0.6f, 0.0f, 0.6f));
@@ -927,9 +963,9 @@ void app_run(App& app){
             }
         }
 
-        //**************************************/
-        // NPC UPDATE
-        //**************************************/
+        /**************************************************************
+         * NPC UPDATE
+         **************************************************************/
         static constexpr float NPC_HAIL_RANGE_SQ = 36.0f; // 6m
 
         for (auto& npc : app.npcs){
@@ -943,8 +979,9 @@ void app_run(App& app){
                     ? npc_mdl_it->second : app.scene.driver_model;
                 float c = std::cos(app.trike.heading);
                 float s = std::sin(app.trike.heading);
-                // sidecar offset
-                // note: this is npc sidecar pos
+                
+
+                // NPC SIDECAR OFFSET
                 // x forward/backward
                 // y up/down
                 // z right/left
@@ -957,6 +994,7 @@ void app_run(App& app){
                     c * sidecar_off.x - s * sidecar_off.z,
                     sidecar_off.y,
                     s * sidecar_off.x + c * sidecar_off.z);
+                    
                 npc.yaw = -app.trike.heading + glm::radians(90.0f) - npc_mdl.forward_offset + glm::pi<float>();
                 // accumulate fare distance
                 app.passenger_fare += std::abs(app.trike.speed) * dt
@@ -1128,9 +1166,9 @@ void app_run(App& app){
             }
         }
 
-        //**************************************/
-        // CAMERA
-        //**************************************/
+        /**************************************************************
+         * CAMERA
+         **************************************************************/
         glm::mat4 view;
         glm::mat4 proj = glm::perspective(
             glm::radians(Const::CAM_FOV),
@@ -1211,23 +1249,23 @@ void app_run(App& app){
         }
 
 
-        // audio update
+        /**************************************************************
+         * AUDIO UPDATE
+         **************************************************************/
         {
-            glm::vec3 lis_pos = (app.player.mode == PLAYER_FOOT)
-                ? app.player.pos : app.trike.position;
-            glm::vec3 lis_fwd = glm::vec3(
-                std::cos(app.trike.heading), 0.0f, std::sin(app.trike.heading));
-            bool driving = (app.player.mode == PLAYER_DRIVING
-                         || app.player.mode == PLAYER_MOUNTING);
-            audio_update(app.audio, dt, lis_pos, lis_fwd,
-                app.trike.speed, Const::TRIKE_MAX_SPEED, driving);
+            glm::vec3 lis_pos = (app.player.mode == PLAYER_FOOT) ? app.player.pos : app.trike.position;
+            glm::vec3 lis_fwd = glm::vec3(std::cos(app.trike.heading), 0.0f, std::sin(app.trike.heading));
+            bool driving = (app.player.mode == PLAYER_DRIVING || app.player.mode == PLAYER_MOUNTING);
+            audio_update(app.audio, dt, lis_pos, lis_fwd, app.trike.speed, Const::TRIKE_MAX_SPEED, driving);
         }
 
-        // render
+        /**************************************************************
+         * RENDER
+         **************************************************************/
         glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
-        // shadow pass
+        // SHADOW PASS
         scene_update_daytime(app.scene, dt);
         app.editor_renderer.sun_dir = app.scene.sun_dir;
         app.editor_renderer.light_color = app.scene.light_color;
@@ -1242,12 +1280,14 @@ void app_run(App& app){
         glClear(GL_DEPTH_BUFFER_BIT);
         glEnable(GL_CULL_FACE);
         glCullFace(GL_FRONT);
-        editor_renderer_shadow_pass(app.editor_renderer, app.map,
-            app.scene.light_space_mat, app.dynamic_sims);
+
+
+        editor_renderer_shadow_pass(app.editor_renderer, app.map, app.scene.light_space_mat, app.dynamic_sims);
         scene_trike_shadow_draw(app.scene, app.trike);
-        driver_model_draw(app.scene.driver_model, app.player, app.trike,
-            app.scene.shadow_shader, app.scene.light_space_mat, glm::mat4(1.0f),
+        driver_model_draw(app.scene.driver_model, app.player, app.trike, app.scene.shadow_shader, app.scene.light_space_mat, glm::mat4(1.0f),
             app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
+
+
         for (const auto& npc : app.npcs) {
             glm::vec3 dnpc = npc.position - app.trike.position;
             dnpc.y = 0.0f;
@@ -1307,7 +1347,7 @@ void app_run(App& app){
             npc_draw(npc, *mdl, app.editor_renderer.obj_shader, view, proj);
         }
 
-        // destination marker 
+        // DESTINATION MARKER
         // glowing ring above drop point while passenger is riding
         if (app.passenger_npc_id != -1){
             for (const auto& npc : app.npcs){
@@ -1347,6 +1387,9 @@ void app_run(App& app){
     }
 }
 
+/*****************************************************
+ * APP_SHUTDOWN
+ *****************************************************/
 void app_shutdown(App& app){
     audio_shutdown(app.audio);
     hud_destroy(app.hud);
