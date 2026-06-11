@@ -52,7 +52,7 @@ struct AudioSystem {
 
     // footstep trigger
     float step_timer = 0.0f; // accumulates anim_timer delta
-    float step_interval = 0.55f; // seconds between steps at walk speed
+    float step_interval = 1.7f; // seconds between steps at walk speed
 
     bool initialized = false;
 

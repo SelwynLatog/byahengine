@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <cstring>
+#include <unordered_map>
 
 // internal helpers
 static ma_sound* alloc_sound(ma_engine* engine, const std::string& path,
@@ -235,16 +236,45 @@ void audio_trigger_voice_local(AudioSystem& audio, const std::string& path){
 }
 
 void audio_trigger_step(AudioSystem& audio,
-    const std::string& path, float anim_timer_delta)
-{
+    const std::string& path, float anim_timer_delta){
     if (!audio.initialized || path.empty()) return;
     audio.step_timer += anim_timer_delta;
     if (audio.step_timer < audio.step_interval) return;
     audio.step_timer = 0.0f;
-    // steps are non-spatial
-    glm::vec3 at_listener = audio.listener_pos;
-    play_oneshot(audio.engine, audio.step_pool, AUDIO_STEP_VOICES,
-        audio.step_head, path, at_listener, 0.7f);
+
+    // build variant list from the file's directory, cached per directory
+    // e.g. assets/audio/footstep/concrete/concrete1.wav
+    //   -> scans assets/audio/footstep/type/variant1 for all wavs once picks randomly each step
+    static std::unordered_map<std::string, std::vector<std::string>> s_variants;
+    std::string dir = path;
+    if (s_variants.find(dir) == s_variants.end()){
+        auto& list = s_variants[dir];
+        if (std::filesystem::exists(dir)){
+            for (const auto& e : std::filesystem::directory_iterator(dir)){
+                if (!e.is_regular_file()) continue;
+                auto ext = e.path().extension().string();
+                if (ext == ".wav" || ext == ".ogg")
+                    list.push_back(e.path().string());
+            }
+            std::sort(list.begin(), list.end());
+        }
+        // fallback: if scan empty or dir missing, use the path itself
+        if (list.empty()) list.push_back(path);
+        std::cout << "[audio] step variants for " << dir << ": " << list.size() << "\n";
+    }
+
+    const auto& variants = s_variants[dir];
+    const std::string& pick = variants[rand() % variants.size()];
+    AudioVoice& slot = audio.step_pool[audio.step_head];
+    if (slot.sound){
+        ma_sound_stop(slot.sound);
+        free_sound(slot.sound);
+        slot.sound = nullptr;
+    }
+    slot.sound = alloc_sound(audio.engine, pick, false, false, 0.7f);
+    if (slot.sound) ma_sound_start(slot.sound);
+    slot.in_use = true;
+    audio.step_head = (audio.step_head + 1) % AUDIO_STEP_VOICES;
 }
 
 void audio_radio_next(AudioSystem& audio){

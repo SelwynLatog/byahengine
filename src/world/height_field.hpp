@@ -44,6 +44,8 @@ void heightfield_init(HeightField& hf, int rows, int cols, float cell_size, glm:
 
 float heightfield_sample(const HeightField& hf, float x, float z);
 
+SurfaceType heightfield_get_surface(const HeightField& hf, float x, float z);
+
 glm::vec3 heightfield_normal(const HeightField& hf, float x, float z);
 
 // raise or lower circular region centered at world (cx,cz)

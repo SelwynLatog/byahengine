@@ -559,6 +559,26 @@ void app_run(App& app){
             app.player.speed = glm::length(walk_vel);
             app.player.pos.y = heightfield_sample(app.map.terrain, app.player.pos.x, app.player.pos.z);
             app.player.anim_timer += (app.player.speed > 0.1f ? app.player.speed * 1.8f : 1.0f) * dt;
+
+            // FOOTSTEPS SFX QUERY MAPS W SURFACE TYPE
+            if (app.player.speed > 0.1f){
+                static char const* STEP_PATHS[(int)SURFACE_COUNT] = {
+                    "", // NONE
+                    "audio/footstep/concrete", // asphalt map, same sound brah
+                    "audio/footstep/gravel",
+                    "audio/footstep/dirt",
+                    "audio/footstep/sand",
+                    "audio/footstep/grass",
+                    "audio/footstep/concrete",
+                    "audio/footstep/rock"
+                };
+
+                SurfaceType surf= heightfield_get_surface(app.map.terrain, app.player.pos.x, app.player.pos.z);
+
+                // surface index find
+                int si = glm::clamp((int)surf, 0, (int)SURFACE_COUNT - 1);
+                if (si > 0) audio_trigger_step(app.audio, std::string("../assets/") + STEP_PATHS[si], app.player.speed * dt);
+            }
         }
 
         // F key - FREE CAM

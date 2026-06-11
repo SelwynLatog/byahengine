@@ -45,6 +45,16 @@ float heightfield_sample(const HeightField& hf, float x, float z){
     return h0 + (h1 - h0) * tz;
 }
 
+SurfaceType heightfield_get_surface(const HeightField& hf, float x, float z){
+    if (hf.surface.empty()) return SURFACE_NONE;
+    float lx = x - hf.origin.x;
+    float lz = z - hf.origin.z;
+    int col = (int)(lx / hf.cell_size);
+    int row = (int)(lz / hf.cell_size);
+    if (col < 0 || col >= hf.cols || row < 0 || row >= hf.rows) return SURFACE_NONE;
+    return (SurfaceType)hf.surface[row * hf.cols + col];
+}
+
 glm::vec3 heightfield_normal(const HeightField& hf, float x, float z){
     // give smooth normal that blends across cell boundaries
     float s = hf.cell_size;
