@@ -1,6 +1,9 @@
-A tricycle simulator with its driving physics engine built in pure C++ and OpenGL.
-A classic Filipino experience built from scratch.
-WIP
+a 3D simulation engine built with openGL C++, including a custom renderer, physics, content pipelines, and editor tooling. 
+
+This project simply serves as my playground to learn low level graphics programming by simulating a tricycle driver's environment via custom terrain, road, animations, audio, rigid body, npc, & lighting systems.
+
+It's oddly specific and that's simply because I commute to college by tricycle in a rural area surrounded by uneven roads, hills, and a beach. I thought it would be both hilarious and fascinating to simulate my daily rides using a custom graphics engine. 
+
 
 # V1:
 May-08-2026
