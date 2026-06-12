@@ -379,7 +379,8 @@ void audio_update_env(AudioSystem& audio, float dt,
         // load sound if slot just acquired
         if (slot.zone_id != zone.id){
             if (slot.sound) free_sound(slot.sound);
-            slot.sound = alloc_sound(audio.engine, zone.audio_path, true, false, 0.0f);
+            std::string full_path = std::string("../assets/") + zone.audio_path;
+            slot.sound = alloc_sound(audio.engine, full_path, true, false, 0.0f);
             slot.zone_id = zone.id;
             slot.cur_vol = 0.0f;
             slot.playing = false;
