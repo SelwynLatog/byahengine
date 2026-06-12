@@ -11,6 +11,7 @@
 #include <glm/gtc/constants.hpp>
 #include "../world/world_map.hpp"
 #include "../world/road_builder.hpp"
+#include "../world/ambience_zone.hpp"
 #include <cmath>
 #include <iostream>
 #include <fstream>
@@ -233,6 +234,8 @@ void app_init(App& app){
 
     // try to load existing map
     world_map_load(app.map, Const::MAP_SAVE_PATH);
+    ambience_load(app.map.ambience_zones, app.map.ambience_count,
+        Const::MAX_AMBIENCE_ZONES, Const::AMBIENCE_SAVE_PATH);
 
     for (auto& r : app.map.roads) road_spline_build_mesh(r, &app.map.terrain);
     
@@ -1277,6 +1280,8 @@ void app_run(App& app){
             glm::vec3 lis_fwd = glm::vec3(std::cos(app.trike.heading), 0.0f, std::sin(app.trike.heading));
             bool driving = (app.player.mode == PLAYER_DRIVING || app.player.mode == PLAYER_MOUNTING);
             audio_update(app.audio, dt, lis_pos, lis_fwd, app.trike.speed, Const::TRIKE_MAX_SPEED, driving);
+            audio_update_env(app.audio, dt, lis_pos, app.map.ambience_zones, app.map.ambience_count,
+                app.scene.night_factor);
         }
 
         /**************************************************************
@@ -1416,6 +1421,7 @@ void app_shutdown(App& app){
     scene_destroy(app.scene);
     window_destroy(app.window);
     world_map_save(app.map, Const::MAP_SAVE_PATH);
+    ambience_save(app.map.ambience_zones, app.map.ambience_count, Const::AMBIENCE_SAVE_PATH);
     editor_renderer_destroy(app.editor_renderer);
     app.running = false;
 }

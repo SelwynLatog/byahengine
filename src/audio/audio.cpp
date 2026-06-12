@@ -1,6 +1,7 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 #include "audio.hpp"
+#include "../world/ambience_zone.hpp"
 #include <iostream>
 #include <filesystem>
 #include <algorithm>
@@ -97,6 +98,12 @@ bool audio_init(AudioSystem& audio, const char* assets_dir){
     audio.ambient = alloc_sound(audio.engine, amb, true, false, 1.0f);
     if (audio.ambient) ma_sound_start(audio.ambient);
 
+    // rain loop
+    std::string rain_path = adir + "/audio/ambience/rain_loop.wav";
+    audio.rain = alloc_sound(audio.engine, rain_path, true, false, 0.0f);
+    if (audio.rain) ma_sound_start(audio.rain);
+
+    std::memset(audio.ambience_slots, 0, sizeof(audio.ambience_slots));
 
     ma_engine_set_volume(audio.engine, 3.0f);
 
@@ -105,6 +112,7 @@ bool audio_init(AudioSystem& audio, const char* assets_dir){
     std::memset(audio.impact_pool, 0, sizeof(audio.impact_pool));
     std::memset(audio.voice_pool, 0, sizeof(audio.voice_pool));
     std::memset(audio.step_pool, 0, sizeof(audio.step_pool));
+    std::memset(audio.ambience_slots, 0, sizeof(audio.ambience_slots));
 
     audio.initialized = true;
     std::cout << "[audio] initialized\n";
@@ -119,10 +127,19 @@ void audio_shutdown(AudioSystem& audio){
     free_sound(audio.eng_high);
     free_sound(audio.ambient);
     free_sound(audio.radio);
+    free_sound(audio.rain);
 
-    for (int i = 0; i < AUDIO_IMPACT_VOICES; i++) free_sound(audio.impact_pool[i].sound);
-    for (int i = 0; i < AUDIO_VOICE_VOICES; i++) free_sound(audio.voice_pool[i].sound);
-    for (int i = 0; i < AUDIO_STEP_VOICES; i++) free_sound(audio.step_pool[i].sound);
+    for (int i = 0; i < Const::MAX_AMBIENCE_SLOTS; i++){
+        if (audio.ambience_slots[i].sound){
+            free_sound(audio.ambience_slots[i].sound);
+            audio.ambience_slots[i].sound = nullptr;
+            audio.ambience_slots[i].playing = false;
+        }
+    }
+
+    for (int i = 0; i < Const::AUDIO_IMPACT_VOICES; i++) free_sound(audio.impact_pool[i].sound);
+    for (int i = 0; i < Const::AUDIO_VOICE_VOICES; i++) free_sound(audio.voice_pool[i].sound);
+    for (int i = 0; i < Const::AUDIO_STEP_VOICES; i++) free_sound(audio.step_pool[i].sound);
 
     ma_engine_uninit(audio.engine);
     delete audio.engine;
@@ -179,7 +196,7 @@ void audio_update(AudioSystem& audio, float dt,
         audio.impact_cooldown -= dt;
 
     // clean up finished one-shots
-    for (int i = 0; i < AUDIO_IMPACT_VOICES; i++){
+    for (int i = 0; i < Const::AUDIO_IMPACT_VOICES; i++){
         auto& v = audio.impact_pool[i];
         if (v.sound && v.in_use && !ma_sound_is_playing(v.sound)){
             free_sound(v.sound);
@@ -187,7 +204,7 @@ void audio_update(AudioSystem& audio, float dt,
             v.in_use = false;
         }
     }
-    for (int i = 0; i < AUDIO_VOICE_VOICES; i++){
+    for (int i = 0; i < Const::AUDIO_VOICE_VOICES; i++){
         auto& v = audio.voice_pool[i];
         if (v.sound && v.in_use && !ma_sound_is_playing(v.sound)){
             free_sound(v.sound);
@@ -203,7 +220,7 @@ void audio_trigger_impact(AudioSystem& audio,
     if (!audio.initialized || path.empty()) return;
     if (audio.impact_cooldown > 0.0f) return;
     float vol = glm::clamp(0.4f + force * 0.08f, 0.3f, 1.0f);
-    play_oneshot(audio.engine, audio.impact_pool, AUDIO_IMPACT_VOICES,
+    play_oneshot(audio.engine, audio.impact_pool, Const::AUDIO_IMPACT_VOICES,
         audio.impact_head, path, pos, vol);
     audio.impact_cooldown = AudioSystem::IMPACT_COOLDOWN_INTERVAL;
 }
@@ -212,7 +229,7 @@ void audio_trigger_voice(AudioSystem& audio,
     const std::string& path, const glm::vec3& pos)
 {
     if (!audio.initialized || path.empty()) return;
-    play_oneshot(audio.engine, audio.voice_pool, AUDIO_VOICE_VOICES,
+    play_oneshot(audio.engine, audio.voice_pool, Const::AUDIO_VOICE_VOICES,
         audio.voice_head, path, pos, 1.0f);
 }
 
@@ -232,7 +249,7 @@ void audio_trigger_voice_local(AudioSystem& audio, const std::string& path){
     slot.sound = s;
     ma_sound_start(slot.sound);
     slot.in_use = true;
-    audio.voice_head = (audio.voice_head + 1) % AUDIO_VOICE_VOICES;
+    audio.voice_head = (audio.voice_head + 1) % Const::AUDIO_VOICE_VOICES;
 }
 
 void audio_trigger_step(AudioSystem& audio,
@@ -274,7 +291,7 @@ void audio_trigger_step(AudioSystem& audio,
     slot.sound = alloc_sound(audio.engine, pick, false, false, 0.7f);
     if (slot.sound) ma_sound_start(slot.sound);
     slot.in_use = true;
-    audio.step_head = (audio.step_head + 1) % AUDIO_STEP_VOICES;
+    audio.step_head = (audio.step_head + 1) % Const::AUDIO_STEP_VOICES;
 }
 
 void audio_radio_next(AudioSystem& audio){
@@ -306,4 +323,96 @@ void audio_radio_toggle(AudioSystem& audio){
 void audio_radio_set_volume(AudioSystem& audio, float vol){
     audio.radio_volume = glm::clamp(vol, 0.0f, 1.0f);
     if (audio.radio) ma_sound_set_volume(audio.radio, audio.radio_volume);
+}
+
+void audio_rain_set(AudioSystem& audio, bool active){
+    audio.rain_active = active;
+    // actual volume lerp happens in audio_update_env each frame
+}
+
+void audio_update_env(AudioSystem& audio, float dt,
+    const glm::vec3& listener_pos,
+    const AmbienceZone* zones, int zone_count,
+    float night_factor)
+{
+    if (!audio.initialized) return;
+
+    // rain crossfade 
+    float rain_target = audio.rain_active ? Const::RAIN_VOL_MAX : 0.0f;
+    audio.rain_vol = audio.rain_vol + glm::clamp(rain_target - audio.rain_vol,
+        -Const::FADE_SPEED * dt, Const::FADE_SPEED * dt);
+    if (audio.rain) ma_sound_set_volume(audio.rain, audio.rain_vol);
+
+    // per zone slot update
+    // mark all slots as unclaimed this frame
+    bool claimed[Const::MAX_AMBIENCE_SLOTS] = {};
+
+    for (int z = 0; z < zone_count; z++){
+        const AmbienceZone& zone = zones[z];
+
+        if (zone.type == AMBIENCE_NIGHT && night_factor < Const::NIGHT_THRESH) continue;
+
+        float dist = glm::length(listener_pos - zone.pos);
+        if (dist >= zone.radius) continue; // outside, don't need slot
+
+        int slot_idx = -1;
+        for (int i = 0; i < Const::MAX_AMBIENCE_SLOTS; i++){
+            if (audio.ambience_slots[i].zone_id == zone.id){
+                slot_idx = i;
+                break;
+            }
+        }
+        if (slot_idx == -1){
+            // grab first free slot
+            for (int i = 0; i < Const::MAX_AMBIENCE_SLOTS; i++){
+                if (audio.ambience_slots[i].zone_id == -1){
+                    slot_idx = i;
+                    break;
+                }
+            }
+        }
+        if (slot_idx == -1) continue; // all slots busy, so skip
+
+        auto& slot = audio.ambience_slots[slot_idx];
+        claimed[slot_idx] = true;
+
+        // load sound if slot just acquired
+        if (slot.zone_id != zone.id){
+            if (slot.sound) free_sound(slot.sound);
+            slot.sound = alloc_sound(audio.engine, zone.audio_path, true, false, 0.0f);
+            slot.zone_id = zone.id;
+            slot.cur_vol = 0.0f;
+            slot.playing = false;
+            if (slot.sound){ ma_sound_start(slot.sound); slot.playing = true; }
+        }
+
+        // target volume: linear falloff from zone center, max 1.0 at center
+        float t = 1.0f - (dist / zone.radius);
+        float target_vol = glm::smoothstep(0.0f, 1.0f, t);
+
+        // lerp toward target
+        slot.cur_vol = slot.cur_vol + glm::clamp(target_vol - slot.cur_vol,
+            -Const::FADE_SPEED * dt, Const::FADE_SPEED * dt);
+        if (slot.sound) ma_sound_set_volume(slot.sound, slot.cur_vol);
+    }
+
+    // release unclaimed slots (listener left zone or zone became inactive)
+    for (int i = 0; i < Const::MAX_AMBIENCE_SLOTS; i++){
+        if (audio.ambience_slots[i].zone_id == -1) continue;
+        if (claimed[i]) continue;
+
+        auto& slot = audio.ambience_slots[i];
+
+        // fade out
+        slot.cur_vol = slot.cur_vol - Const::FADE_SPEED * dt;
+        if (slot.cur_vol <= 0.0f){
+            if (slot.sound){ free_sound(slot.sound); slot.sound = nullptr; }
+            slot.zone_id = -1;
+            slot.cur_vol = 0.0f;
+            slot.playing = false;
+        } 
+        else {
+            if (slot.sound) ma_sound_set_volume(slot.sound, slot.cur_vol);
+        }
+    }
 }

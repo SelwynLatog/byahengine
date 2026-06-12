@@ -47,6 +47,25 @@ namespace Const{
     inline constexpr float LIGHT_NIGHT_AMBIENT = 0.07f;
     inline constexpr float LIGHT_NIGHT_DIFF = 1.0f;
 
+    // sound stuff
+    // max concurrent one-shot voices per pool
+    static constexpr int AUDIO_IMPACT_VOICES  = 8;
+    static constexpr int AUDIO_VOICE_VOICES = 4;
+    static constexpr int AUDIO_STEP_VOICES = 4;
+
+    // ambience
+    static constexpr int MAX_AMBIENCE_ZONES = 64; // max placed zones in world
+    static constexpr int MAX_AMBIENCE_SLOTS = 8; // max concurrently audible zones
+    static constexpr float AMBIENCE_RADIUS_DEFAULT = 20.0f;
+    static constexpr float AMBIENCE_RADIUS_MIN = 5.0f;
+    static constexpr float AMBIENCE_RADIUS_MAX = 120.0f;
+    static constexpr float AMBIENCE_RADIUS_STEP = 2.0f; // [ / ] key increment
+    static constexpr float FADE_SPEED = 1.2f; // vol units/sec fade in+out
+    static constexpr float RAIN_VOL_MAX = 0.85f;
+    static constexpr float NIGHT_THRESH = 0.35f; // night_factor above this activates AMBIENCE_NIGHT zones
+    static constexpr const char* AMBIENCE_SAVE_PATH = "../assets/_ambience.amb";
+
+
     // physics
     inline constexpr float GRAVITY= 9.81f; // m/s2
     inline constexpr float FIXED_TIMESTEP= 1.0f/ 120.0f; // physics ticks at 120hz

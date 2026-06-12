@@ -5,6 +5,7 @@
 #include <vector>
 #include "../world/world_object.hpp"
 #include "../world/height_field.hpp"
+#include "../world/ambience_zone.hpp"
 #include "../core/const.hpp"
 
 // which transform operation currently in use
@@ -22,7 +23,8 @@ enum EditorMode{
     MODE_OCEAN, // place/resize ocean zones
     MODE_LIGHT, // place light source, adjust intensity
     MODE_POSE,
-    MODE_AUDIO
+    MODE_AUDIO,
+    MODE_AMBIENCE
 };
 
 // editor mode state lives in App
@@ -106,5 +108,11 @@ struct EditorState{
     int audio_slot = 0; // which slot is being edited, maps to AudioSlot enum
     int audio_file_page = 0; // scroll offset in audio file list
     std::vector<std::string> audio_file_list; // scanned from assets/audio/
+
+    // ambience editor
+    // active when MODE_AMBIENCE
+    int selected_zone_id = -1; // -1 = none selected
+    int ambience_file_page = 0; // scroll offset in audio file list
+    bool ambience_placing = false; // true = ghost zone follows ground cursor, LMB confirms
 
 };

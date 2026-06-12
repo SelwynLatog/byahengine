@@ -32,6 +32,7 @@ add_executable(tricycle-sim
     src/world/ocean.cpp
     src/world/npc.cpp
     src/world/animal_anim.cpp
+    src/world/ambience_zone.cpp
     src/audio/audio.cpp
     vendor/glad/src/glad.c
     src/stb_impl.cpp

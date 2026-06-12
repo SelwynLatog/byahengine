@@ -2,14 +2,10 @@
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
+#include "../core/const.hpp"
 
 struct ma_engine;
 struct ma_sound;
-
-// max concurrent one-shot voices per pool
-static constexpr int AUDIO_IMPACT_VOICES  = 8;
-static constexpr int AUDIO_VOICE_VOICES = 4;
-static constexpr int AUDIO_STEP_VOICES = 4;
 
 struct AudioVoice {
     ma_sound* sound = nullptr;
@@ -36,13 +32,13 @@ struct AudioSystem {
     bool radio_on = false;
 
     // ring buffer alloc
-    AudioVoice impact_pool[AUDIO_IMPACT_VOICES];
+    AudioVoice impact_pool[Const::AUDIO_IMPACT_VOICES];
     int impact_head = 0;
 
-    AudioVoice voice_pool[AUDIO_VOICE_VOICES];
+    AudioVoice voice_pool[Const::AUDIO_VOICE_VOICES];
     int voice_head = 0;
 
-    AudioVoice step_pool[AUDIO_STEP_VOICES];
+    AudioVoice step_pool[Const::AUDIO_STEP_VOICES];
     int step_head = 0;
 
     // 3D listener state
@@ -61,6 +57,21 @@ struct AudioSystem {
     // especially on grouped objects
     float impact_cooldown = 0.0f;
     static constexpr float IMPACT_COOLDOWN_INTERVAL = 0.18f; // seconds
+
+    // env ambience slots
+    // audio system needs submode for area based selection
+    struct AmbienceSlot{
+        ma_sound* sound = nullptr;
+        int zone_id = -1;
+        float cur_vol = 0.0f; // for faded volume
+        bool playing = false;
+    };
+    AmbienceSlot ambience_slots[Const::MAX_AMBIENCE_SLOTS];
+
+    // global for rain
+    ma_sound* rain = nullptr;
+    bool rain_active = false;
+    float rain_vol = 0.0f;
 };
 
 // lifecycle
@@ -93,3 +104,9 @@ void audio_trigger_step(AudioSystem& audio,
 void audio_radio_next(AudioSystem& audio);
 void audio_radio_toggle(AudioSystem& audio);
 void audio_radio_set_volume(AudioSystem& audio, float vol);
+
+struct AmbienceZone;
+void audio_update_env(AudioSystem& audio, float dt, const glm::vec3& listener_pos,
+    const AmbienceZone* zones, int zone_count, float night_factor);
+
+void audio_rain_set(AudioSystem& audio, bool active);

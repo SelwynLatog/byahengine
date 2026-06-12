@@ -4,6 +4,7 @@
 #include "road_spline.hpp"
 #include "ocean.hpp"
 #include "light_source.hpp"
+#include "ambience_zone.hpp"
 #include <vector>
 #include <string>
 
@@ -16,6 +17,10 @@ struct WorldMap{
     int next_id = 0;
     int next_road_id = 0;
     Ocean ocean;
+
+    AmbienceZone ambience_zones[Const::MAX_AMBIENCE_ZONES];
+    int ambience_count = 0;
+    int next_ambience_id = 0;
 };
 
 // add object to map

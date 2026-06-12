@@ -1057,6 +1057,99 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
     }
 
 
+    if (editor.mode == MODE_AMBIENCE){
+        font_draw(er.font, "[ AMBIENCE MODE ]", 180, 16, 3, 0.30f, 0.95f, 0.60f);
+        font_draw(er.font, "LMB=place/select  DEL=delete  F=type  [/]=radius  1-8=assign audio  UP/DN=scroll  I=exit",
+            220, 40, 2, 0.30f, 0.95f, 0.60f);
+
+        er.line_verts.clear();
+        static const int SEGS = 40;
+        for (int z = 0; z < map.ambience_count; z++){
+            const AmbienceZone& zone = map.ambience_zones[z];
+            bool selected = (zone.id == editor.selected_zone_id);
+
+            // PROXIMITY = teal, NIGHT = deep purple, selected = bright white
+            glm::vec3 col = selected
+                ? glm::vec3(1.0f, 1.0f, 1.0f)
+                : (zone.type == AMBIENCE_NIGHT
+                    ? glm::vec3(0.55f, 0.20f, 0.90f)
+                    : glm::vec3(0.10f, 0.85f, 0.55f));
+
+            float ground_y = heightfield_sample(map.terrain, zone.pos.x, zone.pos.z) + 0.1f;
+
+            // center cross so you can see the anchor point
+            float cs = 0.5f;
+            er.line_verts.insert(er.line_verts.end(),
+                {zone.pos.x - cs, ground_y, zone.pos.z, col.r, col.g, col.b});
+            er.line_verts.insert(er.line_verts.end(),
+                {zone.pos.x + cs, ground_y, zone.pos.z, col.r, col.g, col.b});
+            er.line_verts.insert(er.line_verts.end(),
+                {zone.pos.x, ground_y, zone.pos.z - cs, col.r, col.g, col.b});
+            er.line_verts.insert(er.line_verts.end(),
+                {zone.pos.x, ground_y, zone.pos.z + cs, col.r, col.g, col.b});
+
+            // radius circle on ground
+            for (int i = 0; i < SEGS; i++){
+                float a0 = (float)i / SEGS * 2.0f * 3.14159265f;
+                float a1 = (float)(i + 1) / SEGS * 2.0f * 3.14159265f;
+                float x0 = zone.pos.x + std::cos(a0) * zone.radius;
+                float z0 = zone.pos.z + std::sin(a0) * zone.radius;
+                float x1 = zone.pos.x + std::cos(a1) * zone.radius;
+                float z1 = zone.pos.z + std::sin(a1) * zone.radius;
+                er.line_verts.insert(er.line_verts.end(), {x0, ground_y, z0, col.r, col.g, col.b});
+                er.line_verts.insert(er.line_verts.end(), {x1, ground_y, z1, col.r, col.g, col.b});
+            }
+        }
+        flush_line_batch(er, er.shader, view, proj);
+
+        // selected zone info HUD
+        for (int z = 0; z < map.ambience_count; z++){
+            const AmbienceZone& zone = map.ambience_zones[z];
+            if (zone.id != editor.selected_zone_id) continue;
+
+            // file list
+            static constexpr int AMB_PAGE_SIZE = 8;
+            int x = 16, y = 60;
+            font_draw(er.font, "FILES", x, y, 2, 0.9f, 0.9f, 0.9f);
+            y += 28;
+            int total = (int)editor.audio_file_list.size();
+            if (total == 0){
+                font_draw(er.font, "no .wav/.ogg in assets/audio/", x, y, 1, 0.5f, 0.5f, 0.5f);
+            }
+            else {
+                int end = std::min(editor.ambience_file_page + AMB_PAGE_SIZE, total);
+                for (int i = editor.ambience_file_page; i < end; i++){
+                    int slot_key = i - editor.ambience_file_page + 1;
+                    std::string name = editor.audio_file_list[i];
+                    name = name.substr(name.find_last_of('/') + 1);
+                    if (name.size() > 28) name = name.substr(0, 26) + "..";
+                    font_draw(er.font, std::to_string(slot_key) + " " + name,
+                        x, y, 1, 0.75f, 0.75f, 0.75f);
+                    y += 18;
+                }
+                char pg[32];
+                snprintf(pg, sizeof(pg), "[%d-%d / %d]",
+                    editor.ambience_file_page + 1,
+                    std::min(editor.ambience_file_page + AMB_PAGE_SIZE, total), total);
+                font_draw(er.font, pg, x, y + 4, 1, 0.4f, 0.4f, 0.4f);
+            }
+
+            // zone info bottom
+            char buf[128];
+            snprintf(buf, sizeof(buf), "ZONE id=%d  TYPE: %s  RADIUS: %.1fm",
+                zone.id,
+                zone.type == AMBIENCE_NIGHT ? "NIGHT" : "PROXIMITY",
+                zone.radius);
+            font_draw(er.font, buf, 16, Const::WINDOW_HEIGHT - 120, 2, 0.30f, 0.95f, 0.60f);
+
+            std::string apath = zone.audio_path[0] ? zone.audio_path : "(none)";
+            std::string aname = apath.substr(apath.find_last_of('/') + 1);
+            font_draw(er.font, "AUDIO: " + aname,
+                16, Const::WINDOW_HEIGHT - 98, 2, 0.30f, 0.95f, 0.60f);
+            break;
+        }
+    }
+
     if (editor.mode == MODE_POSE){
         static const char* bone_names[6] = {
             "TORSO", "HEAD", "LEG_L", "LEG_R", "ARM_L", "ARM_R"
@@ -1728,12 +1821,12 @@ void editor_renderer_draw_ocean(EditorRenderer& er, Ocean& ocean,
     shader_bind(er.ocean_shader);
     glUniformMatrix4fv(OL.view,  1, GL_FALSE, glm::value_ptr(view));
     glUniformMatrix4fv(OL.proj,  1, GL_FALSE, glm::value_ptr(proj));
-    glUniform1f(OL.time,    ocean.time);
+    glUniform1f(OL.time, ocean.time);
     glUniform1f(OL.y_level, ocean.y_level);
-    glUniform3f(OL.light_dir,      light_dir.x,          light_dir.y,          light_dir.z);
-    glUniform3f(OL.cam_pos,        cam_pos.x,             cam_pos.y,            cam_pos.z);
-    glUniform3f(OL.light_color,    er.light_color.r,      er.light_color.g,     er.light_color.b);
-    glUniform1f(OL.ambient,        er.ambient);
+    glUniform3f(OL.light_dir, light_dir.x, light_dir.y, light_dir.z);
+    glUniform3f(OL.cam_pos, cam_pos.x, cam_pos.y, cam_pos.z);
+    glUniform3f(OL.light_color, er.light_color.r, er.light_color.g, er.light_color.b);
+    glUniform1f(OL.ambient, er.ambient);
     glUniform1f(OL.diff_intensity, er.diff_intensity);
 
     glEnable(GL_BLEND);
