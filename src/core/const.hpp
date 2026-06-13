@@ -348,7 +348,7 @@ namespace Const{
 
     // rain splashes
     inline constexpr int RAIN_SPLASH_MAX = 300;
-    inline constexpr float RAIN_SPLASH_LIFE = 0.35f; // higher = more visible particles
+    inline constexpr float RAIN_SPLASH_LIFE = 0.55f; // higher = more visible particles
     inline constexpr float RAIN_SPLASH_RADIUS = 0.55f; // higher = bigger splash rad
 
 

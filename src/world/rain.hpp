@@ -17,6 +17,7 @@ struct RainSplash {
     glm::vec3 pos;
     float life;
     float radius;
+    bool alive = false;
 };
 
 struct RainState{

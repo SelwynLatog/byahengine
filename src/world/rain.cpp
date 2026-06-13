@@ -187,6 +187,7 @@ void rain_update(RainState& rain, float dt, glm::vec3 cam_pos, float speed, floa
             sp.pos.y = heightfield_sample(terrain, sp.pos.x, sp.pos.z) + 0.05f;
             sp.life = 0.0f;
             sp.radius = 0.0f;
+            sp.alive = true;
         }
 
         if (out_y || out_xz)
@@ -196,8 +197,8 @@ void rain_update(RainState& rain, float dt, glm::vec3 cam_pos, float speed, floa
     // tick splashes
     float life_step = dt / Const::RAIN_SPLASH_LIFE;
     for (int i = 0; i < Const::RAIN_SPLASH_MAX; i++){
-        if (rain.splashes[i].radius == 0.0f && rain.splashes[i].life == 0.0f) continue;
-        if (rain.splashes[i].life >= 1.0f) continue;
+        if (!rain.splashes[i].alive) continue;
+        if (rain.splashes[i].life >= 1.0f){ rain.splashes[i].alive = false; continue; }
         rain.splashes[i].life += life_step;
         rain.splashes[i].radius = rain.splashes[i].life * Const::RAIN_SPLASH_RADIUS;
     }
@@ -267,10 +268,10 @@ void rain_draw(RainState& rain, const glm::mat4& view, const glm::mat4& proj, gl
     int si = 0;
     for (int i = 0; i < Const::RAIN_SPLASH_MAX; i++){
         const RainSplash& sp = rain.splashes[i];
-        if (sp.life <= 0.0f || sp.life >= 1.0f) continue;
+        if (!sp.alive) continue;
         float r = sp.radius;
         for (int seg = 0; seg < 8; seg++){
-            float a0 = (seg    ) * (glm::two_pi<float>() / 8.0f);
+            float a0 = (seg) * (glm::two_pi<float>() / 8.0f);
             float a1 = (seg + 1) * (glm::two_pi<float>() / 8.0f);
             sbuf[si++] = sp.pos.x + std::cos(a0) * r;
             sbuf[si++] = sp.pos.y + 0.02f;
