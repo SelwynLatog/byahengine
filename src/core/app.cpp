@@ -286,6 +286,7 @@ void app_init(App& app){
 
     hud_init(app.hud, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
     audio_init(app.audio, "../assets");
+    rain_init(app.rain, app.trike.position);
 
     // seed cam to actual player spawn so first-frame lerp has no jump
     {
@@ -1406,6 +1407,10 @@ void app_run(App& app){
             }
         }
 
+
+        rain_tick_trigger(app.rain, dt);
+        rain_update(app.rain, dt, app.trike.position, app.trike.speed, app.trike.heading, app.map.terrain);
+        rain_draw(app.rain, view, proj, app.trike.position, app.trike.speed, app.trike.heading);
         hud_draw(app.hud, app.trike, app.passenger_npc_id != -1, app.passenger_fare);
         window_swap_buffers(app.window);
         window_poll_events();
@@ -1416,6 +1421,7 @@ void app_run(App& app){
  * APP_SHUTDOWN
  *****************************************************/
 void app_shutdown(App& app){
+    rain_destroy(app.rain);
     audio_shutdown(app.audio);
     hud_destroy(app.hud);
     scene_destroy(app.scene);

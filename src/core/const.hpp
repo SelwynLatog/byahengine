@@ -328,6 +328,30 @@ namespace Const{
     inline constexpr float OCEAN_WAVE_SPEED2 = 1.3f; // second layer time mult
     inline constexpr float OCEAN_SHALLOW_DIST = 12.0f; // metres from shore edge for teal tint
 
+    // rain
+    inline constexpr bool RAIN_FORCE_ENABLE = true; // enable to insta trigger rain at build, debug
+    inline constexpr bool RAIN_PAUSE = false; // enable to pause rain for debugging streak texture
+    inline constexpr int RAIN_PARTICLE_COUNT = 2500;
+    inline constexpr float RAIN_FALL_SPEED = 22.0f;
+    inline constexpr float RAIN_STREAK_SPEED = 0.55f;
+    inline constexpr float RAIN_STREAK_LENGTH = 0.55f; // quad height
+    inline constexpr float RAIN_STREAK_WIDTH = 0.01f; // quad width
+    inline constexpr float RAIN_BOX_HALF_XZ = 28.0f; // spawn box rad around cam XZ
+    inline constexpr float RAIN_BOX_HEIGHT = 18.0f;  // spawn height above cam
+    inline constexpr float RAIN_WIND_X = 1.4f; // m/s wind drift X
+    inline constexpr float RAIN_WIND_Z = 0.5f; // m/s wind drift Z
+    inline constexpr float RAIN_ALPHA = 0.15f; // streak base opacity
+    // random trigger: rain starts every RAIN_INTERVAL_MIN..MAX seconds, lasts RAIN_DUR seconds
+    inline constexpr float RAIN_INTERVAL_MIN = 30.0f;
+    inline constexpr float RAIN_INTERVAL_MAX = 90.0f;
+    inline constexpr float RAIN_DUR = 20.0f;
+
+    // rain splashes
+    inline constexpr int RAIN_SPLASH_MAX = 300;
+    inline constexpr float RAIN_SPLASH_LIFE = 0.35f; // higher = more visible particles
+    inline constexpr float RAIN_SPLASH_RADIUS = 0.55f; // higher = bigger splash rad
+
+
     // driver / NPC character scale
     // scale against actual height axis, not longest axis like trike
     inline constexpr float DRIVER_TARGET_HEIGHT = 1.55f; // metres

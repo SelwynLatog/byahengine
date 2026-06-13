@@ -1,6 +1,7 @@
 #pragma once
 #include "window.hpp"
 #include "editor_state.hpp"
+#include "player_state.hpp"
 #include "../physics/trike_state.hpp"
 #include "../physics/trike_physics.hpp"
 #include "../physics/obstacle.hpp"
@@ -9,13 +10,12 @@
 #include "../renderer/editor_renderer.hpp"
 #include "../world/world_map.hpp"
 #include "../world/world_object.hpp"
+#include "../physics/dynamic_sim.hpp"
+#include "../world/npc.hpp"
+#include "../world/rain.hpp"
+#include "../audio/audio.hpp"
 #include <vector>
 #include <unordered_map>
-#include "../physics/dynamic_sim.hpp"
-#include "player_state.hpp"
-#include "../world/npc.hpp"
-#include "../audio/audio.hpp"
-
 
 struct App {
     Window window;
@@ -48,6 +48,7 @@ struct App {
     std::unordered_map<std::string, DriverModel> npc_model_cache;
 
     AudioSystem audio;
+    RainState rain;
     float passenger_time = 0.0f; // accumulates while npc is passenger, drives slow dropoff
 };
 
