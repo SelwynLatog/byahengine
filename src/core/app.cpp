@@ -1407,10 +1407,16 @@ void app_run(App& app){
             }
         }
 
+        // push overcast sky when rain is active or about to trigger
+        app.scene.sky_rain_target = app.rain.active ? 1.0f : 0.0f;
+
+         // rain follows whoever is the listener — trike or player on foot
+        glm::vec3 rain_origin = (app.player.mode == PLAYER_FOOT) ? app.player.pos : app.trike.position;
+        float rain_speed = (app.player.mode == PLAYER_FOOT) ? app.player.speed : app.trike.speed;
 
         rain_tick_trigger(app.rain, dt);
-        rain_update(app.rain, dt, app.trike.position, app.trike.speed, app.trike.heading, app.map.terrain);
-        rain_draw(app.rain, view, proj, app.trike.position, app.trike.speed, app.trike.heading);
+        rain_update(app.rain, dt, rain_origin, rain_speed, app.trike.heading, app.map.terrain);
+        rain_draw(app.rain, view, proj, rain_origin, rain_speed, app.trike.heading);
         hud_draw(app.hud, app.trike, app.passenger_npc_id != -1, app.passenger_fare);
         window_swap_buffers(app.window);
         window_poll_events();

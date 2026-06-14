@@ -50,6 +50,9 @@ struct SceneState {
     int sky_flip_a = 0;
     int sky_flip_b = 0;
     float sky_blend = 0.0f;
+    float sky_rain_blend = 0.0f;
+    float sky_rain_target = 0.0f;
+    GLuint sky_rain_tex = 0;
     int sky_use_night_b = 0;
     float sky_uv_offset = 0.0f;
     // shadow map
@@ -73,9 +76,11 @@ struct SceneState {
     } gizmo_loc;
 
     struct {
-        GLint inv_view_proj, sky_tex, sky_night_tex;
+        GLint inv_view_proj, sky_tex, sky_night_tex, sky_rain_tex;
         GLint tint_a, tint_b, flip_a, flip_b;
         GLint blend, uv_offset, use_night_b;
+        GLint rain_blend;
+        GLint night_factor;
     } sky_loc;
 
     struct {

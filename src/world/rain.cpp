@@ -28,12 +28,21 @@ uniform vec3  u_cam_right;
 uniform vec3  u_streak_dir;
 uniform float u_streak_len;
 uniform float u_streak_width;
+uniform vec3  u_cam_center;
+uniform float u_box_half_xz;
     
 out float v_alpha;
-    
+out float v_edge_fade;
+
 void main(){
     int qi = gl_VertexID % 6;
     
+    // fade out particles in outer 35% of box so hard edge is never visible
+    float dx = abs(a_pos.x - u_cam_center.x) / u_box_half_xz;
+    float dz = abs(a_pos.z - u_cam_center.z) / u_box_half_xz;
+    float edge = max(dx, dz);
+    v_edge_fade = 1.0 - smoothstep(0.65, 1.0, edge);
+
     vec3 top = a_pos;
     vec3 bot = a_pos + u_streak_dir * (u_streak_len * a_len_scale);
     vec3 right = u_cam_right * (u_streak_width * a_width_scale);
@@ -60,11 +69,12 @@ void main(){
 static const char* RAIN_FRAG = R"(
 #version 330 core
 in float v_alpha;
+in float v_edge_fade;
 out vec4 frag_color;
 uniform float u_alpha;
 void main(){
     // rain frag color edit here
-    frag_color = vec4(0.78, 0.88, 1.00, u_alpha * v_alpha);
+    frag_color = vec4(0.78, 0.88, 1.00, u_alpha * v_alpha * v_edge_fade);
 }
 )";
 
@@ -113,6 +123,8 @@ void rain_init(RainState& rain, glm::vec3 cam_pos){
     rain.loc.streak_len = glGetUniformLocation(id, "u_streak_len");
     rain.loc.streak_width = glGetUniformLocation(id, "u_streak_width");
     rain.loc.alpha = glGetUniformLocation(id, "u_alpha");
+    rain.loc.cam_center = glGetUniformLocation(id, "u_cam_center");
+    rain.loc.box_half_xz = glGetUniformLocation(id, "u_box_half_xz");
 
     // scatter initial particles
     for (int i = 0; i < Const::RAIN_PARTICLE_COUNT; i++)
@@ -250,12 +262,14 @@ void rain_draw(RainState& rain, const glm::mat4& view, const glm::mat4& proj, gl
     glUniform1f(rain.loc.streak_len, Const::RAIN_STREAK_LENGTH);
     glUniform1f(rain.loc.streak_width, Const::RAIN_STREAK_WIDTH);
     glUniform1f(rain.loc.alpha, Const::RAIN_ALPHA);
+    glUniform3f(rain.loc.cam_center, cam_pos.x, cam_pos.y, cam_pos.z);
+    glUniform1f(rain.loc.box_half_xz, Const::RAIN_BOX_HALF_XZ);
 
     // additive blend: streaks brighten without harsh cutouts
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     glDepthMask(GL_FALSE);
-    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
     glBindVertexArray(rain.mesh.vao);
     glDrawArrays(GL_TRIANGLES, 0, rain.mesh.count);
     glBindVertexArray(0);

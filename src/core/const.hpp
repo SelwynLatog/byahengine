@@ -16,8 +16,8 @@ namespace Const{
 
     // day cycle
     // 10 real minutes = 1 full in-game day
-    inline constexpr float DAY_DURATION_SECONDS = 600.0f;
-    inline constexpr float DAY_START_TIME = 22.0f; // start at 7am
+    inline constexpr float DAY_DURATION_SECONDS = 30.0f;
+    inline constexpr float DAY_START_TIME = 7.0f; // start at 7am
 
     // time ranges (0-24)
     inline constexpr float DAY_MORNING_START = 5.0f;
@@ -331,13 +331,13 @@ namespace Const{
     // rain
     inline constexpr bool RAIN_FORCE_ENABLE = true; // enable to insta trigger rain at build, debug
     inline constexpr bool RAIN_PAUSE = false; // enable to pause rain for debugging streak texture
-    inline constexpr int RAIN_PARTICLE_COUNT = 2500;
+    inline constexpr int RAIN_PARTICLE_COUNT = 4000;
     inline constexpr float RAIN_FALL_SPEED = 22.0f;
     inline constexpr float RAIN_STREAK_SPEED = 0.55f;
     inline constexpr float RAIN_STREAK_LENGTH = 0.55f; // quad height
     inline constexpr float RAIN_STREAK_WIDTH = 0.01f; // quad width
-    inline constexpr float RAIN_BOX_HALF_XZ = 28.0f; // spawn box rad around cam XZ
-    inline constexpr float RAIN_BOX_HEIGHT = 18.0f;  // spawn height above cam
+    inline constexpr float RAIN_BOX_HALF_XZ = 55.0f; // spawn box rad around cam XZ
+    inline constexpr float RAIN_BOX_HEIGHT = 22.0f;  // spawn height above cam
     inline constexpr float RAIN_WIND_X = 1.4f; // m/s wind drift X
     inline constexpr float RAIN_WIND_Z = 0.5f; // m/s wind drift Z
     inline constexpr float RAIN_ALPHA = 0.15f; // streak base opacity
@@ -347,9 +347,9 @@ namespace Const{
     inline constexpr float RAIN_DUR = 20.0f;
 
     // rain splashes
-    inline constexpr int RAIN_SPLASH_MAX = 300;
+    inline constexpr int RAIN_SPLASH_MAX = 600;
     inline constexpr float RAIN_SPLASH_LIFE = 0.55f; // higher = more visible particles
-    inline constexpr float RAIN_SPLASH_RADIUS = 0.55f; // higher = bigger splash rad
+    inline constexpr float RAIN_SPLASH_RADIUS = 0.35f; // higher = bigger splash rad
 
 
     // driver / NPC character scale

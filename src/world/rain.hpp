@@ -42,6 +42,7 @@ struct RainState{
         GLint cam_right, streak_dir;
         GLint streak_len, streak_width;
         GLint alpha;
+        GLint cam_center, box_half_xz;
     } loc;
 
     struct {

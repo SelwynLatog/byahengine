@@ -149,6 +149,7 @@ out vec4 frag_color;
 uniform mat4      u_inv_view_proj;
 uniform sampler2D u_sky_tex;       // day tex
 uniform sampler2D u_sky_night_tex; // night tex
+uniform sampler2D u_sky_rain_tex;  // rain tex
 uniform vec3      u_tint_a;
 uniform vec3      u_tint_b;
 uniform int       u_flip_a;
@@ -156,6 +157,8 @@ uniform int       u_flip_b;
 uniform int       u_use_night_b;   // 1 = sample night tex for B side
 uniform float     u_blend;
 uniform float     u_uv_offset;
+uniform float     u_rain_blend;
+uniform float     u_night_factor;
 const float PI = 3.14159265;
 void main(){
     vec4 world = u_inv_view_proj * vec4(v_ndc, 1.0, 1.0);
@@ -170,7 +173,16 @@ void main(){
     vec3 col_b = (u_use_night_b == 1)
         ? texture(u_sky_night_tex, vec2(u_b, v)).rgb * u_tint_b
         : texture(u_sky_tex, vec2(u_b, v)).rgb * u_tint_b;
-    frag_color = vec4(mix(col_a, col_b, u_blend), 1.0);
+
+    vec3 day_night = mix(col_a, col_b, u_blend);
+    vec3 rain_sample = texture(u_sky_rain_tex, vec2(base_u, v)).rgb;
+    // day/golden: mild desaturate + slight cool tint, keep texture readable
+    // night: full greyscale conversion + heavy dim
+    float lum = dot(rain_sample, vec3(0.299, 0.587, 0.114));
+    vec3 rain_grey = vec3(lum) * vec3(0.58, 0.63, 0.70);
+    rain_sample = mix(rain_sample, rain_grey, mix(0.25, 1.0, u_night_factor));
+    rain_sample *= mix(0.88, 0.15, u_night_factor);
+    frag_color = vec4(mix(day_night, rain_sample, u_rain_blend), 1.0);
 }
 )";
 
@@ -315,7 +327,26 @@ void scene_init(SceneState& scene){
     }
 
 
-     // load night sky
+     // load rain/overcast sky
+    {
+        const char* rain_path = "../assets/sky_rain.jpg";
+        stbi_set_flip_vertically_on_load(0);
+        int w, h, ch;
+        unsigned char* px = stbi_load(rain_path, &w, &h, &ch, 3);
+        if (px){
+            glGenTextures(1, &scene.sky_rain_tex);
+            glBindTexture(GL_TEXTURE_2D, scene.sky_rain_tex);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, px);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            stbi_image_free(px);
+            std::cout << "[sky] loaded rain " << w << "x" << h << "\n";
+        }
+    }
+
+    // load night sky
     {
         const char* night_path = "../assets/sky_night.jpg";
         stbi_set_flip_vertically_on_load(0);
@@ -449,6 +480,9 @@ void scene_init(SceneState& scene){
         L.blend = glGetUniformLocation(id, "u_blend");
         L.uv_offset = glGetUniformLocation(id, "u_uv_offset");
         L.use_night_b = glGetUniformLocation(id, "u_use_night_b");
+        L.rain_blend = glGetUniformLocation(id, "u_rain_blend");
+        L.sky_rain_tex = glGetUniformLocation(id, "u_sky_rain_tex");
+        L.night_factor = glGetUniformLocation(id, "u_night_factor");
     }
     {
         GLuint id = scene.shadow_shader.id;
@@ -687,8 +721,43 @@ void scene_update_daytime(SceneState& scene, float dt){
     float night_pull_near = scene.night_factor * 160.0f;
     float night_pull_far = scene.night_factor * 360.0f;
 
-    scene.fog_near = day_near_base - golden_pull_near - night_pull_near;
-    scene.fog_far  = day_far_base  - golden_pull_far  - night_pull_far;
+    float effective_golden_near = golden_pull_near * (1.0f - scene.sky_rain_blend);
+    float effective_golden_far  = golden_pull_far  * (1.0f - scene.sky_rain_blend);
+    float rain_fog_near_pull = glm::mix(140.0f, 60.0f, scene.night_factor);
+    float rain_fog_far_pull  = glm::mix(320.0f, 120.0f, scene.night_factor);
+    scene.fog_near = day_near_base - effective_golden_near - night_pull_near - scene.sky_rain_blend * rain_fog_near_pull;
+    scene.fog_far  = day_far_base  - effective_golden_far  - night_pull_far - scene.sky_rain_blend * rain_fog_far_pull;
+    // hard floor so fog never starts at or behind the camera
+    scene.fog_near = glm::max(scene.fog_near, 8.0f);
+    scene.fog_far = glm::max(scene.fog_far,  scene.fog_near + 40.0f);
+
+    // RAIN COLOR DESATURATION
+    // grey-blue overcast light, kills the warm morning/golden tones
+    if (scene.sky_rain_blend > 0.01f){
+        // day: cool blue-grey overcast light
+        // night: don't touch light_color much, just boost ambient so scene stays readable
+        glm::vec3 rain_light_day = glm::vec3(0.72f, 0.78f, 0.88f); // cool overcast day
+        glm::vec3 rain_light_night = glm::vec3(0.30f, 0.33f, 0.38f); // dim but visible night
+        glm::vec3 rain_light = glm::mix(rain_light_day, rain_light_night, scene.night_factor);
+
+        // day: flatten diffuse shadows. night: boost ambient so objects are readable
+        float target_ambient = glm::mix(0.55f, 0.40f, scene.night_factor);
+        float target_diff = glm::mix(0.25f, 0.18f, scene.night_factor);
+        scene.light_color = glm::mix(scene.light_color, rain_light, scene.sky_rain_blend);
+        scene.ambient = glm::mix(scene.ambient, target_ambient, scene.sky_rain_blend);
+        scene.diff_intensity = glm::mix(scene.diff_intensity, target_diff, scene.sky_rain_blend);
+
+        // fog: day pulls in hard, night pulls in even harder for that claustrophobic wet feel
+        glm::vec3 rain_fog_day = glm::vec3(0.48f, 0.52f, 0.58f);
+        glm::vec3 rain_fog_night = glm::vec3(0.06f, 0.07f, 0.09f); // dark but not black
+        glm::vec3 rain_fog = glm::mix(rain_fog_day, rain_fog_night, scene.night_factor);
+        scene.fog_color = glm::mix(scene.fog_color, rain_fog, scene.sky_rain_blend);
+        scene.fog_color = glm::clamp(scene.fog_color, glm::vec3(0.0f), glm::vec3(1.0f));
+    }
+
+    // lerp rain sky blend toward target
+    float rain_lerp_speed = (scene.sky_rain_target > scene.sky_rain_blend) ? 0.012f : 0.006f;
+    scene.sky_rain_blend = glm::mix(scene.sky_rain_blend, scene.sky_rain_target, rain_lerp_speed);
 
     static float s_last_printed = -1.0f;
     if ((int)scene.day_time != (int)s_last_printed){
@@ -717,6 +786,9 @@ void scene_draw_sky(SceneState& scene, const glm::mat4& view, const glm::mat4& p
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, scene.sky_night_tex ? scene.sky_night_tex : scene.sky_tex);
     glUniform1i(SL.sky_night_tex, 1);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, scene.sky_rain_tex ? scene.sky_rain_tex : scene.sky_tex);
+    glUniform1i(SL.sky_rain_tex, 2);
     glActiveTexture(GL_TEXTURE0);
     glUniform3f(SL.tint_a, scene.sky_tint_a.r, scene.sky_tint_a.g, scene.sky_tint_a.b);
     glUniform3f(SL.tint_b, scene.sky_tint_b.r, scene.sky_tint_b.g, scene.sky_tint_b.b);
@@ -725,6 +797,8 @@ void scene_draw_sky(SceneState& scene, const glm::mat4& view, const glm::mat4& p
     glUniform1f(SL.blend, scene.sky_blend);
     glUniform1f(SL.uv_offset, scene.sky_uv_offset);
     glUniform1i(SL.use_night_b, scene.sky_use_night_b);
+    glUniform1f(SL.rain_blend, scene.sky_rain_blend);
+    glUniform1f(SL.night_factor, scene.night_factor);
     
     glDepthMask(GL_FALSE);
     glDisable(GL_DEPTH_TEST);
@@ -989,6 +1063,7 @@ void scene_draw_drop_marker(SceneState& scene, glm::vec3 pos, float pulse, const
 void scene_destroy(SceneState& scene){
     if (scene.sky_tex) glDeleteTextures(1, &scene.sky_tex);
     if (scene.sky_night_tex) glDeleteTextures(1, &scene.sky_night_tex);
+    if (scene.sky_rain_tex)  glDeleteTextures(1, &scene.sky_rain_tex);
     shader_destroy(scene.sky_shader);
     mesh_destroy(scene.sky_quad);
     shader_destroy(scene.shadow_shader);
