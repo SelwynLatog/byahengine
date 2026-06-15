@@ -97,6 +97,29 @@ void main(){
 }
 )";
 
+static const char* FLASH_VERT = R"(
+#version 330 core
+const vec2 VERTS[6] = vec2[](
+    vec2(-1,-1), vec2(1,-1), vec2(1,1),
+    vec2(-1,-1), vec2(1,1), vec2(-1,1)
+);
+void main(){
+    gl_Position = vec4(VERTS[gl_VertexID], 0.0, 1.0);
+}
+)";
+
+static const char* FLASH_FRAG = R"(
+#version 330 core
+out vec4 frag_color;
+uniform float u_alpha;
+uniform vec2  u_res;
+void main(){
+    vec2 uv = (gl_FragCoord.xy / u_res) * 2.0 - 1.0;
+    float vignette = 1.0 - smoothstep(0.3, 1.4, length(uv));
+    frag_color = vec4(0.90, 0.95, 1.0, u_alpha * (0.6 + 0.4 * vignette));
+}
+)";
+
 static float randf(float lo, float hi){
     return lo + (hi - lo) * ((float)rand() / (float)RAND_MAX);
 }
@@ -173,6 +196,14 @@ void rain_init(RainState& rain, glm::vec3 cam_pos){
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
+
+
+    // flash quad
+    shader_init(rain.flash_shader, FLASH_VERT, FLASH_FRAG);
+    rain.flash_loc_alpha = glGetUniformLocation(rain.flash_shader.id, "u_alpha");
+    rain.flash_loc_res = glGetUniformLocation(rain.flash_shader.id, "u_res");
+    glGenVertexArrays(1, &rain.flash_vao);
+    rain.thunder_timer = randf(Const::THUNDER_INTERVAL_MIN, Const::THUNDER_INTERVAL_MAX);
 }
 
 void rain_update(RainState& rain, float dt, glm::vec3 cam_pos, float speed, float heading, const HeightField& terrain){
@@ -314,6 +345,21 @@ void rain_draw(RainState& rain, const glm::mat4& view, const glm::mat4& proj, gl
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // fullscreen lightning flash overlay
+    if (Const::RAIN_THUNDERSTORM && rain.flash_alpha > 0.001f){
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_DEPTH_TEST);
+        shader_bind(rain.flash_shader);
+        glUniform1f(rain.flash_loc_alpha, rain.flash_alpha);
+        glUniform2f(rain.flash_loc_res, (float)Const::WINDOW_WIDTH, (float)Const::WINDOW_HEIGHT);
+        glBindVertexArray(rain.flash_vao);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+        glEnable(GL_DEPTH_TEST);
+    }
+
     glDisable(GL_BLEND);
 }
 
@@ -336,6 +382,55 @@ void rain_tick_trigger(RainState& rain, float dt){
     }
 }
 
+void rain_tick_thunder(RainState& rain, float dt, const std::string& assets_root){
+    if (!rain.active || !Const::RAIN_THUNDERSTORM) return;
+
+    // decay active flash
+    if (rain.flash_alpha > 0.0f){
+        rain.flash_alpha -= rain.flash_decay * dt;
+        if (rain.flash_alpha < 0.0f) rain.flash_alpha = 0.0f;
+    }
+
+    // delayed audio boom
+    if (rain.thunder_boom_pending){
+        rain.thunder_audio_delay -= dt;
+        // app.cpp reads boom_pending + delay <= 0 to fire audio
+    }
+
+    // waiting to fire main strike after pre-flash gap
+    if (rain.main_strike_pending){
+        rain.preflash_gap_timer -= dt;
+        if (rain.preflash_gap_timer <= 0.0f){
+            rain.main_strike_pending = false;
+            rain.flash_alpha = Const::THUNDER_FLASH_ALPHA_MAX;
+            rain.flash_decay = Const::THUNDER_FLASH_DECAY;
+            rain.thunder_audio_delay = randf(Const::THUNDER_AUDIO_DELAY_MIN, Const::THUNDER_AUDIO_DELAY_MAX);
+            rain.thunder_boom_pending = true;
+        }
+        return;
+    }
+
+    rain.thunder_timer -= dt;
+    if (rain.thunder_timer > 0.0f) return;
+
+    // new strike coin fli[]
+    if (randf(0.0f, 1.0f) < Const::THUNDER_DOUBLE_CHANCE){
+        // pre-flash dim, fast decay, then gap before main
+        rain.flash_alpha = Const::THUNDER_PREFLASH_ALPHA;
+        rain.flash_decay = Const::THUNDER_PREFLASH_DECAY;
+        rain.preflash_gap_timer = Const::THUNDER_PREFLASH_GAP;
+        rain.main_strike_pending = true;
+    }
+    else {
+        // single strike directly
+        rain.flash_alpha = Const::THUNDER_FLASH_ALPHA_MAX;
+        rain.flash_decay = Const::THUNDER_FLASH_DECAY;
+        rain.thunder_audio_delay = randf(Const::THUNDER_AUDIO_DELAY_MIN, Const::THUNDER_AUDIO_DELAY_MAX);
+        rain.thunder_boom_pending = true;
+    }
+    rain.thunder_timer = randf(Const::THUNDER_INTERVAL_MIN, Const::THUNDER_INTERVAL_MAX);
+}
+
 void rain_destroy(RainState& rain){
     shader_destroy(rain.shader);
     shader_destroy(rain.splash_shader);
@@ -345,4 +440,6 @@ void rain_destroy(RainState& rain){
     if (rain.splash_vbo) glDeleteBuffers(1, &rain.splash_vbo);
     rain.mesh.vao = rain.mesh.vbo = 0;
     rain.splash_vao = rain.splash_vbo = 0;
+    if (rain.flash_vao) glDeleteVertexArrays(1, &rain.flash_vao);
+    rain.flash_vao = 0;
 }

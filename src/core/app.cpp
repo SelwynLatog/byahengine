@@ -12,6 +12,7 @@
 #include "../world/world_map.hpp"
 #include "../world/road_builder.hpp"
 #include "../world/ambience_zone.hpp"
+#include "../world/rain.hpp"
 #include <cmath>
 #include <iostream>
 #include <fstream>
@@ -1415,8 +1416,18 @@ void app_run(App& app){
         float rain_speed = (app.player.mode == PLAYER_FOOT) ? app.player.speed : app.trike.speed;
 
         rain_tick_trigger(app.rain, dt);
+        audio_rain_set(app.audio, app.rain.active);
+        rain_tick_thunder(app.rain, dt, "../assets");
+
+        // fire when delay just expired this frame
+        if (app.rain.thunder_boom_pending && app.rain.thunder_audio_delay <= 0.0f){
+            app.rain.thunder_boom_pending = false;
+            audio_trigger_voice_local(app.audio, "../assets/audio/ambience/thunder.wav");
+        }
         rain_update(app.rain, dt, rain_origin, rain_speed, app.trike.heading, app.map.terrain);
         rain_draw(app.rain, view, proj, rain_origin, rain_speed, app.trike.heading);
+
+
         hud_draw(app.hud, app.trike, app.passenger_npc_id != -1, app.passenger_fare);
         window_swap_buffers(app.window);
         window_poll_events();

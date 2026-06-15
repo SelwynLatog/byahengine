@@ -99,7 +99,7 @@ bool audio_init(AudioSystem& audio, const char* assets_dir){
     if (audio.ambient) ma_sound_start(audio.ambient);
 
     // rain loop
-    std::string rain_path = adir + "/audio/ambience/rain_loop.wav";
+    std::string rain_path = adir + "/audio/ambience/rain.wav";
     audio.rain = alloc_sound(audio.engine, rain_path, true, false, 0.0f);
     if (audio.rain) ma_sound_start(audio.rain);
 

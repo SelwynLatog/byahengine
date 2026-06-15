@@ -346,6 +346,21 @@ namespace Const{
     inline constexpr float RAIN_INTERVAL_MAX = 90.0f;
     inline constexpr float RAIN_DUR = 20.0f;
 
+    // thunder + lightning
+    // RAIN_THUNDERSTORM enables everything, set true to debug
+    inline constexpr bool RAIN_THUNDERSTORM = true;
+    inline constexpr float THUNDER_FLASH_ALPHA_MAX = 0.75f; // peal white overlay flash
+    inline constexpr float THUNDER_FLASH_DECAY = 6.0f; // how fast flash fades per sec
+    inline constexpr float THUNDER_PREFLASH_ALPHA = 0.28f; // dim pre-flash
+    inline constexpr float THUNDER_PREFLASH_DECAY = 9.0f; // pre-flash dies fast
+    inline constexpr float THUNDER_PREFLASH_GAP = 0.08f; // seconds between pre and main
+    inline constexpr float THUNDER_DOUBLE_CHANCE = 0.4f; //% of strikes get a pre-flash
+    inline constexpr float THUNDER_INTERVAL_MIN = 18.0f; // secs between strikes (min)
+    inline constexpr float THUNDER_INTERVAL_MAX = 45.0f; // secs between strikes (max)
+    inline constexpr float THUNDER_AUDIO_DELAY_MIN = 0.0f; // delay between flash and boom (sec)
+    inline constexpr float THUNDER_AUDIO_DELAY_MAX = 1.8f; // simulates distance
+
+
     // rain splashes
     inline constexpr int RAIN_SPLASH_MAX = 600;
     inline constexpr float RAIN_SPLASH_LIFE = 0.55f; // higher = more visible particles
