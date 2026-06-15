@@ -1300,34 +1300,38 @@ void app_run(App& app){
         app.editor_renderer.diff_intensity= app.scene.diff_intensity;
         
         app.editor_renderer.shadow_cull_center = app.trike.position;
-        scene_shadow_pass(app.scene, app.obstacles, app.trike.position);
+        static int s_shadow_frame = 0;
+        s_shadow_frame++;
+        if (s_shadow_frame >= 3){
+            s_shadow_frame = 0;
+            scene_shadow_pass(app.scene, app.obstacles, app.trike.position);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
-        glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
-        glClear(GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_FRONT);
+            glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
+            glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_FRONT);
 
+            editor_renderer_shadow_pass(app.editor_renderer, app.map, app.scene.light_space_mat, app.dynamic_sims);
+            scene_trike_shadow_draw(app.scene, app.trike);
+            driver_model_draw(app.scene.driver_model, app.player, app.trike, app.scene.shadow_shader, app.scene.light_space_mat, glm::mat4(1.0f),
+                app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
 
-        editor_renderer_shadow_pass(app.editor_renderer, app.map, app.scene.light_space_mat, app.dynamic_sims);
-        scene_trike_shadow_draw(app.scene, app.trike);
-        driver_model_draw(app.scene.driver_model, app.player, app.trike, app.scene.shadow_shader, app.scene.light_space_mat, glm::mat4(1.0f),
-            app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
-
-
-        for (const auto& npc : app.npcs) {
-            glm::vec3 dnpc = npc.position - app.trike.position;
-            dnpc.y = 0.0f;
-            if (glm::dot(dnpc, dnpc) > Const::NPC_CULL_DIST_SQ) continue;
-            auto it = app.npc_model_cache.find(npc.model_path);
-            DriverModel* mdl = (it != app.npc_model_cache.end())
-                ? &it->second : &app.scene.driver_model;
-            npc_draw(npc, *mdl, app.scene.shadow_shader,
-                app.scene.light_space_mat, glm::mat4(1.0f));
+            for (const auto& npc : app.npcs) {
+                glm::vec3 dnpc = npc.position - app.trike.position;
+                dnpc.y = 0.0f;
+                if (glm::dot(dnpc, dnpc) > Const::NPC_CULL_DIST_SQ) continue;
+                auto it = app.npc_model_cache.find(npc.model_path);
+                DriverModel* mdl = (it != app.npc_model_cache.end())
+                    ? &it->second : &app.scene.driver_model;
+                npc_draw(npc, *mdl, app.scene.shadow_shader,
+                    app.scene.light_space_mat, glm::mat4(1.0f));
+            }
+            glCullFace(GL_BACK);
+            glDisable(GL_CULL_FACE);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
-        glCullFace(GL_BACK);
-        glDisable(GL_CULL_FACE);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        
         int fb_w, fb_h;
         glfwGetFramebufferSize(app.window.handle, &fb_w, &fb_h);
         glViewport(0, 0, fb_w, fb_h);
