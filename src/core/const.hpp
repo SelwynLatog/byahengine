@@ -16,7 +16,7 @@ namespace Const{
 
     // day cycle
     // 10 real minutes = 1 full in-game day
-    inline constexpr float DAY_DURATION_SECONDS = 30.0f;
+    inline constexpr float DAY_DURATION_SECONDS = 600.0f;
     inline constexpr float DAY_START_TIME = 7.0f; // start at 7am
 
     // time ranges (0-24)
@@ -326,10 +326,10 @@ namespace Const{
     inline constexpr float OCEAN_WAVE_AMP2 = 0.06f; // second wave layer
     inline constexpr float OCEAN_WAVE_FREQ2 = 0.27f; // second layer spatial freq
     inline constexpr float OCEAN_WAVE_SPEED2 = 1.3f; // second layer time mult
-    inline constexpr float OCEAN_SHALLOW_DIST = 12.0f; // metres from shore edge for teal tint
+inline constexpr float OCEAN_SHALLOW_DIST = 12.0f; // metres from shore edge for teal tint
 
     // rain
-    inline constexpr bool RAIN_FORCE_ENABLE = true; // enable to insta trigger rain at build, debug
+    inline constexpr bool RAIN_FORCE_ENABLE = false; // enable to insta trigger rain at build, debug
     inline constexpr bool RAIN_PAUSE = false; // enable to pause rain for debugging streak texture
     inline constexpr int RAIN_PARTICLE_COUNT = 4000;
     inline constexpr float RAIN_FALL_SPEED = 22.0f;
@@ -344,11 +344,12 @@ namespace Const{
     // random trigger: rain starts every RAIN_INTERVAL_MIN..MAX seconds, lasts RAIN_DUR seconds
     inline constexpr float RAIN_INTERVAL_MIN = 30.0f;
     inline constexpr float RAIN_INTERVAL_MAX = 90.0f;
-    inline constexpr float RAIN_DUR = 20.0f;
+    inline constexpr float RAIN_DUR = 600.0f; // sec
+    inline constexpr float RAIN_START_CHANCE = 0.2f;
 
     // thunder + lightning
     // RAIN_THUNDERSTORM enables everything, set true to debug
-    inline constexpr bool RAIN_THUNDERSTORM = true;
+    inline constexpr bool RAIN_THUNDERSTORM = false;
     inline constexpr float THUNDER_FLASH_ALPHA_MAX = 0.75f; // peal white overlay flash
     inline constexpr float THUNDER_FLASH_DECAY = 6.0f; // how fast flash fades per sec
     inline constexpr float THUNDER_PREFLASH_ALPHA = 0.28f; // dim pre-flash

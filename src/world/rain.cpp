@@ -371,10 +371,19 @@ void rain_tick_trigger(RainState& rain, float dt){
     if (rain.timer > 0.0f) return;
 
     if (!rain.active){
-        // start a rain event
-        rain.active = true;
-        rain.timer = Const::RAIN_DUR;
-    } 
+
+        // roll for rain start
+        if (randf(0.0f, 1.0f) < Const::RAIN_START_CHANCE){
+            rain.active = true;
+            rain.timer = Const::RAIN_DUR;
+        }
+        else{
+            rain.timer = randf(
+                Const::RAIN_INTERVAL_MIN,
+                Const::RAIN_INTERVAL_MAX
+            );
+        }
+    }
     else {
         // end ,schedule next
         rain.active = false;
