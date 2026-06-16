@@ -858,22 +858,35 @@ void app_run(App& app){
                 float impulse = closing * (1.0f + wo->restitution) * (Const::TRIKE_MASS / total_mass);
                 sim.velocity += -hit_normal * impulse;
 
-                // torque 
-                // pitch and roll from hit direction and object height
+                // torque — topple away from hit direction in world space
+                // push_dir: direction the object is being shoved (away from trike)
+                glm::vec3 push_dir = -hit_normal; // points into object, away from trike
                 float height = (sim.aabb.max.y - sim.aabb.min.y);
-                float inertia = wo->mass * height * height * 0.3f; // approx rod inertia
+                float inertia = wo->mass * height * height * 0.3f;
                 float torque_mag = impulse * height * 0.5f / (inertia + 0.001f);
 
-                // hit from front/back = pitch
-                sim.pitch_vel += torque_mag * glm::dot(-hit_normal, trike_fwd);
-                // hit from side = roll
-                glm::vec3 trike_rgt = { std::cos(app.trike.heading + glm::half_pi<float>()), 0.0f,
-                                        std::sin(app.trike.heading + glm::half_pi<float>()) };
-                sim.roll_vel+= torque_mag * glm::dot(-hit_normal, trike_rgt);
+                // object local axes (ignoring its current tilt, world-aligned is fine for impact)
+                // push along object's local Z (depth) = pitch it over forward/back
+                // push along object's local X (width)  = roll it sideways
+                // both use push_dir projected onto world XZ so Y component doesn't affect topple
+                glm::vec3 push_xz = glm::vec3(push_dir.x, 0.0f, push_dir.z);
+                if (glm::length(push_xz) > 0.001f) push_xz = glm::normalize(push_xz);
 
-                // spin on Y
-                // glancing cause yaw spin
-                sim.yaw_vel+= torque_mag * 0.4f * (glm::dot(-hit_normal, trike_rgt));
+                // object forward = its placed yaw from world object rotation
+                float obj_yaw = wo->rotation.y;
+                glm::vec3 obj_fwd = { std::cos(obj_yaw), 0.0f, std::sin(obj_yaw) };
+                glm::vec3 obj_rgt = { std::cos(obj_yaw + glm::half_pi<float>()), 0.0f,
+                                      std::sin(obj_yaw + glm::half_pi<float>()) };
+
+                // project push onto object axes to get topple components
+                float push_fwd  = glm::dot(push_xz, obj_fwd); // + = topple forward (pitch+)
+                float push_side = glm::dot(push_xz, obj_rgt); // + = topple right   (roll+)
+
+                sim.pitch_vel += torque_mag * push_fwd;
+                sim.roll_vel  += torque_mag * push_side;
+
+                // glancing yaw spin from side component
+                sim.yaw_vel += torque_mag * 0.4f * push_side;
 
                 // trike loses speed proportional to object mass
                 app.trike.speed *= (1.0f - glm::clamp(wo->mass / total_mass * 0.6f, 0.0f, 0.6f));
@@ -899,13 +912,73 @@ void app_run(App& app){
             // integrate position
             sim.position += sim.velocity * dt;
 
-            // snap dyn objects to terrain
+            // gravity + ground contact
             float sim_ground = heightfield_sample(app.map.terrain, sim.position.x, sim.position.z);
-            if (sim.position.y < sim_ground) sim.position.y = sim_ground;
+            bool on_ground = (sim.position.y <= sim_ground + 0.01f);
+            if (on_ground) {
+                sim.position.y = sim_ground;
+                sim.vert_vel = 0.0f;
+            } 
+            else {
+                sim.vert_vel -= Const::GRAVITY * dt;
+                sim.position.y += sim.vert_vel * dt;
+                // clamp after integration too
+                if (sim.position.y < sim_ground) {
+                    sim.position.y = sim_ground;
+                    sim.vert_vel = 0.0f;
+                }
+            }
 
-            // ground friction bleeds linear velocity
+
+            // static obstacle collision for dynamic objects
+            // rebuild AABB at new position before testing
+            {
+                auto bit = app.editor_renderer.prop_bounds.find(wo->model_path);
+                if (bit != app.editor_renderer.prop_bounds.end()){
+                    float yoff = app.editor_renderer.prop_y_offset.count(wo->model_path)
+                        ? app.editor_renderer.prop_y_offset.at(wo->model_path) : 0.0f;
+                    glm::vec3 lmin = bit->second.local_min;
+                    glm::vec3 lmax = bit->second.local_max;
+                    sim.aabb.min = sim.position + glm::vec3(lmin.x*wo->scale.x, (lmin.y+yoff)*wo->scale.y, lmin.z*wo->scale.z);
+                    sim.aabb.max = sim.position + glm::vec3(lmax.x*wo->scale.x, (lmax.y+yoff)*wo->scale.y, lmax.z*wo->scale.z);
+                }
+            }
+            for (const auto& obs : app.obstacles){
+                if (obs.world_id == id) continue; // skip self
+                if (!aabb_overlap(sim.aabb, obs.aabb)) continue;
+
+                glm::vec3 mtv = aabb_mtv(sim.aabb, obs.aabb);
+                sim.position += mtv;
+
+                // rebuild after push so next obstacle test is accurate
+                auto bit = app.editor_renderer.prop_bounds.find(wo->model_path);
+                if (bit != app.editor_renderer.prop_bounds.end()){
+                    float yoff = app.editor_renderer.prop_y_offset.count(wo->model_path)
+                        ? app.editor_renderer.prop_y_offset.at(wo->model_path) : 0.0f;
+                    glm::vec3 lmin = bit->second.local_min;
+                    glm::vec3 lmax = bit->second.local_max;
+                    sim.aabb.min = sim.position + glm::vec3(lmin.x*wo->scale.x, (lmin.y+yoff)*wo->scale.y, lmin.z*wo->scale.z);
+                    sim.aabb.max = sim.position + glm::vec3(lmax.x*wo->scale.x, (lmax.y+yoff)*wo->scale.y, lmax.z*wo->scale.z);
+                }
+
+                // cancel velocity into the wall
+                glm::vec3 mtv_normal = glm::length(mtv) > 0.0f ? glm::normalize(mtv) : glm::vec3(0,1,0);
+                float vel_into = glm::dot(sim.velocity, -mtv_normal);
+                if (vel_into > 0.0f){
+                    sim.velocity += mtv_normal * vel_into;
+                    // bleed angular on hard wall contact
+                    float bleed = glm::clamp(vel_into * 0.3f, 0.0f, 0.6f);
+                    sim.pitch_vel *= (1.0f - bleed);
+                    sim.roll_vel  *= (1.0f - bleed);
+                    sim.yaw_vel   *= (1.0f - bleed);
+                }
+            }
+
+
+            // XZ drag: only on ground
             float drag = 1.0f - wo->friction * dt;
-            sim.velocity *= glm::clamp(drag, 0.0f, 1.0f);
+            if (on_ground)
+                sim.velocity *= glm::clamp(drag, 0.0f, 1.0f);
 
             // integrate angular
             sim.yaw += sim.yaw_vel * dt;
@@ -943,7 +1016,8 @@ void app_run(App& app){
 
             float lin_spd = glm::length(sim.velocity);
             float ang_spd = std::abs(sim.yaw_vel) + std::abs(sim.pitch_vel) + std::abs(sim.roll_vel);
-            if (lin_spd < 0.05f && ang_spd < 0.02f){
+            bool airborne = (sim.position.y > sim_ground + 0.05f);
+            if (!airborne && lin_spd < 0.05f && ang_spd < 0.02f){
                 sim.velocity  = glm::vec3(0.0f);
                 sim.yaw_vel   = sim.pitch_vel = sim.roll_vel = 0.0f;
                 sim.sleeping  = true;
