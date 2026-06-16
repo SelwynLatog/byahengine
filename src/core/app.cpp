@@ -1054,10 +1054,20 @@ void app_run(App& app){
                     sim_a.velocity -= hit_normal * (impulse / wo_a->mass);
                     sim_b.velocity += hit_normal * (impulse / wo_b->mass);
 
-                    // transfer some angular from linear impulse
-                    float torque = impulse * 0.3f;
-                    sim_a.roll_vel -= torque / (wo_a->mass + 0.001f);
-                    sim_b.roll_vel += torque / (wo_b->mass + 0.001f);
+
+                    // topple threshold
+                    // only topple if impulse is strong enough relative to object mass
+                    // a potato nudging a fence should never knock it over bruhhh
+                    float topple_threshold_a = wo_a->mass * 0.8f;
+                    float topple_threshold_b = wo_b->mass * 0.8f;
+                    if (impulse > topple_threshold_a){
+                        float torque = impulse * 0.3f;
+                        sim_a.roll_vel -= torque / (wo_a->mass + 0.001f);
+                    }
+                    if (impulse > topple_threshold_b){
+                        float torque = impulse * 0.3f;
+                        sim_b.roll_vel += torque / (wo_b->mass + 0.001f);
+                    }
                 }
             }
         }

@@ -89,10 +89,10 @@ namespace Const{
     inline constexpr float TRIKE_SIDECAR_MASS= 60.0f; // kg, sidecar estimate depends some regions have bulkier models
     // but for our place typically pretty light
 
-    inline constexpr float TRIKE_LATERAL_FRICTION= 12.0f; // resists sideways slip N/(m/s)
-    inline constexpr float TRIKE_ROLL_STIFFNESS= 31.0f; // suspension spring restoring roll
-    inline constexpr float TRIKE_ROLL_DAMPING= 14.0f; // damping on roll oscillation
-    inline constexpr float TRIKE_ROLLOVER_THRESHOLD= 28.0f; // degrees, tip point
+    inline constexpr float TRIKE_LATERAL_FRICTION= 22.0f; // resists sideways slip N/(m/s)
+    inline constexpr float TRIKE_ROLL_STIFFNESS= 40.0f; // suspension spring restoring roll
+    inline constexpr float TRIKE_ROLL_DAMPING= 20.0f; // damping on roll oscillation
+    inline constexpr float TRIKE_ROLLOVER_THRESHOLD= 38.0f; // degrees, tip point
     inline constexpr float TRIKE_RESPAWN_DELAY= 2.5f; // seconds before reset after tip
 
     // suspension
@@ -326,7 +326,7 @@ namespace Const{
     inline constexpr float OCEAN_WAVE_AMP2 = 0.06f; // second wave layer
     inline constexpr float OCEAN_WAVE_FREQ2 = 0.27f; // second layer spatial freq
     inline constexpr float OCEAN_WAVE_SPEED2 = 1.3f; // second layer time mult
-inline constexpr float OCEAN_SHALLOW_DIST = 12.0f; // metres from shore edge for teal tint
+    inline constexpr float OCEAN_SHALLOW_DIST = 12.0f; // metres from shore edge for teal tint
 
     // rain
     inline constexpr bool RAIN_FORCE_ENABLE = false; // enable to insta trigger rain at build, debug
