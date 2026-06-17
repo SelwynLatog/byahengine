@@ -1,22 +1,21 @@
 #pragma once
-#include "shader.hpp"
-#include "mesh.hpp"
-#include "font.hpp"
-#include "obj_mesh.hpp"
 #include "../core/editor_state.hpp"
 #include "../world/world_map.hpp"
 #include "../world/height_field.hpp"
 #include "../world/road_spline.hpp"
 #include "../world/ocean.hpp"
 #include "../world/npc.hpp"
+#include "../physics/dynamic_sim.hpp"
+#include "../tricycle/driver_model.hpp"
+#include "../tricycle/tricycle_model.hpp"
+#include "shader.hpp"
+#include "mesh.hpp"
+#include "font.hpp"
+#include "obj_mesh.hpp"
 #include <glm/glm.hpp>
 #include <map>
 #include <string>
 #include <unordered_map>
-#include "../physics/dynamic_sim.hpp"
-#include "../tricycle/driver_model.hpp"
-#include "../tricycle/tricycle_model.hpp"
-
 // all visual feedback for editor:
 // uses same gizmo shader pattern as scene.cpp
 struct EditorRenderer{

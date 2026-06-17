@@ -10,6 +10,8 @@ add_executable(tricycle-sim
     src/core/window.cpp
     src/core/editor_cam.cpp
     src/core/editor_input.cpp
+    src/core/cam.cpp
+    src/core/npc_update.cpp
     src/renderer/shader.cpp
     src/renderer/mesh.cpp
     src/renderer/mesh_builder.cpp
@@ -25,6 +27,7 @@ add_executable(tricycle-sim
     src/tricycle/driver_anim.cpp
     src/physics/trike_physics.cpp
     src/physics/trike_aabb.cpp
+    src/physics/collision.cpp
     src/world/world_map.cpp
     src/world/road_builder.cpp
     src/world/height_field.cpp

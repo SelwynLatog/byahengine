@@ -1,5 +1,5 @@
-#include "ocean.hpp"
 #include "../core/const.hpp"
+#include "ocean.hpp"
 #include <glad/glad.h>
 #include <fstream>
 #include <iostream>

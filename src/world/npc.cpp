@@ -1,28 +1,17 @@
-#include "npc.hpp"
 #include "../core/const.hpp"
 #include "../world/height_field.hpp"
 #include "../world/animal_behavior.hpp"
 #include "../world/animal_anim.hpp"
 #include "../tricycle/driver_model.hpp"
 #include "../tricycle/driver_anim.hpp"
+#include "../renderer/obj_mesh.hpp"
+#include "../renderer/obj_loader.hpp"
+#include "npc.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glad/glad.h>
-#include "../renderer/obj_mesh.hpp"
-#include "../renderer/obj_loader.hpp"
 #include <cmath>
-
-static constexpr float NPC_WALK_SPEED = 1.4f;
-static constexpr float NPC_ARRIVE_DIST = 0.6f;
-static constexpr float NPC_RAGDOLL_DURATION = 3.5f;
-static constexpr float NPC_GRAVITY = 9.81f;
-static constexpr float NPC_ANG_DRAG = 0.85f;
-static constexpr float NPC_LIN_DRAG = 0.75f;
-static constexpr float NPC_HAIL_RANGE_SQ = 36.0f; // 6m radius, checked in app
-static constexpr float NPC_HAIL_TIMER_MIN = 8.0f;  // seconds between hail attempts
-static constexpr float NPC_HAIL_TIMER_MAX = 20.0f;
-
 
 static void animal_update(NpcState& npc, const HeightField& terrain,
     const AnimalBehavior& b, float dt, glm::vec3 trike_pos)
@@ -133,7 +122,7 @@ void npc_init(NpcState& npc, int id, NpcType type, glm::vec3 pos, float yaw,
     if (glm::length(walk_dir) > 0.1f)
         npc.yaw = std::atan2(walk_dir.z, walk_dir.x);
     // stagger hail timers so npcs don't all hail at once
-    npc.hail_timer= NPC_HAIL_TIMER_MIN + (float)(id % 7) * 1.8f;
+    npc.hail_timer= Const::NPC_HAIL_TIMER_MIN + (float)(id % 7) * 1.8f;
     for (int i = 0; i < BONE_COUNT; i++){
         npc.hail_pose_quat[i]  = glm::quat(1,0,0,0);
         npc.mount_pose_quat[i] = glm::quat(1,0,0,0);
@@ -154,16 +143,16 @@ void npc_update(NpcState& npc, const HeightField& terrain, float dt,
     if (npc.mode == NPC_RAGDOLL) {
         npc.ragdoll_timer += dt;
 
-        npc.ragdoll_vel *= std::pow(NPC_LIN_DRAG, dt);
+        npc.ragdoll_vel *= std::pow(Const::NPC_LIN_DRAG, dt);
         npc.position += npc.ragdoll_vel * dt;
 
         float ground_y = heightfield_sample(terrain, npc.position.x, npc.position.z);
         if (npc.position.y > ground_y)
-            npc.position.y -= NPC_GRAVITY * dt * dt;
+            npc.position.y -= Const::NPC_GRAVITY * dt * dt;
         if (npc.position.y < ground_y)
             npc.position.y = ground_y;
 
-        float ang_drag = std::pow(NPC_ANG_DRAG, dt);
+        float ang_drag = std::pow(Const::NPC_ANG_DRAG, dt);
         npc.ragdoll_pitch_vel *= ang_drag;
         npc.ragdoll_roll_vel  *= ang_drag;
         npc.ragdoll_pitch += npc.ragdoll_pitch_vel * dt;
@@ -176,7 +165,7 @@ void npc_update(NpcState& npc, const HeightField& terrain, float dt,
         npc.ragdoll_yaw += npc.ragdoll_yaw_vel * dt;
         if (std::abs(npc.ragdoll_yaw_vel) < 0.05f) npc.ragdoll_yaw *= (1.0f - 4.0f * dt);
 
-        if (npc.ragdoll_timer >= NPC_RAGDOLL_DURATION) {
+        if (npc.ragdoll_timer >= Const::NPC_RAGDOLL_DURATION) {
             npc.ragdoll_timer = 0.0f;
             npc.ragdoll_pitch = npc.ragdoll_roll     = 0.0f;
             npc.ragdoll_pitch_vel = npc.ragdoll_roll_vel = 0.0f;
@@ -215,8 +204,8 @@ void npc_update(NpcState& npc, const HeightField& terrain, float dt,
 
     if (npc.mode == NPC_MOUNTING) {
         // walk toward sidecar mount point
-        npc.speed = NPC_WALK_SPEED;
-        npc.anim_timer += NPC_WALK_SPEED * dt * 1.8f;
+        npc.speed = Const::NPC_WALK_SPEED;
+        npc.anim_timer += Const::NPC_WALK_SPEED * dt * 1.8f;
         npc.position.y = heightfield_sample(terrain, npc.position.x, npc.position.z);
         return;
     }
@@ -226,20 +215,20 @@ void npc_update(NpcState& npc, const HeightField& terrain, float dt,
         glm::vec3 delta = npc.walk_a - npc.position;
         delta.y = 0.0f;
         float dist = glm::length(delta);
-        if (dist < NPC_ARRIVE_DIST) {
+        if (dist < Const::NPC_ARRIVE_DIST) {
             npc.fare_distance = 0.0f;
             npc.mode = (glm::length(npc.walk_b - npc.walk_a) > 0.1f) ? NPC_WALK : NPC_IDLE;
             npc.walk_forward = true;
             if (npc.hail_timer <= 0.0f)
-                npc.hail_timer = NPC_HAIL_TIMER_MIN;
+                npc.hail_timer = Const::NPC_HAIL_TIMER_MIN;
         } 
         else {
             glm::vec3 dir = delta / dist;
             npc.yaw = std::atan2(dir.z, dir.x);
-            npc.position += dir * NPC_WALK_SPEED * dt;
+            npc.position += dir * Const::NPC_WALK_SPEED * dt;
         }
-        npc.speed = NPC_WALK_SPEED;
-        npc.anim_timer += NPC_WALK_SPEED * dt * 1.8f;
+        npc.speed = Const::NPC_WALK_SPEED;
+        npc.anim_timer += Const::NPC_WALK_SPEED * dt * 1.8f;
         npc.position.y = heightfield_sample(terrain, npc.position.x, npc.position.z);
         return;
     }
@@ -250,16 +239,16 @@ void npc_update(NpcState& npc, const HeightField& terrain, float dt,
         delta.y = 0.0f;
         float dist = glm::length(delta);
 
-        if (dist < NPC_ARRIVE_DIST) {
+        if (dist < Const::NPC_ARRIVE_DIST) {
             npc.walk_forward = !npc.walk_forward;
         } 
         else {
             glm::vec3 dir = delta / dist;
             npc.yaw = std::atan2(dir.z, dir.x);
-            npc.position += dir * NPC_WALK_SPEED * dt;
+            npc.position += dir * Const::NPC_WALK_SPEED * dt;
         }
-        npc.speed = NPC_WALK_SPEED;
-        npc.anim_timer += NPC_WALK_SPEED * dt * 1.8f;
+        npc.speed = Const::NPC_WALK_SPEED;
+        npc.anim_timer += Const::NPC_WALK_SPEED * dt * 1.8f;
     }
     else { // NPC_IDLE
         npc.speed = 0.0f;

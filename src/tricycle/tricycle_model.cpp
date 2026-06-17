@@ -1,8 +1,8 @@
-#include "tricycle_model.hpp"
 #include "../core/const.hpp"
 #include "../renderer/obj_loader.hpp"
 #include "../renderer/obj_mesh.hpp"
 #include "../renderer/shader.hpp"
+#include "tricycle_model.hpp"
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>

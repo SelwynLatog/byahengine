@@ -1,5 +1,5 @@
-#include "rain.hpp"
 #include "../core/const.hpp"
+#include "rain.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>

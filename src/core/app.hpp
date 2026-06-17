@@ -1,7 +1,7 @@
 #pragma once
 #include "window.hpp"
 #include "editor_state.hpp"
-#include "player_state.hpp"
+#include "../physics/player_state.hpp"
 #include "../physics/trike_state.hpp"
 #include "../physics/trike_physics.hpp"
 #include "../physics/obstacle.hpp"

@@ -1,19 +1,18 @@
-#include "driver_model.hpp"
-#include "driver_anim.hpp"
-#include <glm/gtc/quaternion.hpp>
+#include "../../vendor/stb/stb_image.h"
 #include "../core/const.hpp"
 #include "../renderer/obj_loader.hpp"
 #include "../renderer/obj_mesh.hpp"
 #include "../renderer/shader.hpp"
+#include "../world/npc.hpp"
+#include "driver_model.hpp"
+#include "driver_anim.hpp"
+#include <glm/gtc/quaternion.hpp>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <cmath>
-#include "../../vendor/stb/stb_image.h"
-#include "../world/npc.hpp"
-
 // cached uniform locations for driver shader
 // avoids glGetUniformLocation string lookup every bone every frame
 struct DriverShaderLocs {

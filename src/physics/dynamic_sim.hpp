@@ -1,5 +1,5 @@
 #pragma once
-#include "../physics/trike_aabb.hpp"
+#include "trike_aabb.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 

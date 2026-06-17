@@ -1,15 +1,15 @@
 #pragma once
-#include "shader.hpp"
-#include "mesh.hpp"
 #include "../core/const.hpp"
-#include "../core/player_state.hpp"
-#include "obj_mesh.hpp"
+#include "../physics/player_state.hpp"
 #include "../physics/trike_state.hpp"
 #include "../physics/obstacle.hpp"
 #include "../tricycle/tricycle_mesh.hpp"
 #include "../tricycle/tricycle_model.hpp"
 #include "../tricycle/driver_model.hpp"
 #include "../world/light_source.hpp"
+#include "shader.hpp"
+#include "mesh.hpp"
+#include "obj_mesh.hpp"
 #include <glm/glm.hpp>
 #include <vector>
 

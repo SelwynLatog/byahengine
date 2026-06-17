@@ -3,7 +3,7 @@
 #include "../world/height_field.hpp"
 #include "../tricycle/driver_model.hpp"
 #include "../renderer/shader.hpp"
-#include "../core/player_state.hpp"
+#include "../physics/player_state.hpp"
 #include "../physics/trike_state.hpp"
 
 enum NpcType : int {

@@ -1,14 +1,14 @@
 #pragma once
-#include <unordered_map>
-#include <string>
-#include <glad/glad.h>
 #include "../renderer/shader.hpp"
 #include "../renderer/obj_mesh.hpp"
-#include "../core/player_state.hpp"
+#include "../physics/player_state.hpp"
 #include "../physics/trike_state.hpp"
 #include "driver_anim.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glad/glad.h>
+#include <unordered_map>
+#include <string>
 
 enum NpcType : int;
 

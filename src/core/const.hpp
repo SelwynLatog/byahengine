@@ -49,21 +49,21 @@ namespace Const{
 
     // sound stuff
     // max concurrent one-shot voices per pool
-    static constexpr int AUDIO_IMPACT_VOICES  = 8;
-    static constexpr int AUDIO_VOICE_VOICES = 4;
-    static constexpr int AUDIO_STEP_VOICES = 4;
+    inline constexpr int AUDIO_IMPACT_VOICES  = 8;
+    inline constexpr int AUDIO_VOICE_VOICES = 4;
+    inline constexpr int AUDIO_STEP_VOICES = 4;
 
     // ambience
-    static constexpr int MAX_AMBIENCE_ZONES = 64; // max placed zones in world
-    static constexpr int MAX_AMBIENCE_SLOTS = 8; // max concurrently audible zones
-    static constexpr float AMBIENCE_RADIUS_DEFAULT = 20.0f;
-    static constexpr float AMBIENCE_RADIUS_MIN = 5.0f;
-    static constexpr float AMBIENCE_RADIUS_MAX = 120.0f;
-    static constexpr float AMBIENCE_RADIUS_STEP = 2.0f; // [ / ] key increment
-    static constexpr float FADE_SPEED = 1.2f; // vol units/sec fade in+out
-    static constexpr float RAIN_VOL_MAX = 0.85f;
-    static constexpr float NIGHT_THRESH = 0.35f; // night_factor above this activates AMBIENCE_NIGHT zones
-    static constexpr const char* AMBIENCE_SAVE_PATH = "../assets/_ambience.amb";
+    inline constexpr int MAX_AMBIENCE_ZONES = 64; // max placed zones in world
+    inline constexpr int MAX_AMBIENCE_SLOTS = 8; // max concurrently audible zones
+    inline constexpr float AMBIENCE_RADIUS_DEFAULT = 20.0f;
+    inline constexpr float AMBIENCE_RADIUS_MIN = 5.0f;
+    inline constexpr float AMBIENCE_RADIUS_MAX = 120.0f;
+    inline constexpr float AMBIENCE_RADIUS_STEP = 2.0f; // [ / ] key increment
+    inline constexpr float FADE_SPEED = 1.2f; // vol units/sec fade in+out
+    inline constexpr float RAIN_VOL_MAX = 0.85f;
+    inline constexpr float NIGHT_THRESH = 0.35f; // night_factor above this activates AMBIENCE_NIGHT zones
+    inline constexpr const char* AMBIENCE_SAVE_PATH = "../assets/_ambience.amb";
 
 
     // physics
@@ -96,11 +96,11 @@ namespace Const{
     inline constexpr float TRIKE_RESPAWN_DELAY= 2.5f; // seconds before reset after tip
 
     // suspension
-    static constexpr float TRIKE_SUSP_REST = 0.0f; // ride height above ground_y (wheel radius already baked into model offset)
-    static constexpr float TRIKE_SUSP_STIFFNESS = 18000.0f; // N/m soft enough to bounce but stiff enough not to wallow
-    static constexpr float TRIKE_SUSP_DAMPING = 900.0f; // N·s/m critically damped feel
-    static constexpr float TRIKE_SUSP_BUMP = 0.12f; // max compression travel, meters
-    static constexpr float TRIKE_SUSP_DROOP = 0.08f; // max droop travel, meters
+    inline constexpr float TRIKE_SUSP_REST = 0.0f; // ride height above ground_y (wheel radius already baked into model offset)
+    inline constexpr float TRIKE_SUSP_STIFFNESS = 18000.0f; // N/m soft enough to bounce but stiff enough not to wallow
+    inline constexpr float TRIKE_SUSP_DAMPING = 900.0f; // N·s/m critically damped feel
+    inline constexpr float TRIKE_SUSP_BUMP = 0.12f; // max compression travel, meters
+    inline constexpr float TRIKE_SUSP_DROOP = 0.08f; // max droop travel, meters
 
 
     // Mesh default front
@@ -137,7 +137,7 @@ namespace Const{
     inline constexpr float CAM_SLOPE_PITCH_SCALE  = 1.8f;  // how much slope tilts the cam, tune up/down
     inline constexpr float CAM_SLOPE_LERP_SPEED = 3.0f;  // how fast cam pitch chases slope change
     inline constexpr float CAM_SLOPE_TARGET_Y_BIAS = 1.2f; // metres lookat lifts per radian of uphill pitch
-
+    
     // editor
     inline constexpr float EDITOR_CAM_SPEED = 30.0f; //metres/sec freecam movement
     inline constexpr float EDITOR_LOOK_SENSITIVITY = 0.003f; // radians per pixel drag
@@ -374,6 +374,16 @@ namespace Const{
     inline constexpr float DRIVER_SEAT_OFFSET_X = 0.65f; // forward/back in trike local space
     inline constexpr float DRIVER_SEAT_OFFSET_Y = 0.01f; // seat height above trike position
     inline constexpr float DRIVER_SEAT_OFFSET_Z = -0.3f;  // lateral
+
+    inline constexpr float NPC_WALK_SPEED = 1.4f;
+    inline constexpr float NPC_ARRIVE_DIST = 0.6f;
+    inline constexpr float NPC_RAGDOLL_DURATION = 3.5f;
+    inline constexpr float NPC_GRAVITY = 9.81f;
+    inline constexpr float NPC_ANG_DRAG = 0.85f;
+    inline constexpr float NPC_LIN_DRAG = 0.75f;
+    inline constexpr float NPC_HAIL_RANGE_SQ = 36.0f; // 6m radius, checked in app
+    inline constexpr float NPC_HAIL_TIMER_MIN = 8.0f;  // seconds between hail attempts
+    inline constexpr float NPC_HAIL_TIMER_MAX = 20.0f;
 
     // fare system
     inline constexpr float FARE_RATE_PER_METRE = 0.00001f; // pesos per metre

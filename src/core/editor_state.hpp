@@ -1,12 +1,12 @@
 #pragma once
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <string>
-#include <vector>
 #include "../world/world_object.hpp"
 #include "../world/height_field.hpp"
 #include "../world/ambience_zone.hpp"
 #include "../core/const.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <string>
+#include <vector>
 
 // which transform operation currently in use
 enum EditorTool{

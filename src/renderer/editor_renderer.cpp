@@ -1,10 +1,11 @@
-#include "editor_renderer.hpp"
-#include "obj_loader.hpp"
-#include "obj_mesh.hpp"
+#include "../../vendor/stb/stb_image.h"
 #include "../core/const.hpp"
 #include "../world/world_object.hpp"
 #include "../world/ocean.hpp"
 #include "../world/npc.hpp"
+#include "editor_renderer.hpp"
+#include "obj_loader.hpp"
+#include "obj_mesh.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -15,7 +16,6 @@
 #include <cmath>
 #include <cstdio>
 #include <map>
-#include "../../vendor/stb/stb_image.h"
 #include <iostream>
 #include <fstream>
 #include <filesystem>

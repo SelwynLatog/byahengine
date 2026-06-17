@@ -1,7 +1,7 @@
-#include "trike_physics.hpp"
 #include "../core/const.hpp"
 #include "../world/height_field.hpp"
 #include <glm/gtc/constants.hpp>
+#include "trike_physics.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>

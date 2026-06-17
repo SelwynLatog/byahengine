@@ -1,8 +1,9 @@
+#include "../../vendor/stb/stb_image.h"
+#include "../core/const.hpp"
+#include "../physics/trike_aabb.hpp"
 #include "scene.hpp"
 #include "mesh_builder.hpp"
 #include "obj_loader.hpp"
-#include "../core/const.hpp"
-#include "../physics/trike_aabb.hpp"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -10,7 +11,6 @@
 #include <glm/gtc/constants.hpp>
 #include <iostream>
 #include <cmath>
-#include "../../vendor/stb/stb_image.h"
 
 // shader sources
 static const char* VERT_SRC = R"(
