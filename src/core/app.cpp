@@ -459,9 +459,9 @@ void app_run(App& app){
             // TERRAIN SURFACE
             editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj, app.map.ocean);
 
-            // EDITOR OVERLAYS
-            // grid, ghost prop, selection highlight, gizmos
+            // MAIN OBJECT DRAW
             editor_renderer_draw(app.editor_renderer, app.editor, app.map, view, proj, app.editor.show_hitboxes, app.map.lights);
+
 
             // POSE MODE
             // isolated draw of driver + trike at origin for live bone tuning
@@ -479,10 +479,12 @@ void app_run(App& app){
             }
 
             // MAIN EDITOR HUD
+            editor_renderer_draw_hud(app.editor_renderer, app.editor, app.map);
+
             font_draw(app.editor_renderer.font,"[TAB] drive  [L CLICK] place/select  [DEL] delete  [B] behavior  [Ctrl+S] save",
                     10, Const::WINDOW_HEIGHT - 40, 2, 0.7f, 0.7f, 0.7f);
             font_draw(app.editor_renderer.font,"[T] translate  [R] rotate  [Y] scale  [PgUp/PgDn] Y nudge  [1-9] prop  [/] page",
-                    10, Const::WINDOW_HEIGHT - 20, 2, 0.7f, 0.7f, 0.7f);
+                    10, Const::WINDOW_HEIGHT - 20, 2, 0.7f, 0.7f, 0.7f);    
 
             // PEDESTRIAN config overlay
             if (app.editor.selected_id != -1){
@@ -510,8 +512,6 @@ void app_run(App& app){
             window_poll_events();
             continue;
         }
-
-
 
 
         /******************************************************************************

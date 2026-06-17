@@ -822,111 +822,38 @@ static void rotated_world_bounds(
     }
 }
 
+
 void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj, bool show_hitboxes,
     const std::vector<LightSource>& lights){
 
-    // light dir which matches scene.cpp
     glm::vec3 LIGHT_DIR = glm::normalize(er.sun_dir);
 
-    // bind shader and set shared uniforms once
-    // model is identity for grid
-    // each box override per draw_wire_box call
     shader_bind(er.shader);
     set_mat4(er.shader, "u_model", glm::mat4(1.0f));
     set_mat4(er.shader, "u_view", view);
     set_mat4(er.shader, "u_proj", proj);
 
-    // 1. draw snap grid
-    // static mesh
+    // SNAP GRID
+    // obhect mode only
     if (editor.mode == MODE_OBJECT){
         glBindVertexArray(er.grid.vao);
         glDrawArrays(GL_LINES, 0, er.grid.count);
         glBindVertexArray(0);
     }
 
-    if (editor.mode == MODE_TERRAIN){
-        if (!editor.paint_mode){
-            font_draw(er.font, "[ TERRAIN MODE ]  P=paint mode", 220, 16, 3, 0.30f, 0.90f, 0.25f);
-            font_draw(er.font, "LMB=raise  RMB=lower  SHIFT=smooth  [/]=brush size  H=exit",
-                220, 40, 2, 0.30f, 0.90f, 0.25f);
-            char brush_buf[64];
-            snprintf(brush_buf, sizeof(brush_buf), "BRUSH RADIUS: %.1fm", editor.brush_radius);
-            font_draw(er.font, brush_buf, 220, 60, 2, 0.30f, 0.90f, 0.25f);
-        } 
-        else {
-            font_draw(er.font, "[ PAINT MODE ]  P=sculpt mode", 220, 16, 3, 0.95f, 0.70f, 0.10f);
-            font_draw(er.font, "LMB=paint  S=spline  [/]=brush  0=erase 1=asphalt 2=gravel 3=dirt 4=sand 5=grass 6=cement 7=rock",
-                220, 40, 2, 0.95f, 0.70f, 0.10f);
-            font_draw(er.font, "Ctrl+Shift+W=wipe canvas  H=exit terrain",
-                220, 58, 2, 0.95f, 0.70f, 0.10f);
-            char surf_buf[64];
-            snprintf(surf_buf, sizeof(surf_buf), "SURFACE: %s   BRUSH: %.1fm",
-                Const::SURFACE_NAMES[(int)editor.paint_surface], editor.brush_radius);
-            font_draw(er.font, surf_buf, 220, 76, 2, 0.95f, 0.70f, 0.10f);
-        }
-    }
-
-    if (editor.mode == MODE_ROAD){
-        static const char* ROAD_TYPE_NAMES[ROAD_COUNT] = {
-            "ASPHALT", "GRAVEL", "DIRT", "SAND", "GRASS", "CEMENT", "ROAD_LINES"
-        };
-
-        font_draw(er.font, "[ ROAD MODE ]", 180, 16, 3, 0.25f, 0.75f, 1.00f);
-        font_draw(er.font, "LMB=add point  RMB=undo  ENTER=finish  DEL=delete  [/]=road type  M=exit",
-            220, 40, 2, 0.25f, 0.75f, 1.00f);
-
-        bool found = false;
-        for (const auto& r : map.roads){
-            if (r.id == editor.active_road_id){
-                char buf[64];
-                const char* type_name = ROAD_TYPE_NAMES[glm::clamp((int)r.type, 0, (int)ROAD_COUNT - 1)];
-                snprintf(buf, sizeof(buf), "TYPE: %s   POINTS: %d", type_name, (int)r.points.size());
-                font_draw(er.font, buf, 220, 60, 2, 0.25f, 0.75f, 1.00f);
-                found = true;
-                break;
-            }
-        }
-        if (!found){
-            char buf[64];
-            snprintf(buf, sizeof(buf), "TYPE: %s   (no active spline)",
-                ROAD_TYPE_NAMES[glm::clamp((int)editor.active_road_id, 0, (int)ROAD_COUNT - 1)]);
-            font_draw(er.font, buf, 220, 60, 2, 0.50f, 0.50f, 0.50f);
-        }
-    }
-
-    if (editor.mode == MODE_OCEAN){
-        font_draw(er.font, "[ OCEAN MODE ]", 180, 16, 3, 0.10f, 0.55f, 0.90f);
-        font_draw(er.font, "PgUp/Dn=y level  E=toggle on/off  [/]=rebuild  O=exit",
-            220, 40, 2, 0.10f, 0.55f, 0.90f);
-
-        char buf[64];
-        snprintf(buf, sizeof(buf), "OCEAN Y: %.2f  [PgUp/Dn] nudge  [E] toggle %s",
-            map.ocean.y_level, map.ocean.enabled ? "ON" : "OFF");
-        font_draw(er.font, buf, 220, 60, 2, 1.0f, 0.80f, 0.10f);
-    }
-
+    // LIGHT MODE
+    // wire stems + radius circles
     if (editor.mode == MODE_LIGHT){
-        font_draw(er.font, "[ LIGHT MODE ]", 180, 16, 3, 1.0f, 0.90f, 0.30f);
-        font_draw(er.font, "LMB=place/select  DEL=delete  Arrows=move XZ  PgUp/Dn=move Y  [/]=radius  +/-=intensity",
-            220, 40, 2, 1.0f, 0.90f, 0.30f);
-        font_draw(er.font, "Q/E=red  Z/X=green  C/V=blue  L=exit",
-            220, 58, 2, 1.0f, 0.90f, 0.30f);
-
-        // draw a wire circle on the ground at each light's XZ + a vertical stem
         er.line_verts.clear();
         for (const auto& l : map.lights){
             bool selected = (l.id == editor.selected_light_id);
             glm::vec3 col = selected ? glm::vec3(1.0f, 1.0f, 0.0f) : glm::vec3(l.color);
-
-            // vertical stem from ground to light position
             float ground_y = heightfield_sample(map.terrain, l.position.x, l.position.z);
             er.line_verts.insert(er.line_verts.end(),
                 {l.position.x, ground_y, l.position.z, col.r, col.g, col.b});
             er.line_verts.insert(er.line_verts.end(),
                 {l.position.x, l.position.y, l.position.z, col.r, col.g, col.b});
-
-            // radius circle on the ground
             static const int SEGS = 32;
             for (int i = 0; i < SEGS; i++){
                 float a0 = (float)i / SEGS * 2.0f * 3.14159265f;
@@ -940,144 +867,22 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
             }
         }
         flush_line_batch(er, er.shader, view, proj);
-
-        // selected light info HUD
-        if (editor.selected_light_id != -1){
-            for (const auto& l : map.lights){
-                if (l.id != editor.selected_light_id) continue;
-                char buf[128];
-                snprintf(buf, sizeof(buf), "POS (%.1f, %.1f, %.1f)  R:%.2f G:%.2f B:%.2f",
-                    l.position.x, l.position.y, l.position.z,
-                    l.color.r, l.color.g, l.color.b);
-                font_draw(er.font, buf, 220, 76, 2, 1.0f, 1.0f, 1.0f);
-                snprintf(buf, sizeof(buf), "RADIUS: %.1fm   INTENSITY: %.2f",
-                    l.radius, l.intensity);
-                font_draw(er.font, buf, 220, 94, 2, 1.0f, 1.0f, 1.0f);
-                break;
-            }
-        }
     }
 
-    if (editor.mode == MODE_AUDIO){
-        static const char* SLOT_NAMES[] = {
-            "impact", "proximity",
-            "hail", "pickup", "yap",
-            "dropoff_good", "dropoff_bad",
-            "crash_mild", "crash_heavy", "crash_rollover"
-        };
-        static constexpr int AUDIO_SLOT_COUNT = 10;
-        static constexpr int AUDIO_PAGE_SIZE  = 8;
-
-        font_draw(er.font, "[ AUDIO MODE ]", 180, 16, 3, 0.80f, 0.40f, 1.00f);
-        font_draw(er.font, "TAB=cycle slot  1-8=assign file  UP/DN=scroll  DEL=clear  Z=exit",
-            220, 40, 2, 0.80f, 0.40f, 1.00f);
-
-        // find selected object
-        const WorldObject* target = nullptr;
-        for (const auto& o : map.objects)
-            if (o.id == editor.selected_id){ target = &o; break; }
-
-        if (target){
-            // slot list on the left
-            int x = 16, y = 60;
-            font_draw(er.font, "SLOTS", x, y, 2, 0.9f, 0.9f, 0.9f);
-            y += 28;
-
-            auto get_slot_val = [&](const WorldObject& o, int slot) -> const std::string& {
-                switch(slot){
-                    case 0: return o.audio_impact;
-                    case 1: return o.audio_proximity;
-                    case 2: return o.audio_hail;
-                    case 3: return o.audio_pickup;
-                    case 4: return o.audio_yap;
-                    case 5: return o.audio_dropoff_good;
-                    case 6: return o.audio_dropoff_bad;
-                    case 7: return o.audio_crash_mild;
-                    case 8: return o.audio_crash_heavy;
-                    case 9: return o.audio_crash_rollover;
-                    default: return o.audio_impact;
-                }
-            };
-
-            for (int i = 0; i < AUDIO_SLOT_COUNT; i++){
-                bool active = (i == editor.audio_slot);
-                const std::string& val = get_slot_val(*target, i);
-                std::string label = std::string(active ? "> " : "  ")
-                    + SLOT_NAMES[i] + ": "
-                    + (val.empty() ? "(none)" : val.substr(val.find_last_of('/') + 1));
-                if (label.size() > 36) label = label.substr(0, 34) + "..";
-                float r = active ? 0.0f : 0.55f;
-                float g = active ? 1.0f : 0.55f;
-                float b = active ? 0.8f : 0.55f;
-                font_draw(er.font, label, x, y, active ? 2 : 1, r, g, b);
-                y += active ? 22 : 18;
-            }
-
-            // file list on the right
-            x = 340; y = 60;
-            font_draw(er.font, "FILES", x, y, 2, 0.9f, 0.9f, 0.9f);
-            y += 28;
-
-            int total = (int)editor.audio_file_list.size();
-            if (total == 0){
-                font_draw(er.font, "no .wav/.ogg in assets/audio/", x, y, 1, 0.5f, 0.5f, 0.5f);
-            }
-            else {
-                int end = std::min(editor.audio_file_page + AUDIO_PAGE_SIZE, total);
-                for (int i = editor.audio_file_page; i < end; i++){
-                    int slot_key = i - editor.audio_file_page + 1;
-                    std::string name = editor.audio_file_list[i];
-                    // trim to filename only for display
-                    name = name.substr(name.find_last_of('/') + 1);
-                    if (name.size() > 28) name = name.substr(0, 26) + "..";
-                    std::string line = std::to_string(slot_key) + " " + name;
-                    font_draw(er.font, line, x, y, 1, 0.75f, 0.75f, 0.75f);
-                    y += 18;
-                }
-                // scroll indicator
-                char pg[32];
-                snprintf(pg, sizeof(pg), "[%d-%d / %d]  UP/DN scroll",
-                    editor.audio_file_page + 1,
-                    std::min(editor.audio_file_page + AUDIO_PAGE_SIZE, total),
-                    total);
-                font_draw(er.font, pg, x, y + 4, 1, 0.4f, 0.4f, 0.4f);
-            }
-
-            // radius display if proximity slot is active
-            if (editor.audio_slot == 1){
-                char buf[64];
-                snprintf(buf, sizeof(buf), "RADIUS: %.1fm  ([/] to adjust)",
-                    target->audio_radius);
-                font_draw(er.font, buf, 16, Const::WINDOW_HEIGHT - 100, 2, 0.80f, 0.40f, 1.00f);
-            }
-        }
-        else {
-            font_draw(er.font, "no object selected", 220, 60, 2, 0.5f, 0.5f, 0.5f);
-        }
-    }
-
-
+    // AMBIENCE SUB AUDIO MODE
+    // radius circles + center crosses
     if (editor.mode == MODE_AMBIENCE){
-        font_draw(er.font, "[ AMBIENCE MODE ]", 180, 16, 3, 0.30f, 0.95f, 0.60f);
-        font_draw(er.font, "LMB=place/select  DEL=delete  F=type  [/]=radius  1-8=assign audio  UP/DN=scroll  I=exit",
-            220, 40, 2, 0.30f, 0.95f, 0.60f);
-
         er.line_verts.clear();
         static const int SEGS = 40;
         for (int z = 0; z < map.ambience_count; z++){
             const AmbienceZone& zone = map.ambience_zones[z];
             bool selected = (zone.id == editor.selected_zone_id);
-
-            // PROXIMITY = teal, NIGHT = deep purple, selected = bright white
             glm::vec3 col = selected
                 ? glm::vec3(1.0f, 1.0f, 1.0f)
                 : (zone.type == AMBIENCE_NIGHT
                     ? glm::vec3(0.55f, 0.20f, 0.90f)
                     : glm::vec3(0.10f, 0.85f, 0.55f));
-
             float ground_y = heightfield_sample(map.terrain, zone.pos.x, zone.pos.z) + 0.1f;
-
-            // center cross so you can see the anchor point
             float cs = 0.5f;
             er.line_verts.insert(er.line_verts.end(),
                 {zone.pos.x - cs, ground_y, zone.pos.z, col.r, col.g, col.b});
@@ -1087,8 +892,6 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
                 {zone.pos.x, ground_y, zone.pos.z - cs, col.r, col.g, col.b});
             er.line_verts.insert(er.line_verts.end(),
                 {zone.pos.x, ground_y, zone.pos.z + cs, col.r, col.g, col.b});
-
-            // radius circle on ground
             for (int i = 0; i < SEGS; i++){
                 float a0 = (float)i / SEGS * 2.0f * 3.14159265f;
                 float a1 = (float)(i + 1) / SEGS * 2.0f * 3.14159265f;
@@ -1101,97 +904,9 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
             }
         }
         flush_line_batch(er, er.shader, view, proj);
-
-        // selected zone info HUD
-        for (int z = 0; z < map.ambience_count; z++){
-            const AmbienceZone& zone = map.ambience_zones[z];
-            if (zone.id != editor.selected_zone_id) continue;
-
-            // file list
-            static constexpr int AMB_PAGE_SIZE = 8;
-            int x = 16, y = 60;
-            font_draw(er.font, "FILES", x, y, 2, 0.9f, 0.9f, 0.9f);
-            y += 28;
-            int total = (int)editor.audio_file_list.size();
-            if (total == 0){
-                font_draw(er.font, "no .wav/.ogg in assets/audio/", x, y, 1, 0.5f, 0.5f, 0.5f);
-            }
-            else {
-                int end = std::min(editor.ambience_file_page + AMB_PAGE_SIZE, total);
-                for (int i = editor.ambience_file_page; i < end; i++){
-                    int slot_key = i - editor.ambience_file_page + 1;
-                    std::string name = editor.audio_file_list[i];
-                    name = name.substr(name.find_last_of('/') + 1);
-                    if (name.size() > 28) name = name.substr(0, 26) + "..";
-                    font_draw(er.font, std::to_string(slot_key) + " " + name,
-                        x, y, 1, 0.75f, 0.75f, 0.75f);
-                    y += 18;
-                }
-                char pg[32];
-                snprintf(pg, sizeof(pg), "[%d-%d / %d]",
-                    editor.ambience_file_page + 1,
-                    std::min(editor.ambience_file_page + AMB_PAGE_SIZE, total), total);
-                font_draw(er.font, pg, x, y + 4, 1, 0.4f, 0.4f, 0.4f);
-            }
-
-            // zone info bottom
-            char buf[128];
-            snprintf(buf, sizeof(buf), "ZONE id=%d  TYPE: %s  RADIUS: %.1fm",
-                zone.id,
-                zone.type == AMBIENCE_NIGHT ? "NIGHT" : "PROXIMITY",
-                zone.radius);
-            font_draw(er.font, buf, 16, Const::WINDOW_HEIGHT - 120, 2, 0.30f, 0.95f, 0.60f);
-
-            std::string apath = zone.audio_path[0] ? zone.audio_path : "(none)";
-            std::string aname = apath.substr(apath.find_last_of('/') + 1);
-            font_draw(er.font, "AUDIO: " + aname,
-                16, Const::WINDOW_HEIGHT - 98, 2, 0.30f, 0.95f, 0.60f);
-            break;
-        }
     }
 
-    if (editor.mode == MODE_POSE){
-        static const char* bone_names[6] = {
-            "TORSO", "HEAD", "LEG_L", "LEG_R", "ARM_L", "ARM_R"
-        };
-        font_draw(er.font, "[ POSE MODE ]", 180, 16, 3, 1.0f, 0.60f, 0.10f);
-        font_draw(er.font, "F=next bone  Arrows=rot XY  PgUp/Dn=rot Z  NP8/2=seat Z  NP4/6=seat X  NP+/-=seat Y",
-            220, 40, 2, 1.0f, 0.60f, 0.10f);
-        font_draw(er.font, "SHIFT=fine  ENTER=dump values  V=hail/mount toggle  K=exit", 220, 58, 2, 1.0f, 0.60f, 0.10f);
-        if (editor.pose_npc_id != -1){
-            const char* pose_label = editor.pose_editing_hail ? "EDITING: HAIL  [Ctrl+H to save]" : "EDITING: MOUNT  [Ctrl+M to save]";
-            font_draw(er.font, pose_label, 220, 112, 2, editor.pose_editing_hail ? 0.4f : 0.2f, 1.0f, 0.4f);
-        }
-
-        // convert active bone quat to axis-angle for HUD display
-        const glm::quat& bq = editor.pose_quat[editor.pose_bone];
-        float bangle = glm::degrees(2.0f * std::acos(glm::clamp(bq.w, -1.0f, 1.0f)));
-        float bs = std::sqrt(std::max(0.0f, 1.0f - bq.w * bq.w));
-        glm::vec3 baxis = (bs > 0.001f)
-            ? glm::vec3(bq.x/bs, bq.y/bs, bq.z/bs)
-            : glm::vec3(1,0,0);
-        char buf[128];
-        snprintf(buf, sizeof(buf), "BONE: %s  [%d]  axis(%.2f,%.2f,%.2f)  angle:%.1fdeg",
-            bone_names[editor.pose_bone], editor.pose_bone,
-            baxis.x, baxis.y, baxis.z, bangle);
-        font_draw(er.font, buf, 220, 76, 2, 1.0f, 1.0f, 1.0f);
-
-
-        if (editor.pose_numpad_translate){
-            const glm::vec3& off = editor.pose_offset[editor.pose_bone];
-            snprintf(buf, sizeof(buf), "NP=BONE TRANSLATE  X:%.3f  Y:%.3f  Z:%.3f  [NP0 for seat]",
-                off.x, off.y, off.z);
-            font_draw(er.font, buf, 220, 94, 2, 1.0f, 0.7f, 0.3f);
-        } 
-        else {
-            snprintf(buf, sizeof(buf), "NP=SEAT  X:%.3f  Y:%.3f  Z:%.3f  [NP0 for bone translate]",
-                editor.pose_seat.x, editor.pose_seat.y, editor.pose_seat.z);
-            font_draw(er.font, buf, 220, 94, 2, 0.7f, 1.0f, 0.7f);
-        }
-    }
-
-    // 2. wireframe box colored by behavior
-    // gives visual feedback for every placed object even before OBJ meshes load
+    // wireframe boxes by behavior
     if (!show_hitboxes) goto skip_wireframes;
     er.line_verts.clear();
     for (const auto& o : map.objects){
@@ -1216,11 +931,10 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
     flush_line_batch(er, er.shader, view, proj);
     skip_wireframes:
 
-    // draw placed object meshes
+    // placed prop meshes
     editor_renderer_draw_props(er, map, view, proj, {}, {}, lights);
 
-    // 3. ghost box
-    // only drawn when cursor is over valid ground and a model is selected
+    // ghost box at cursor
     if (editor.placement_valid && !editor.selected_model.empty()){
         glm::vec3 gp = editor.ghost_pos;
         er.line_verts.clear();
@@ -1231,9 +945,7 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
         flush_line_batch(er, er.shader, view, proj);
     }
 
-    // 4. selection highlight
-    // wraps curr selected placed obj
-    // walks the object list to find the selected id
+    // selection highlight
     if (editor.selected_id != -1){
         er.line_verts.clear();
         for (const auto& o : map.objects){
@@ -1259,137 +971,17 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
         flush_line_batch(er, er.shader, view, proj);
     }
 
-    // 5. prop palette HUD
-    // shows current page of props and highlights selected model
-    // audio mode has an audio list, unnecessary & messy to draw prop list here
-    // makes audio mode worklflow much cleaner and hud not messy
-    if (editor.mode != MODE_AUDIO && editor.mode != MODE_AMBIENCE){
-        const int PAGE_SIZE = Const::EDITOR_PAGE_SIZE;
-        int total = (int)editor.prop_list.size();
-        int x = 16;
-        int y = 60;
-        font_draw(er.font, "PROPS", x, y, 2, 0.9f, 0.9f, 0.9f);
-        y += 30;
-
-         if (total == 0){
-            font_draw(er.font, "no .obj in assets/", x, y, 1, 0.5f, 0.5f, 0.5f);
-        }
-        else {
-            int page_start = editor.prop_page * PAGE_SIZE;
-            int page_end   = std::min(page_start + PAGE_SIZE, total);
-
-            for (int i = page_start; i < page_end; i++){
-                int slot = i - page_start + 1; // 1-9
-                bool active = (editor.prop_list[i] == editor.selected_model);
-
-                std::string name = editor.prop_list[i];
-                if (name.size() > 20) name = name.substr(0, 18) + "..";
-
-                std::string line = std::to_string(slot) + " " + name;
-
-                if (active)
-                    font_draw(er.font, line, x, y, 1, 0.0f, 1.0f, 1.0f); // cyan = selected
-                else
-                    font_draw(er.font, line, x, y, 1, 0.7f, 0.7f, 0.7f); // grey = idle
-                y += 20;
-            }
-
-            // page indicator
-            int max_page = (total - 1) / PAGE_SIZE;
-            std::string page_str = "[ pg " + std::to_string(editor.prop_page + 1)
-                + "/" + std::to_string(max_page + 1) + " ]";
-            font_draw(er.font, page_str, x, y + 4, 3, 0.5f, 0.5f, 0.5f);
-        }
-    }
-
-    // 6. status HUD
-    // shows:
-    // tools
-    // selected model
-    // object count
-    // selected object transform
-    {
-        int x = 16;
-        int bottom = Const::WINDOW_HEIGHT -220;
-        int y = bottom;
-
-        // tool name
-        const char* tool_str = editor.tool == TOOL_TRANSLATE ? "TRANSLATE" :
-            editor.tool == TOOL_ROTATE ? "ROTATE" : "SCALE";
-        
-        font_draw(er.font, std::string("TOOL: ") + tool_str, x, y, 2, 1.0f, 1.0f, 0.2f);
-        y += 20;
-
-        // selected model name
-        std::string model_label = "MODEL: " + (editor.selected_model.empty() ? "(none)" : editor.selected_model);
-        font_draw(er.font, model_label, x, y, 2, 1.0f, 1.0f, 1.0f);
-        y += 20;
-
-        // total object count
-        font_draw(er.font, "OBJECTS: " + std::to_string(map.objects.size()), x, y, 2, 0.7f, 0.7f, 0.7f);
-        y += 20;
-
-        // selected object transform
-        // we only showw when something is selected
-        if (editor.selected_id != -1){
-            for (const auto& o : map.objects){
-                if (o.id != editor.selected_id) continue;
-
-                char buf[128];
-                snprintf(buf, sizeof(buf), "POS X:%.1f  Y:%.1f  Z:%.1f",
-                    o.position.x, o.position.y, o.position.z);
-                font_draw(er.font, buf, x, y, 2, 0.6f, 1.0f, 0.6f);
-                y += 20;
-
-                snprintf(buf, sizeof(buf), "ROT Y:%.1f deg",
-                    glm::degrees(o.rotation.y));
-                font_draw(er.font, buf, x, y, 2, 0.6f, 1.0f, 0.6f);
-                y += 20;
-
-                snprintf(buf, sizeof(buf), "SCALE X:%.2f  Y:%.2f  Z:%.2f",
-                    o.scale.x, o.scale.y, o.scale.z);
-                font_draw(er.font, buf, x, y, 2, 0.6f, 1.0f, 0.6f);
-                y += 20;
-
-                // behavior label matches wireframe color
-                const char* bname = "STATIC";
-                float br = 0.55f, bg = 0.55f, bb = 0.55f;
-                switch(o.behavior){
-                    case STATIC: bname="STATIC"; br=0.55f; bg=0.55f; bb=0.55f; break;
-                    case DYNAMIC: bname="DYNAMIC"; br=0.20f; bg=0.50f; bb=1.00f; break;
-                    case DECORATION: bname="DECORATION"; br=0.95f; bg=0.80f; bb=0.10f; break;
-                    case PEDESTRIAN: bname="PEDESTRIAN"; br=0.20f; bg=0.85f; bb=0.30f; break;
-                }
-                snprintf(buf, sizeof(buf), "BEHAVIOR: %s  [B] cycle", bname);
-                font_draw(er.font, buf, x, y, 2, br, bg, bb);
-                y += 20;
-
-                if (o.behavior == DYNAMIC){
-                    // for now hud is ass because there no preset named stored for objs
-                    // will add in the future. Testing values for now before I scale furthe
-                    snprintf(buf, sizeof(buf), "MASS:%.1f  REST:%.2f  FRIC:%.2f  [N] preset",
-                        o.mass, o.restitution, o.friction);
-                    font_draw(er.font, buf, x, y, 2, 0.4f, 0.8f, 1.0f);
-                }
-                break;
-            }
-        }
-    }
-
-    // road mode cursor small diamond at ghost pos so you can see where clicks land
+    // ROAD MODE
+    // cursor diamond + preview line
     if (editor.mode == MODE_ROAD && editor.placement_valid){
         glm::vec3 p = editor.ghost_pos;
-        float s = 0.4f; // diamond half-size in metres
-
-        // 6 points of a diamond: top, bottom, left, right, front, back
+        float s = 0.4f;
         glm::vec3 top = p + glm::vec3( 0,  s,  0);
         glm::vec3 bot = p + glm::vec3( 0, -s,  0);
         glm::vec3 lft = p + glm::vec3(-s,  0,  0);
         glm::vec3 rgt = p + glm::vec3( s,  0,  0);
         glm::vec3 fwd = p + glm::vec3( 0,  0, -s);
         glm::vec3 bck = p + glm::vec3( 0,  0,  s);
-
-        // 12 edges connecting the 6 points
         std::vector<float> diamond;
         auto push_edge = [&](glm::vec3 a, glm::vec3 b){
             diamond.insert(diamond.end(), {a.x,a.y,a.z, 0.25f,0.75f,1.00f});
@@ -1401,7 +993,6 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
         push_edge(bot, fwd); push_edge(bot, bck);
         push_edge(lft, fwd); push_edge(fwd, rgt);
         push_edge(rgt, bck); push_edge(bck, lft);
-
         Mesh dm;
         mesh_init(dm, diamond);
         shader_bind(er.shader);
@@ -1412,7 +1003,6 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
         glDrawArrays(GL_LINES, 0, dm.count);
         glBindVertexArray(0);
         mesh_destroy(dm);
-
         for (const auto& r : map.roads){
             if (r.id != editor.active_road_id) continue;
             if (r.points.empty()) break;
@@ -1431,6 +1021,7 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
         }
     }
 }
+
 
 void editor_renderer_shadow_pass(EditorRenderer& er, const WorldMap& map,
     const glm::mat4& light_space_mat,
@@ -2149,6 +1740,342 @@ void editor_renderer_draw_pose_mode(EditorRenderer& er, const EditorState& edito
             proj);
     }
 }
+
+void editor_renderer_draw_hud(EditorRenderer& er, const EditorState& editor, const WorldMap& map){
+    if (editor.mode == MODE_TERRAIN){
+        if (!editor.paint_mode){
+            font_draw(er.font, "[ TERRAIN MODE ]  P=paint mode", 220, 16, 3, 0.30f, 0.90f, 0.25f);
+            font_draw(er.font, "LMB=raise  RMB=lower  SHIFT=smooth  [/]=brush size  H=exit",
+                220, 40, 2, 0.30f, 0.90f, 0.25f);
+            char brush_buf[64];
+            snprintf(brush_buf, sizeof(brush_buf), "BRUSH RADIUS: %.1fm", editor.brush_radius);
+            font_draw(er.font, brush_buf, 220, 60, 2, 0.30f, 0.90f, 0.25f);
+        }
+        else {
+            font_draw(er.font, "[ PAINT MODE ]  P=sculpt mode", 220, 16, 3, 0.95f, 0.70f, 0.10f);
+            font_draw(er.font, "LMB=paint  S=spline  [/]=brush  0=erase 1=asphalt 2=gravel 3=dirt 4=sand 5=grass 6=cement 7=rock",
+                220, 40, 2, 0.95f, 0.70f, 0.10f);
+            font_draw(er.font, "Ctrl+Shift+W=wipe canvas  H=exit terrain",
+                220, 58, 2, 0.95f, 0.70f, 0.10f);
+            char surf_buf[64];
+            snprintf(surf_buf, sizeof(surf_buf), "SURFACE: %s   BRUSH: %.1fm",
+                Const::SURFACE_NAMES[(int)editor.paint_surface], editor.brush_radius);
+            font_draw(er.font, surf_buf, 220, 76, 2, 0.95f, 0.70f, 0.10f);
+        }
+    }
+
+    if (editor.mode == MODE_ROAD){
+        static const char* ROAD_TYPE_NAMES[ROAD_COUNT] = {
+            "ASPHALT", "GRAVEL", "DIRT", "SAND", "GRASS", "CEMENT", "ROAD_LINES"
+        };
+        font_draw(er.font, "[ ROAD MODE ]", 180, 16, 3, 0.25f, 0.75f, 1.00f);
+        font_draw(er.font, "LMB=add point  RMB=undo  ENTER=finish  DEL=delete  [/]=road type  M=exit",
+            220, 40, 2, 0.25f, 0.75f, 1.00f);
+        bool found = false;
+        for (const auto& r : map.roads){
+            if (r.id == editor.active_road_id){
+                char buf[64];
+                const char* type_name = ROAD_TYPE_NAMES[glm::clamp((int)r.type, 0, (int)ROAD_COUNT - 1)];
+                snprintf(buf, sizeof(buf), "TYPE: %s   POINTS: %d", type_name, (int)r.points.size());
+                font_draw(er.font, buf, 220, 60, 2, 0.25f, 0.75f, 1.00f);
+                found = true;
+                break;
+            }
+        }
+        if (!found){
+            char buf[64];
+            snprintf(buf, sizeof(buf), "TYPE: %s   (no active spline)",
+                ROAD_TYPE_NAMES[glm::clamp((int)editor.active_road_id, 0, (int)ROAD_COUNT - 1)]);
+            font_draw(er.font, buf, 220, 60, 2, 0.50f, 0.50f, 0.50f);
+        }
+    }
+
+    if (editor.mode == MODE_OCEAN){
+        font_draw(er.font, "[ OCEAN MODE ]", 180, 16, 3, 0.10f, 0.55f, 0.90f);
+        font_draw(er.font, "PgUp/Dn=y level  E=toggle on/off  [/]=rebuild  O=exit",
+            220, 40, 2, 0.10f, 0.55f, 0.90f);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "OCEAN Y: %.2f  [PgUp/Dn] nudge  [E] toggle %s",
+            map.ocean.y_level, map.ocean.enabled ? "ON" : "OFF");
+        font_draw(er.font, buf, 220, 60, 2, 1.0f, 0.80f, 0.10f);
+    }
+
+    if (editor.mode == MODE_LIGHT){
+        font_draw(er.font, "[ LIGHT MODE ]", 180, 16, 3, 1.0f, 0.90f, 0.30f);
+        font_draw(er.font, "LMB=place/select  DEL=delete  Arrows=move XZ  PgUp/Dn=move Y  [/]=radius  +/-=intensity",
+            220, 40, 2, 1.0f, 0.90f, 0.30f);
+        font_draw(er.font, "Q/E=red  Z/X=green  C/V=blue  L=exit",
+            220, 58, 2, 1.0f, 0.90f, 0.30f);
+        if (editor.selected_light_id != -1){
+            for (const auto& l : map.lights){
+                if (l.id != editor.selected_light_id) continue;
+                char buf[128];
+                snprintf(buf, sizeof(buf), "POS (%.1f, %.1f, %.1f)  R:%.2f G:%.2f B:%.2f",
+                    l.position.x, l.position.y, l.position.z,
+                    l.color.r, l.color.g, l.color.b);
+                font_draw(er.font, buf, 220, 76, 2, 1.0f, 1.0f, 1.0f);
+                snprintf(buf, sizeof(buf), "RADIUS: %.1fm   INTENSITY: %.2f",
+                    l.radius, l.intensity);
+                font_draw(er.font, buf, 220, 94, 2, 1.0f, 1.0f, 1.0f);
+                break;
+            }
+        }
+    }
+
+    if (editor.mode == MODE_AUDIO){
+        static const char* SLOT_NAMES[] = {
+            "impact", "proximity",
+            "hail", "pickup", "yap",
+            "dropoff_good", "dropoff_bad",
+            "crash_mild", "crash_heavy", "crash_rollover"
+        };
+        static constexpr int AUDIO_SLOT_COUNT = 10;
+        static constexpr int AUDIO_PAGE_SIZE  = 8;
+
+        font_draw(er.font, "[ AUDIO MODE ]", 180, 16, 3, 0.80f, 0.40f, 1.00f);
+        font_draw(er.font, "TAB=cycle slot  1-8=assign file  UP/DN=scroll  DEL=clear  Z=exit",
+            220, 40, 2, 0.80f, 0.40f, 1.00f);
+
+        const WorldObject* target = nullptr;
+        for (const auto& o : map.objects)
+            if (o.id == editor.selected_id){ target = &o; break; }
+
+        if (target){
+            int x = 16, y = 60;
+            font_draw(er.font, "SLOTS", x, y, 2, 0.9f, 0.9f, 0.9f);
+            y += 28;
+
+            auto get_slot_val = [&](const WorldObject& o, int slot) -> const std::string& {
+                switch(slot){
+                    case 0: return o.audio_impact;
+                    case 1: return o.audio_proximity;
+                    case 2: return o.audio_hail;
+                    case 3: return o.audio_pickup;
+                    case 4: return o.audio_yap;
+                    case 5: return o.audio_dropoff_good;
+                    case 6: return o.audio_dropoff_bad;
+                    case 7: return o.audio_crash_mild;
+                    case 8: return o.audio_crash_heavy;
+                    case 9: return o.audio_crash_rollover;
+                    default: return o.audio_impact;
+                }
+            };
+
+            for (int i = 0; i < AUDIO_SLOT_COUNT; i++){
+                bool active = (i == editor.audio_slot);
+                const std::string& val = get_slot_val(*target, i);
+                std::string label = std::string(active ? "> " : "  ")
+                    + SLOT_NAMES[i] + ": "
+                    + (val.empty() ? "(none)" : val.substr(val.find_last_of('/') + 1));
+                if (label.size() > 36) label = label.substr(0, 34) + "..";
+                float r = active ? 0.0f : 0.55f;
+                float g = active ? 1.0f : 0.55f;
+                float b = active ? 0.8f : 0.55f;
+                font_draw(er.font, label, x, y, active ? 2 : 1, r, g, b);
+                y += active ? 22 : 18;
+            }
+
+            int x2 = 340, y2 = 60;
+            font_draw(er.font, "FILES", x2, y2, 2, 0.9f, 0.9f, 0.9f);
+            y2 += 28;
+            int total = (int)editor.audio_file_list.size();
+            if (total == 0){
+                font_draw(er.font, "no .wav/.ogg in assets/audio/", x2, y2, 1, 0.5f, 0.5f, 0.5f);
+            }
+            else {
+                int end = std::min(editor.audio_file_page + AUDIO_PAGE_SIZE, total);
+                for (int i = editor.audio_file_page; i < end; i++){
+                    int slot_key = i - editor.audio_file_page + 1;
+                    std::string name = editor.audio_file_list[i];
+                    name = name.substr(name.find_last_of('/') + 1);
+                    if (name.size() > 28) name = name.substr(0, 26) + "..";
+                    std::string line = std::to_string(slot_key) + " " + name;
+                    font_draw(er.font, line, x2, y2, 1, 0.75f, 0.75f, 0.75f);
+                    y2 += 18;
+                }
+                char pg[32];
+                snprintf(pg, sizeof(pg), "[%d-%d / %d]  UP/DN scroll",
+                    editor.audio_file_page + 1,
+                    std::min(editor.audio_file_page + AUDIO_PAGE_SIZE, total), total);
+                font_draw(er.font, pg, x2, y2 + 4, 1, 0.4f, 0.4f, 0.4f);
+            }
+            if (editor.audio_slot == 1){
+                char buf[64];
+                snprintf(buf, sizeof(buf), "RADIUS: %.1fm  ([/] to adjust)", target->audio_radius);
+                font_draw(er.font, buf, 16, Const::WINDOW_HEIGHT - 100, 2, 0.80f, 0.40f, 1.00f);
+            }
+        }
+        else {
+            font_draw(er.font, "no object selected", 220, 60, 2, 0.5f, 0.5f, 0.5f);
+        }
+    }
+
+    if (editor.mode == MODE_AMBIENCE){
+        font_draw(er.font, "[ AMBIENCE MODE ]", 180, 16, 3, 0.30f, 0.95f, 0.60f);
+        font_draw(er.font, "LMB=place/select  DEL=delete  F=type  [/]=radius  1-8=assign audio  UP/DN=scroll  I=exit",
+            220, 40, 2, 0.30f, 0.95f, 0.60f);
+
+        for (int z = 0; z < map.ambience_count; z++){
+            const AmbienceZone& zone = map.ambience_zones[z];
+            if (zone.id != editor.selected_zone_id) continue;
+
+            static constexpr int AMB_PAGE_SIZE = 8;
+            int x = 16, y = 60;
+            font_draw(er.font, "FILES", x, y, 2, 0.9f, 0.9f, 0.9f);
+            y += 28;
+            int total = (int)editor.audio_file_list.size();
+            if (total == 0){
+                font_draw(er.font, "no .wav/.ogg in assets/audio/", x, y, 1, 0.5f, 0.5f, 0.5f);
+            }
+            else {
+                int end = std::min(editor.ambience_file_page + AMB_PAGE_SIZE, total);
+                for (int i = editor.ambience_file_page; i < end; i++){
+                    int slot_key = i - editor.ambience_file_page + 1;
+                    std::string name = editor.audio_file_list[i];
+                    name = name.substr(name.find_last_of('/') + 1);
+                    if (name.size() > 28) name = name.substr(0, 26) + "..";
+                    font_draw(er.font, std::to_string(slot_key) + " " + name,
+                        x, y, 1, 0.75f, 0.75f, 0.75f);
+                    y += 18;
+                }
+                char pg[32];
+                snprintf(pg, sizeof(pg), "[%d-%d / %d]",
+                    editor.ambience_file_page + 1,
+                    std::min(editor.ambience_file_page + AMB_PAGE_SIZE, total), total);
+                font_draw(er.font, pg, x, y + 4, 1, 0.4f, 0.4f, 0.4f);
+            }
+            char buf[128];
+            snprintf(buf, sizeof(buf), "ZONE id=%d  TYPE: %s  RADIUS: %.1fm",
+                zone.id,
+                zone.type == AMBIENCE_NIGHT ? "NIGHT" : "PROXIMITY",
+                zone.radius);
+            font_draw(er.font, buf, 16, Const::WINDOW_HEIGHT - 120, 2, 0.30f, 0.95f, 0.60f);
+            std::string apath = zone.audio_path[0] ? zone.audio_path : "(none)";
+            std::string aname = apath.substr(apath.find_last_of('/') + 1);
+            font_draw(er.font, "AUDIO: " + aname, 16, Const::WINDOW_HEIGHT - 98, 2, 0.30f, 0.95f, 0.60f);
+            break;
+        }
+    }
+
+    if (editor.mode == MODE_POSE){
+        static const char* bone_names[6] = {
+            "TORSO", "HEAD", "LEG_L", "LEG_R", "ARM_L", "ARM_R"
+        };
+        font_draw(er.font, "[ POSE MODE ]", 180, 16, 3, 1.0f, 0.60f, 0.10f);
+        font_draw(er.font, "F=next bone  Arrows=rot XY  PgUp/Dn=rot Z  NP8/2=seat Z  NP4/6=seat X  NP+/-=seat Y",
+            220, 40, 2, 1.0f, 0.60f, 0.10f);
+        font_draw(er.font, "SHIFT=fine  ENTER=dump values  V=hail/mount toggle  K=exit", 220, 58, 2, 1.0f, 0.60f, 0.10f);
+        if (editor.pose_npc_id != -1){
+            const char* pose_label = editor.pose_editing_hail ? "EDITING: HAIL  [Ctrl+H to save]" : "EDITING: MOUNT  [Ctrl+M to save]";
+            font_draw(er.font, pose_label, 220, 112, 2, editor.pose_editing_hail ? 0.4f : 0.2f, 1.0f, 0.4f);
+        }
+        const glm::quat& bq = editor.pose_quat[editor.pose_bone];
+        float bangle = glm::degrees(2.0f * std::acos(glm::clamp(bq.w, -1.0f, 1.0f)));
+        float bs = std::sqrt(std::max(0.0f, 1.0f - bq.w * bq.w));
+        glm::vec3 baxis = (bs > 0.001f)
+            ? glm::vec3(bq.x/bs, bq.y/bs, bq.z/bs)
+            : glm::vec3(1,0,0);
+        char buf[128];
+        snprintf(buf, sizeof(buf), "BONE: %s  [%d]  axis(%.2f,%.2f,%.2f)  angle:%.1fdeg",
+            bone_names[editor.pose_bone], editor.pose_bone,
+            baxis.x, baxis.y, baxis.z, bangle);
+        font_draw(er.font, buf, 220, 76, 2, 1.0f, 1.0f, 1.0f);
+        if (editor.pose_numpad_translate){
+            const glm::vec3& off = editor.pose_offset[editor.pose_bone];
+            snprintf(buf, sizeof(buf), "NP=BONE TRANSLATE  X:%.3f  Y:%.3f  Z:%.3f  [NP0 for seat]",
+                off.x, off.y, off.z);
+            font_draw(er.font, buf, 220, 94, 2, 1.0f, 0.7f, 0.3f);
+        }
+        else {
+            snprintf(buf, sizeof(buf), "NP=SEAT  X:%.3f  Y:%.3f  Z:%.3f  [NP0 for bone translate]",
+                editor.pose_seat.x, editor.pose_seat.y, editor.pose_seat.z);
+            font_draw(er.font, buf, 220, 94, 2, 0.7f, 1.0f, 0.7f);
+        }
+    }
+
+    // prop palette
+    if (editor.mode != MODE_AUDIO && editor.mode != MODE_AMBIENCE){
+        const int PAGE_SIZE = Const::EDITOR_PAGE_SIZE;
+        int total = (int)editor.prop_list.size();
+        int x = 16, y = 60;
+        font_draw(er.font, "PROPS", x, y, 2, 0.9f, 0.9f, 0.9f);
+        y += 30;
+        if (total == 0){
+            font_draw(er.font, "no .obj in assets/", x, y, 1, 0.5f, 0.5f, 0.5f);
+        }
+        else {
+            int page_start = editor.prop_page * PAGE_SIZE;
+            int page_end   = std::min(page_start + PAGE_SIZE, total);
+            for (int i = page_start; i < page_end; i++){
+                int slot = i - page_start + 1;
+                bool active = (editor.prop_list[i] == editor.selected_model);
+                std::string name = editor.prop_list[i];
+                if (name.size() > 20) name = name.substr(0, 18) + "..";
+                std::string line = std::to_string(slot) + " " + name;
+                if (active)
+                    font_draw(er.font, line, x, y, 1, 0.0f, 1.0f, 1.0f);
+                else
+                    font_draw(er.font, line, x, y, 1, 0.7f, 0.7f, 0.7f);
+                y += 20;
+            }
+            int max_page = (total - 1) / PAGE_SIZE;
+            std::string page_str = "[ pg " + std::to_string(editor.prop_page + 1)
+                + "/" + std::to_string(max_page + 1) + " ]";
+            font_draw(er.font, page_str, x, y + 4, 3, 0.5f, 0.5f, 0.5f);
+        }
+    }
+
+    // status HUD
+    {
+        int x = 16;
+        int bottom = Const::WINDOW_HEIGHT - 220;
+        int y = bottom;
+        const char* tool_str = editor.tool == TOOL_TRANSLATE ? "TRANSLATE" :
+            editor.tool == TOOL_ROTATE ? "ROTATE" : "SCALE";
+        font_draw(er.font, std::string("TOOL: ") + tool_str, x, y, 2, 1.0f, 1.0f, 0.2f);
+        y += 20;
+        std::string model_label = "MODEL: " + (editor.selected_model.empty() ? "(none)" : editor.selected_model);
+        font_draw(er.font, model_label, x, y, 2, 1.0f, 1.0f, 1.0f);
+        y += 20;
+        font_draw(er.font, "OBJECTS: " + std::to_string(map.objects.size()), x, y, 2, 0.7f, 0.7f, 0.7f);
+        y += 20;
+        if (editor.selected_id != -1){
+            for (const auto& o : map.objects){
+                if (o.id != editor.selected_id) continue;
+                char buf[128];
+                snprintf(buf, sizeof(buf), "POS X:%.1f  Y:%.1f  Z:%.1f",
+                    o.position.x, o.position.y, o.position.z);
+                font_draw(er.font, buf, x, y, 2, 0.6f, 1.0f, 0.6f);
+                y += 20;
+                snprintf(buf, sizeof(buf), "ROT Y:%.1f deg", glm::degrees(o.rotation.y));
+                font_draw(er.font, buf, x, y, 2, 0.6f, 1.0f, 0.6f);
+                y += 20;
+                snprintf(buf, sizeof(buf), "SCALE X:%.2f  Y:%.2f  Z:%.2f",
+                    o.scale.x, o.scale.y, o.scale.z);
+                font_draw(er.font, buf, x, y, 2, 0.6f, 1.0f, 0.6f);
+                y += 20;
+                const char* bname = "STATIC";
+                float br = 0.55f, bg = 0.55f, bb = 0.55f;
+                switch(o.behavior){
+                    case STATIC:     bname="STATIC";     br=0.55f; bg=0.55f; bb=0.55f; break;
+                    case DYNAMIC:    bname="DYNAMIC";    br=0.20f; bg=0.50f; bb=1.00f; break;
+                    case DECORATION: bname="DECORATION"; br=0.95f; bg=0.80f; bb=0.10f; break;
+                    case PEDESTRIAN: bname="PEDESTRIAN"; br=0.20f; bg=0.85f; bb=0.30f; break;
+                }
+                snprintf(buf, sizeof(buf), "BEHAVIOR: %s  [B] cycle", bname);
+                font_draw(er.font, buf, x, y, 2, br, bg, bb);
+                y += 20;
+                if (o.behavior == DYNAMIC){
+                    snprintf(buf, sizeof(buf), "MASS:%.1f  REST:%.2f  FRIC:%.2f  [N] preset",
+                        o.mass, o.restitution, o.friction);
+                    font_draw(er.font, buf, x, y, 2, 0.4f, 0.8f, 1.0f);
+                }
+                break;
+            }
+        }
+    }
+}
+
 
 void editor_renderer_destroy(EditorRenderer& er){
     shader_destroy(er.shader);
