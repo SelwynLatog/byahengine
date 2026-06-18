@@ -172,8 +172,8 @@ void audio_update(AudioSystem& audio, float dt,
         // high fades in at high speed
         float high_vol = glm::smoothstep(0.5f, 1.0f, t);
 
-        // pitch shift: 0.8 at idle, 1.4 at full throttle
-        float pitch = 0.8f + t * 0.6f;
+        // pitch shift
+        float pitch = 1.0f + t * 0.6f;
 
         if (audio.eng_idle) { ma_sound_set_volume(audio.eng_idle, idle_vol); ma_sound_set_pitch(audio.eng_idle, pitch); }
         if (audio.eng_mid)  { ma_sound_set_volume(audio.eng_mid,  mid_vol);  ma_sound_set_pitch(audio.eng_mid,  pitch); }

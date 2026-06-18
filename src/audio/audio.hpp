@@ -20,7 +20,7 @@ struct AudioSystem {
     ma_sound* eng_idle = nullptr;
     ma_sound* eng_mid  = nullptr;
     ma_sound* eng_high = nullptr;
-
+    
     // ambient base loop
     ma_sound* ambient = nullptr;
 
