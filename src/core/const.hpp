@@ -231,27 +231,27 @@ namespace Const{
 
     // DYNAMIC PROPS
 
-    // traffic cones - check
+    // traffic cones
     inline constexpr float DYN_CONE_MASS = 3.0f;
     inline constexpr float DYN_CONE_RESTITUTION = 0.60f;
     inline constexpr float DYN_CONE_FRICTION = 0.70f;
 
-    // garbage bins - check
+    // garbage bins
     inline constexpr float DYN_BIN_MASS = 12.0f;
     inline constexpr float DYN_BIN_RESTITUTION = 0.45f;
     inline constexpr float DYN_BIN_FRICTION = 0.70f;
 
-    // garbage bags - check
+    // garbage bags
     inline constexpr float DYN_BAG_MASS = 1.5f;
     inline constexpr float DYN_BAG_RESTITUTION = 0.20f;
     inline constexpr float DYN_BAG_FRICTION = 0.95f;
 
-    // parked motorcycles - check
+    // parked motorcycles
     inline constexpr float DYN_MOTORCYCLE_MASS = 120.0f;
     inline constexpr float DYN_MOTORCYCLE_RESTITUTION = 0.20f;
     inline constexpr float DYN_MOTORCYCLE_FRICTION = 0.85f;
 
-    // parked trikes - check
+    // parked trikes
     inline constexpr float DYN_TRIKE_MASS = 180.0f;
     inline constexpr float DYN_TRIKE_RESTITUTION = 0.15f;
     inline constexpr float DYN_TRIKE_FRICTION = 0.90f;
@@ -329,7 +329,7 @@ namespace Const{
     inline constexpr float OCEAN_SHALLOW_DIST = 12.0f; // metres from shore edge for teal tint
 
     // rain
-    inline constexpr bool RAIN_FORCE_ENABLE = true; // enable to insta trigger rain at build, debug
+    inline constexpr bool RAIN_FORCE_ENABLE = false; // enable to insta trigger rain at build, debug
     inline constexpr bool RAIN_PAUSE = false; // enable to pause rain for debugging streak texture
     inline constexpr int RAIN_PARTICLE_COUNT = 4000;
     inline constexpr float RAIN_FALL_SPEED = 22.0f;
@@ -349,7 +349,7 @@ namespace Const{
 
     // thunder + lightning
     // RAIN_THUNDERSTORM enables everything, set true to debug
-    inline constexpr bool RAIN_THUNDERSTORM = true;
+    inline constexpr bool RAIN_THUNDERSTORM = false;
     inline constexpr float THUNDER_FLASH_ALPHA_MAX = 0.75f; // peal white overlay flash
     inline constexpr float THUNDER_FLASH_DECAY = 6.0f; // how fast flash fades per sec
     inline constexpr float THUNDER_PREFLASH_ALPHA = 0.28f; // dim pre-flash

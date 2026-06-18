@@ -99,8 +99,8 @@ static GLuint load_texture(EditorRenderer& er, const std::string& path){
     return id;
 }
 
-// draws a wireframe box from world space min/max cornders
-// then uplaods a throwawau vao.vbo each call & destroys after drawing
+// draws a wireframe box from world space min/max corners
+// then uplaods a throwawau vao.vbo each call & destroys after drajwing
 // not meant for high frequency draws
 // purposely for editor only
 static void push_wire_box(
@@ -139,12 +139,39 @@ static void flush_line_batch(EditorRenderer& er, const Shader& shader,
     er.line_verts.clear();
 }
 
+// uploads point lights into a lit shader's u_light_pos/color/radius/intensity arrays
+// culls by distance to cam_pos, writes only the lights that pass into slots 0..N
+// shader must already be bound before calling this
+static void upload_point_lights(GLuint shader_id, const std::vector<LightSource>& lights,
+    const glm::vec3& cam_pos, float night_factor){
+    int active = 0;
+    char buf[64];
+    if (night_factor >= 0.01f){
+        for (int i = 0; i < (int)lights.size() && active < Const::MAX_POINT_LIGHTS; i++){
+            glm::vec3 d = lights[i].position - cam_pos;
+            if (glm::dot(d, d) > Const::LIGHT_CULL_DIST_SQ) continue;
+            snprintf(buf, sizeof(buf), "u_light_pos[%d]", active);
+            glUniform3f(glGetUniformLocation(shader_id, buf),
+                lights[i].position.x, lights[i].position.y, lights[i].position.z);
+            snprintf(buf, sizeof(buf), "u_light_color_pt[%d]", active);
+            glUniform3f(glGetUniformLocation(shader_id, buf),
+                lights[i].color.r, lights[i].color.g, lights[i].color.b);
+            snprintf(buf, sizeof(buf), "u_light_radius[%d]", active);
+            glUniform1f(glGetUniformLocation(shader_id, buf), lights[i].radius);
+            snprintf(buf, sizeof(buf), "u_light_intensity[%d]", active);
+            glUniform1f(glGetUniformLocation(shader_id, buf), lights[i].intensity * night_factor);
+            active++;
+        }
+    }
+    glUniform1i(glGetUniformLocation(shader_id, "u_light_count"), active);
+}
+
 void editor_renderer_init(EditorRenderer& er){
     shader_init_from_file(er.shader, "../assets/shaders/gizmo.vert", "../assets/shaders/gizmo.frag");
     shader_init_from_file(er.obj_shader, "../assets/shaders/lit.vert", "../assets/shaders/object.frag");
     shader_init_from_file(er.road_shader, "../assets/shaders/lit.vert", "../assets/shaders/road.frag");
     shader_init_from_file(er.ocean_shader, "../assets/shaders/ocean.vert", "../assets/shaders/ocean.frag");
-    //font_init(er.font, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
+    font_init(er.font, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
     shader_init_from_file(er.depth_shader, "../assets/shaders/depth.vert", "../assets/shaders/depth.frag");
 
     // buid the snap grid as a static mesh
@@ -309,20 +336,16 @@ float editor_get_y_floor_offset(EditorRenderer& er, const std::string& filename)
 }
 
 void editor_renderer_preload_textures(EditorRenderer& er){
-    int count = 0;
     for (auto& [name, mesh] : er.prop_cache){
         for (int i = 0; i < (int)mesh.data.groups.size(); i++){
             const ObjGroup& grp = mesh.data.groups[i];
             const ObjMaterial* mat = obj_find_material(mesh.data, grp.mat_name);
-            if (mat && !mat->tex_path.empty()){
+            if (mat && !mat->tex_path.empty())
                 load_texture(er, mat->tex_path);
-                count++;
-            }
         }
     }
 }
 
-// maps out a color based on obj behavior
 // maps out a color based on obj behavior
 // makes it easier to read at first glance
 static glm::vec3 behavior_color(ObjectBehavior b){
@@ -372,8 +395,6 @@ static void rotated_world_bounds(
 void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj, bool show_hitboxes,
     const std::vector<LightSource>& lights){
-
-    glm::vec3 LIGHT_DIR = glm::normalize(er.sun_dir);
 
     shader_bind(er.shader);
     set_mat4(er.shader, "u_model", glm::mat4(1.0f));
@@ -453,29 +474,29 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
     }
 
     // wireframe boxes by behavior
-    if (!show_hitboxes) goto skip_wireframes;
-    er.line_verts.clear();
-    for (const auto& o : map.objects){
-        if (o.id == editor.selected_id) continue;
-        auto bit = er.prop_bounds.find(o.model_path);
-        if (bit != er.prop_bounds.end()){
-            float yoff = er.prop_y_offset.count(o.model_path)
-                ? er.prop_y_offset[o.model_path] : 0.0f;
-            glm::vec3 wmin, wmax;
-            rotated_world_bounds(bit->second.local_min, bit->second.local_max,
-                o.position, o.rotation.y, o.scale, yoff, wmin, wmax);
-            push_wire_box(er.line_verts, wmin, wmax, behavior_color(o.behavior));
+    if (show_hitboxes){
+        er.line_verts.clear();
+        for (const auto& o : map.objects){
+            if (o.id == editor.selected_id) continue;
+            auto bit = er.prop_bounds.find(o.model_path);
+            if (bit != er.prop_bounds.end()){
+                float yoff = er.prop_y_offset.count(o.model_path)
+                    ? er.prop_y_offset[o.model_path] : 0.0f;
+                glm::vec3 wmin, wmax;
+                rotated_world_bounds(bit->second.local_min, bit->second.local_max,
+                    o.position, o.rotation.y, o.scale, yoff, wmin, wmax);
+                push_wire_box(er.line_verts, wmin, wmax, behavior_color(o.behavior));
+            }
+            else {
+                glm::vec3 half = o.scale * 0.5f;
+                push_wire_box(er.line_verts,
+                    o.position + glm::vec3(-half.x, 0.0f, -half.z),
+                    o.position + glm::vec3( half.x, o.scale.y, half.z),
+                    behavior_color(o.behavior));
+            }
         }
-        else {
-            glm::vec3 half = o.scale * 0.5f;
-            push_wire_box(er.line_verts,
-                o.position + glm::vec3(-half.x, 0.0f, -half.z),
-                o.position + glm::vec3( half.x, o.scale.y, half.z),
-                behavior_color(o.behavior));
-        }
+        flush_line_batch(er, er.shader, view, proj);
     }
-    flush_line_batch(er, er.shader, view, proj);
-    skip_wireframes:
 
     // placed prop meshes
     editor_renderer_draw_props(er, map, view, proj, {}, {}, lights);
@@ -878,34 +899,12 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
     glActiveTexture(GL_TEXTURE0);
     glUniform1i(RL.tex, 0);
 
-    // upload point lights to road shader
-    // road_loc doesn't have pt_light atm slots so look them up directly
-    GLuint rid = er.road_shader.id;
     glm::vec3 cam_pos_r = glm::vec3(glm::inverse(view)[3]);
-    int active_lcount = 0;
     glUniform3f(RL.fog_color, er.fog_color.r,  er.fog_color.g,  er.fog_color.b);
     glUniform1f(RL.fog_near, er.fog_near);
     glUniform1f(RL.fog_far, er.fog_far);
     glUniform3f(RL.fog_cam_pos, cam_pos_r.x, cam_pos_r.y, cam_pos_r.z);
-    char _buf[64];
-    if (er.night_factor >= 0.01f){
-        for (int i = 0; i < (int)er.last_lights.size() && active_lcount < Const::MAX_POINT_LIGHTS; i++){
-            glm::vec3 d = er.last_lights[i].position - cam_pos_r;
-            if (glm::dot(d, d) > Const::LIGHT_CULL_DIST_SQ) continue;
-            snprintf(_buf, sizeof(_buf), "u_light_pos[%d]", active_lcount);
-            glUniform3f(glGetUniformLocation(rid, _buf),
-                er.last_lights[i].position.x, er.last_lights[i].position.y, er.last_lights[i].position.z);
-            snprintf(_buf, sizeof(_buf), "u_light_color_pt[%d]", active_lcount);
-            glUniform3f(glGetUniformLocation(rid, _buf),
-                er.last_lights[i].color.r, er.last_lights[i].color.g, er.last_lights[i].color.b);
-            snprintf(_buf, sizeof(_buf), "u_light_radius[%d]", active_lcount);
-            glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].radius);
-            snprintf(_buf, sizeof(_buf), "u_light_intensity[%d]", active_lcount);
-            glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].intensity * er.night_factor);
-            active_lcount++;
-        }
-    }
-    glUniform1i(glGetUniformLocation(rid, "u_light_count"), active_lcount);
+    upload_point_lights(er.road_shader.id, er.last_lights, cam_pos_r, er.night_factor);
 
     for (const auto& road : roads){
         if (road.vao == 0 || road.index_count == 0) continue;
@@ -1011,7 +1010,6 @@ void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField
     auto cell_surface = [&](int r, int c) -> int {
         return (int)hf.surface[r * hf.cols + c];
     };
-    int skipped = 0;
     for (int r = 0; r < hf.rows - 1; r++){
         for (int c = 0; c < hf.cols - 1; c++){
             // skip quads that fall inside any ocean zone
@@ -1022,7 +1020,7 @@ void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField
                 && hf.heights[(r+1) * hf.cols + c] < ocean.y_level
                 && hf.heights[r * hf.cols + (c+1)] < ocean.y_level
                 && hf.heights[(r+1) * hf.cols + (c+1)] < ocean.y_level;
-            if (in_ocean){ skipped++; continue; }
+            if (in_ocean) continue;
 
             glm::vec3 p00 = get_pos(r, c);
             glm::vec3 p10 = get_pos(r+1, c);
@@ -1102,8 +1100,8 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
     const glm::mat4& view, const glm::mat4& proj, const Ocean& ocean){
     if (er.terrain_surface_dirty)
         editor_renderer_build_terrain_surface(er, hf, ocean);
-    if (!er.terrain_surface_mesh.vao) return;
 
+    if (!er.terrain_surface_mesh.vao) return;
     glm::vec3 LIGHT_DIR = glm::normalize(er.sun_dir);
     static const glm::vec3 SURF_COLORS[(int)SURFACE_COUNT] = {
         {0.00f, 0.00f, 0.00f}, // none
@@ -1150,33 +1148,12 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
     glUniform1i(RL.shadow_map, 1);
     glActiveTexture(GL_TEXTURE0);
 
-    // UPLOAD POINT LIGHTS TO ROAD SHADER
-    GLuint rid = er.road_shader.id;
     glm::vec3 cam_pos_t = glm::vec3(glm::inverse(view)[3]);
-    int active_lcount = 0;
     glUniform3f(RL.fog_color, er.fog_color.r,  er.fog_color.g,  er.fog_color.b);
     glUniform1f(RL.fog_near, er.fog_near);
     glUniform1f(RL.fog_far, er.fog_far);
     glUniform3f(RL.fog_cam_pos, cam_pos_t.x, cam_pos_t.y, cam_pos_t.z);
-    char _buf[64];
-    if (er.night_factor >= 0.01f){
-        for (int i = 0; i < (int)er.last_lights.size() && active_lcount < Const::MAX_POINT_LIGHTS; i++){
-            glm::vec3 d = er.last_lights[i].position - cam_pos_t;
-            if (glm::dot(d, d) > Const::LIGHT_CULL_DIST_SQ) continue;
-            snprintf(_buf, sizeof(_buf), "u_light_pos[%d]", active_lcount);
-            glUniform3f(glGetUniformLocation(rid, _buf),
-                er.last_lights[i].position.x, er.last_lights[i].position.y, er.last_lights[i].position.z);
-            snprintf(_buf, sizeof(_buf), "u_light_color_pt[%d]", active_lcount);
-            glUniform3f(glGetUniformLocation(rid, _buf),
-                er.last_lights[i].color.r, er.last_lights[i].color.g, er.last_lights[i].color.b);
-            snprintf(_buf, sizeof(_buf), "u_light_radius[%d]", active_lcount);
-            glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].radius);
-            snprintf(_buf, sizeof(_buf), "u_light_intensity[%d]", active_lcount);
-            glUniform1f(glGetUniformLocation(rid, _buf), er.last_lights[i].intensity * er.night_factor);
-            active_lcount++;
-        }
-    }
-    glUniform1i(glGetUniformLocation(rid, "u_light_count"), active_lcount);
+    upload_point_lights(er.road_shader.id, er.last_lights, cam_pos_t, er.night_factor);
 
     glBindVertexArray(er.terrain_surface_mesh.vao);
 
