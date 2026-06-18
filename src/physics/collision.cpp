@@ -95,7 +95,7 @@ bool collision_static_update(App& app, float dt, float& pre_collision_speed, boo
 
         float spd_dot  = glm::dot(fwd, mtv_normal);
         float lat_dot  = glm::dot(rgt, mtv_normal);
-        float spd_along = app.trike.speed        * spd_dot;
+        float spd_along = app.trike.speed * spd_dot;
         float lat_along = app.trike.lateral_speed * lat_dot;
 
         float closing = 0.0f;
@@ -119,7 +119,7 @@ bool collision_static_update(App& app, float dt, float& pre_collision_speed, boo
                 app.trike.lateral_speed += (-lat_along) * (1.0f + Const::RESTITUTION) * lat_dot;
 
             float bleed = glm::clamp(closing * 0.06f, 0.05f, 0.4f);
-            app.trike.speed         *= (1.0f - bleed);
+            app.trike.speed *= (1.0f - bleed);
             app.trike.lateral_speed *= (1.0f - bleed);
 
             float side_factor = std::abs(lat_dot);
@@ -128,7 +128,7 @@ bool collision_static_update(App& app, float dt, float& pre_collision_speed, boo
                     * (lat_dot > 0.0f ? 1.0f : -1.0f);
         }
         else {
-            if (spd_along < 0.0f) app.trike.speed        -= spd_along;
+            if (spd_along < 0.0f) app.trike.speed -= spd_along;
             if (lat_along < 0.0f) app.trike.lateral_speed -= lat_along;
         }
 
@@ -149,7 +149,7 @@ bool collision_static_update(App& app, float dt, float& pre_collision_speed, boo
         float residual = glm::dot(
             fwd2 * app.trike.speed + rgt2 * app.trike.lateral_speed, -mtv_normal);
         if (residual > 0.0f){
-            app.trike.speed        -= residual * glm::dot(fwd2, -mtv_normal);
+            app.trike.speed -= residual * glm::dot(fwd2, -mtv_normal);
             app.trike.lateral_speed -= residual * glm::dot(rgt2, -mtv_normal);
         }
         app.trike.lateral_speed *= 0.55f;
@@ -177,7 +177,8 @@ void collision_dynamic_update(App& app, float dt){
         if (wit == app.wo_by_id.end()) continue;
         const WorldObject* wo = wit->second;
 
-        // rebuild AABB from current sim position — only awake objects need this every frame
+        // rebuild AABB from current sim position 
+        // only awake objects need this every frame
         if (!sim.sleeping){
             auto bit = app.editor_renderer.prop_bounds.find(wo->model_path);
             if (bit != app.editor_renderer.prop_bounds.end()){
@@ -201,7 +202,7 @@ void collision_dynamic_update(App& app, float dt){
             float trike_share = wo->mass / total_mass;
 
             app.trike.position -= mtv * trike_share;
-            sim.position       += mtv * obj_share;
+            sim.position += mtv * obj_share;
 
             glm::vec3 trike_fwd = { std::cos(app.trike.heading), 0.0f, std::sin(app.trike.heading) };
             float closing = std::abs(app.trike.speed) * std::abs(glm::dot(trike_fwd, -hit_normal));

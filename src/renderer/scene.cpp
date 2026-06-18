@@ -109,28 +109,6 @@ void main(){
 }
 )";
 
-static const char* GIZMO_VERT_SRC = R"(
-#version 330 core
-layout(location = 0) in vec3 a_pos;
-layout(location = 1) in vec3 a_color;
-uniform mat4 u_model;
-uniform mat4 u_view;
-uniform mat4 u_proj;
-out vec3 v_color;
-void main(){
-    gl_Position = u_proj * u_view * u_model * vec4(a_pos, 1.0);
-    v_color = a_color;
-}
-)";
-
-static const char* GIZMO_FRAG_SRC = R"(
-#version 330 core
-in  vec3 v_color;
-out vec4 frag_color;
-void main(){
-    frag_color = vec4(v_color, 1.0);
-}
-)";
 
 static const char* SKY_VERT_SRC = R"(
 #version 330 core
@@ -185,23 +163,6 @@ void main(){
     frag_color = vec4(mix(day_night, rain_sample, u_rain_blend), 1.0);
 }
 )";
-
-static const char* DEPTH_VERT_SRC = R"(
-#version 330 core
-layout(location = 0) in vec3 a_pos;
-uniform mat4 u_light_space;
-uniform mat4 u_model;
-void main(){
-    gl_Position = u_light_space * u_model * vec4(a_pos, 1.0);
-}
-)";
-
-static const char* DEPTH_FRAG_SRC = R"(
-#version 330 core
-void main(){}
-)";
-
-
 // internal helpers
 
 static void set_vec3(const Shader& s, const char* n, glm::vec3 v){
@@ -281,11 +242,9 @@ static void draw_box_lit(
 
 void scene_init(SceneState& scene){
 
-    shader_init(scene.shader, VERT_SRC, FRAG_SRC);
-    shader_init(scene.gizmo_shader, GIZMO_VERT_SRC, GIZMO_FRAG_SRC);
-
-    // skybox
-    shader_init(scene.sky_shader, SKY_VERT_SRC, SKY_FRAG_SRC);
+    shader_init_from_file(scene.shader, "../assets/shaders/scene_lit.vert", "../assets/shaders/scene_lit.frag");
+    shader_init_from_file(scene.gizmo_shader, "../assets/shaders/gizmo.vert", "../assets/shaders/gizmo.frag");
+    shader_init_from_file(scene.sky_shader, "../assets/shaders/sky.vert", "../assets/shaders/sky.frag");
     {
         // fullscreen triangle-pair quad, NDC coords only, no normals needed
         std::vector<float> sq = {
@@ -367,7 +326,7 @@ void scene_init(SceneState& scene){
 
 
     // shadow map FBO
-    shader_init(scene.shadow_shader, DEPTH_VERT_SRC, DEPTH_FRAG_SRC);
+    shader_init_from_file(scene.shadow_shader, "../assets/shaders/depth.vert", "../assets/shaders/depth.frag");
     glGenFramebuffers(1, &scene.shadow_fbo);
     glGenTextures(1, &scene.shadow_depth_tex);
     glBindTexture(GL_TEXTURE_2D, scene.shadow_depth_tex);

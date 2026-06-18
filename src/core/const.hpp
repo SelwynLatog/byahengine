@@ -329,7 +329,7 @@ namespace Const{
     inline constexpr float OCEAN_SHALLOW_DIST = 12.0f; // metres from shore edge for teal tint
 
     // rain
-    inline constexpr bool RAIN_FORCE_ENABLE = false; // enable to insta trigger rain at build, debug
+    inline constexpr bool RAIN_FORCE_ENABLE = true; // enable to insta trigger rain at build, debug
     inline constexpr bool RAIN_PAUSE = false; // enable to pause rain for debugging streak texture
     inline constexpr int RAIN_PARTICLE_COUNT = 4000;
     inline constexpr float RAIN_FALL_SPEED = 22.0f;
@@ -349,7 +349,7 @@ namespace Const{
 
     // thunder + lightning
     // RAIN_THUNDERSTORM enables everything, set true to debug
-    inline constexpr bool RAIN_THUNDERSTORM = false;
+    inline constexpr bool RAIN_THUNDERSTORM = true;
     inline constexpr float THUNDER_FLASH_ALPHA_MAX = 0.75f; // peal white overlay flash
     inline constexpr float THUNDER_FLASH_DECAY = 6.0f; // how fast flash fades per sec
     inline constexpr float THUNDER_PREFLASH_ALPHA = 0.28f; // dim pre-flash
