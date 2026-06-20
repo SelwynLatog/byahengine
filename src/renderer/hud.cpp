@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdarg>
 #include <string>
+#include <filesystem>
 
 void hud_init(Hud& h, int window_width, int window_height){
     font_init(h.font, window_width, window_height);
@@ -41,7 +42,7 @@ static std::string fmt(const char* format, ...){
 }
 
 // hud_draw
-void hud_draw(const Hud& h, const TrikeState& trike, bool has_passenger, float fare){
+void hud_draw(const Hud& h, const TrikeState& trike, bool has_passenger, float fare, bool radio_on, const std::string& radio_track){
     const int SCALE= 2;   // 16x16px glyphs
     const int LEFT= 20;  // left margin px
     const int TOP= 20;  // top margin px
@@ -119,6 +120,15 @@ void hud_draw(const Hud& h, const TrikeState& trike, bool has_passenger, float f
     if (has_passenger){
         draw_line(fmt("PASSENGER  FARE: P%.2f", Const::FARE_BASE + fare), 1.0f, 0.9f, 0.2f);
         draw_line("DRIVE TO DESTINATION", 0.4f, 1.0f, 0.4f);
+    }
+    // radio now playing - bottom center
+    if (radio_on && !radio_track.empty()){
+        // strip directory and extension for clean display
+        std::string name = std::filesystem::path(radio_track).stem().string();
+        std::string label = "[NOW PLAYING] " + name;
+        int tx = Const::WINDOW_WIDTH / 2 - (int)(label.size() * 8); // approx center
+        int ty = Const::WINDOW_HEIGHT - 40;
+        font_draw(h.font, label, tx, ty, 2, 1.0f, 0.82f, 0.1f); // gold
     }
 }
 

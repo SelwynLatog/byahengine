@@ -109,6 +109,8 @@ struct EditorRenderer{
         GLint color[Const::MAX_POINT_LIGHTS];
         GLint radius[Const::MAX_POINT_LIGHTS];
         GLint intensity[Const::MAX_POINT_LIGHTS];
+        GLint spot_dir[Const::MAX_POINT_LIGHTS];
+        GLint cos_cutoff[Const::MAX_POINT_LIGHTS];
     } pt_light_loc;
 
     Mesh line_batch;

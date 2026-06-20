@@ -160,6 +160,10 @@ static void upload_point_lights(GLuint shader_id, const std::vector<LightSource>
             glUniform1f(glGetUniformLocation(shader_id, buf), lights[i].radius);
             snprintf(buf, sizeof(buf), "u_light_intensity[%d]", active);
             glUniform1f(glGetUniformLocation(shader_id, buf), lights[i].intensity * night_factor);
+            snprintf(buf, sizeof(buf), "u_light_spot_dir[%d]", active);
+            glUniform3f(glGetUniformLocation(shader_id, buf), lights[i].spot_dir.x, lights[i].spot_dir.y, lights[i].spot_dir.z);
+            snprintf(buf, sizeof(buf), "u_light_cos_cutoff[%d]", active);
+            glUniform1f(glGetUniformLocation(shader_id, buf), lights[i].cos_cutoff);
             active++;
         }
     }
@@ -273,6 +277,10 @@ void editor_renderer_init(EditorRenderer& er){
             LL.radius[i] = glGetUniformLocation(id, buf);
             snprintf(buf, sizeof(buf), "u_light_intensity[%d]", i);
             LL.intensity[i] = glGetUniformLocation(id, buf);
+            snprintf(buf, sizeof(buf), "u_light_spot_dir[%d]", i);
+            LL.spot_dir[i] = glGetUniformLocation(id, buf);
+            snprintf(buf, sizeof(buf), "u_light_cos_cutoff[%d]", i);
+            LL.cos_cutoff[i] = glGetUniformLocation(id, buf);
         }
     }
 
@@ -676,6 +684,8 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
             glUniform3f(er.pt_light_loc.color[active_lcount], lights[i].color.r, lights[i].color.g, lights[i].color.b);
             glUniform1f(er.pt_light_loc.radius[active_lcount], lights[i].radius);
             glUniform1f(er.pt_light_loc.intensity[active_lcount], lights[i].intensity * er.night_factor);
+            glUniform3f(er.pt_light_loc.spot_dir[active_lcount], lights[i].spot_dir.x, lights[i].spot_dir.y, lights[i].spot_dir.z);
+            glUniform1f(er.pt_light_loc.cos_cutoff[active_lcount], lights[i].cos_cutoff);
             active_lcount++;
         }
     }

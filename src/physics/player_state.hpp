@@ -16,4 +16,6 @@ struct PlayerState {
 
     float mount_timer = 0.0f; // counts down during MOUNTING transition
     float anim_timer = 0.0f; // drives leg swing cycle
+
+    bool headlights_on = false;
 };

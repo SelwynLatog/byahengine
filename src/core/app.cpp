@@ -447,6 +447,8 @@ void app_run(App& app){
                 s_cam.pos = app.player.pos + glm::vec3(0.0f, 4.0f, 0.0f);
                 s_cam.needs_snap = true;
                 app.player.mode = PLAYER_FOOT;
+                app.player.headlights_on = false;
+                if (app.audio.radio_on) audio_radio_toggle(app.audio);
             }
             else {
                 // 3m mount radius, stored as squared distance to avoid sqrt
@@ -481,6 +483,29 @@ void app_run(App& app){
             for (auto& obs : app.obstacles) obs.hit_timer = 0.0f;
         }
         s_r_last = r_down;
+
+        // L key - headlight toggle (driving only)
+        static bool s_l_last = false;
+        bool l_down = glfwGetKey(app.window.handle, GLFW_KEY_L) == GLFW_PRESS;
+        if (l_down && !s_l_last && app.player.mode == PLAYER_DRIVING){
+            app.player.headlights_on = !app.player.headlights_on;
+            audio_trigger_voice_local(app.audio, "../assets/audio/misc/headlight_switch.wav");
+        }
+        s_l_last = l_down;
+
+        // P key - radio toggle (driving only)
+        static bool s_p_last = false;
+        bool p_down = glfwGetKey(app.window.handle, GLFW_KEY_P) == GLFW_PRESS;
+        if (p_down && !s_p_last && app.player.mode == PLAYER_DRIVING)
+            audio_radio_toggle(app.audio);
+        s_p_last = p_down;
+
+        // / key - next radio track
+        static bool s_next_last = false;
+        bool next_down = glfwGetKey(app.window.handle, GLFW_KEY_SLASH) == GLFW_PRESS;
+        if (next_down && !s_next_last && app.audio.radio_on)
+            audio_radio_next(app.audio);
+        s_next_last = next_down;
 
         // arrow keys orbit camera
         if (glfwGetKey(app.window.handle, GLFW_KEY_LEFT)  == GLFW_PRESS) s_cam.yaw   -= Const::CAM_YAW_SPEED   * dt;
@@ -608,9 +633,12 @@ void app_run(App& app){
         app.editor_renderer.fog_near = app.scene.fog_near;
         app.editor_renderer.fog_far = app.scene.fog_far;
 
+        std::vector<LightSource> frame_lights = app.map.lights;
+        if (app.player.headlights_on && app.player.mode == PLAYER_DRIVING)
+            frame_lights.push_back(trike_headlight(app.trike.position, app.trike.heading));
+
         scene_draw_sky(app.scene, view, proj);
-        scene_draw(app.scene, app.trike, app.obstacles, app.map.lights, view, proj,
-            app.editor.show_hitboxes);
+        scene_draw(app.scene, app.trike, app.obstacles, frame_lights, view, proj, app.editor.show_hitboxes);
 
         // build flash map from current hit timers
         std::map<int, float> flash_map;
@@ -630,7 +658,7 @@ void app_run(App& app){
         editor_renderer_draw_terrain_surface(app.editor_renderer, app.map.terrain, view, proj,
             app.map.ocean);
         editor_renderer_draw_props(app.editor_renderer, app.map, view, proj,
-            flash_map, app.dynamic_sims, app.map.lights, true);
+            flash_map, app.dynamic_sims, frame_lights, true);
         scene_draw_driver(app.scene, app.player, app.trike, view, proj,
             app.editor_renderer.obj_shader,
             app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
@@ -684,7 +712,9 @@ void app_run(App& app){
         rain_update(app.rain, dt, rain_origin, rain_speed, app.trike.heading, app.map.terrain);
         rain_draw(app.rain, view, proj, rain_origin, rain_speed, app.trike.heading);
 
-        hud_draw(app.hud, app.trike, app.passenger_npc_id != -1, app.passenger_fare);
+        std::string radio_track = (app.audio.radio_on && app.audio.radio_index < (int)app.audio.radio_playlist.size())
+            ? app.audio.radio_playlist[app.audio.radio_index] : "";
+        hud_draw(app.hud, app.trike, app.passenger_npc_id != -1, app.passenger_fare, app.audio.radio_on, radio_track);
         window_swap_buffers(app.window);
         window_poll_events();
     }

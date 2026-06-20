@@ -30,6 +30,8 @@ uniform vec3  u_light_pos[MAX_LIGHTS];
 uniform vec3  u_light_color_pt[MAX_LIGHTS];
 uniform float u_light_radius[MAX_LIGHTS];
 uniform float u_light_intensity[MAX_LIGHTS];
+uniform vec3  u_light_spot_dir[MAX_LIGHTS];
+uniform float u_light_cos_cutoff[MAX_LIGHTS];
 
 float shadow_pcf(vec4 lsp, vec3 normal, vec3 ldir){
     vec3 proj = lsp.xyz / lsp.w;
@@ -59,14 +61,52 @@ void main(){
     vec3 lit = tex_sample.rgb * u_light_color * (ambient + diff * u_diff_intensity * (1.0 - shadow));
 
     for (int i = 0; i < u_light_count; i++){
-        float dist = length(u_light_pos[i] - v_world_pos);
+        vec3 to_frag = v_world_pos - u_light_pos[i];
+        float dist = length(to_frag);
         if (dist >= u_light_radius[i]) continue;
-        float atten = 1.0 - (dist / u_light_radius[i]);
-        atten *= atten;
-        vec3 l = normalize(u_light_pos[i] - v_world_pos);
+        vec3 l = normalize(-to_frag);
         float ndotl = max(dot(n, l), 0.0);
-        lit += tex_sample.rgb * u_light_color_pt[i] * ndotl * atten * u_light_intensity[i];
+
+        // spotlight: add a cheap ambient fill for nearby geometry (trike body, driver)
+        // this prevents the contrast darkening effect when ground is brightly lit
+        if (u_light_cos_cutoff[i] > -1.0){
+            float fill_atten = 1.0 - clamp(dist / 3.5f, 0.0, 1.0);
+            fill_atten *= fill_atten;
+            lit += tex_sample.rgb * u_light_color_pt[i] * 0.35 * fill_atten * u_light_intensity[i] * 0.15;
+        }
+
+        // omni point light path
+        if (u_light_cos_cutoff[i] <= -1.0){
+            float atten = 1.0 - (dist / u_light_radius[i]);
+            atten *= atten;
+            lit += tex_sample.rgb * u_light_color_pt[i] * ndotl * atten * u_light_intensity[i];
+            continue;
+        }
+
+        // spotlight path
+        vec3 spot = normalize(u_light_spot_dir[i]);
+        // to_frag points light->fragment, spot points forward
+        // only illuminate fragments in front of the light
+        float axial = dot(to_frag, spot);
+        if (axial <= 0.0) continue; // behind the light source, skip
+
+        float cos_angle = dot(normalize(to_frag), spot);
+        if (cos_angle < u_light_cos_cutoff[i]) continue;
+
+        // axial attenuation
+        // fades with distance along beam axis
+        float axial_t = clamp(axial / u_light_radius[i], 0.0, 1.0);
+        float axial_atten = 1.0 - axial_t;
+
+        // cone edge softness
+        float cone = smoothstep(u_light_cos_cutoff[i], u_light_cos_cutoff[i] + 0.18, cos_angle);
+
+        float surface = max(dot(n, l), 0.0) * 0.4 + 0.6;
+
+        lit += tex_sample.rgb * u_light_color_pt[i] * surface * axial_atten * u_light_intensity[i] * cone;
+
     }
+
 
     float fog_dist = length(u_cam_pos_fog - v_world_pos);
     float fog_t = clamp((fog_dist - u_fog_near) / (u_fog_far - u_fog_near), 0.0, 1.0);

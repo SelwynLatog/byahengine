@@ -157,6 +157,28 @@ namespace Const{
     inline constexpr float LIGHT_AMBIENT= 0.55f;
     inline constexpr float LIGHT_DIFF= 0.85f;
 
+    // trike headlights
+    // why is it const position tuning instead of per mesh part separation?
+    // becayse that would mean heaving another dedicated trike_headlight finder
+    // the chain is translate(render_pos) * rotate(heading) * rotate(roll) * rotate(pitch) 
+    //* rotate(yaw_offset) * rotate(shake) * translate(-sc) * scale(model_scale)
+    // that means I have to duplicate or expose math outside trike_model.cpp
+    // just to get one position. 
+    // That's coupling the light system to the render transform internals
+    // messy & fragile every time the model matrix changes
+    // Simplicity over fragile "optimal" methods
+    inline constexpr float HEADLIGHT_OFFSET_FWD = 2.2f;  // metres forward from rear axle
+    inline constexpr float HEADLIGHT_OFFSET_Y = 0.85f; // metres above trike position
+    inline constexpr float HEADLIGHT_RADIUS = 35.0f; // falloff distance
+    inline constexpr float HEADLIGHT_INTENSITY = 4.0f;  // peak brightness
+    inline constexpr float HEADLIGHT_R = 1.00f; // warm white
+    inline constexpr float HEADLIGHT_G = 0.95f;
+    inline constexpr float HEADLIGHT_B = 0.80f;
+    inline constexpr float HEADLIGHT_NIGHT_THRESH  = 0.15f; // night_factor above this activates headlights
+    inline constexpr float HEADLIGHT_CONE_DEG = 24.0f; // half-angle of beam cone
+    inline constexpr float HEADLIGHT_CONE_SOFT_DEG = 18.0f; // inner edge full brightness inside this
+
+
     // point lights
     inline constexpr int MAX_POINT_LIGHTS = 150;
     inline constexpr float LIGHT_DEFAULT_RADIUS = 20.0f;
