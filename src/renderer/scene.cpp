@@ -1,4 +1,5 @@
 #include "../../vendor/stb/stb_image.h"
+#include "../core/settings.hpp"
 #include "../core/const.hpp"
 #include "../physics/trike_aabb.hpp"
 #include "scene.hpp"
@@ -804,7 +805,8 @@ void scene_draw(
     if (scene.night_factor >= 0.01f){
         for (int i = 0; i < (int)lights.size() && active_lcount < Const::MAX_POINT_LIGHTS; i++){
             glm::vec3 d = lights[i].position - cam_pos;
-            if (glm::dot(d, d) > Const::LIGHT_CULL_DIST_SQ) continue;
+            float light_cull_sq = my_settings.light_cull_dist * my_settings.light_cull_dist;
+            if (glm::dot(d, d) > light_cull_sq) continue;
             glUniform3f(scene.light_loc.pos[active_lcount], lights[i].position.x, lights[i].position.y, lights[i].position.z);
             glUniform3f(scene.light_loc.color[active_lcount], lights[i].color.r, lights[i].color.g, lights[i].color.b);
             glUniform1f(scene.light_loc.radius[active_lcount], lights[i].radius);

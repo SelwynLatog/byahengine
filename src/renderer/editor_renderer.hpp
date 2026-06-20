@@ -180,3 +180,5 @@ void editor_renderer_draw_pose_mode(EditorRenderer& er, const EditorState& edito
     const DriverModel* npc_model, const WorldMap& map = WorldMap{});
 
 void editor_renderer_draw_hud(EditorRenderer& er, const EditorState& editor, const WorldMap& map);
+
+void editor_renderer_draw_settings_menu(EditorRenderer& er, const EditorState& editor);

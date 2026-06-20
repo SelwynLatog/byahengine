@@ -1,4 +1,5 @@
 #include "../core/const.hpp"
+#include "../core/settings.hpp"
 #include "rain.hpp"
 #include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -150,7 +151,7 @@ void rain_init(RainState& rain, glm::vec3 cam_pos){
     rain.loc.box_half_xz = glGetUniformLocation(id, "u_box_half_xz");
 
     // scatter initial particles
-    for (int i = 0; i < Const::RAIN_PARTICLE_COUNT; i++)
+    for (int i = 0; i < my_settings.rain_particle_count; i++)
         spawn_particle(rain.particles[i], cam_pos);
 
     // N particles * 6 verts each
@@ -158,7 +159,7 @@ void rain_init(RainState& rain, glm::vec3 cam_pos){
     // shader derives the 4 corners from gl_VertexID
     // VBO layout: vec3 pos | float len_s | float width_s | float alpha_s
     // stride = 6 floats = 24 bytes
-    int total_verts = Const::RAIN_PARTICLE_COUNT * 6;
+    int total_verts = my_settings.rain_particle_count * 6;
     std::vector<float> init_data(total_verts * 6, 0.0f);
 
     glGenVertexArrays(1, &rain.mesh.vao);
@@ -214,7 +215,7 @@ void rain_update(RainState& rain, float dt, glm::vec3 cam_pos, float speed, floa
     glm::vec3 fall = { Const::RAIN_WIND_X, -Const::RAIN_FALL_SPEED, Const::RAIN_WIND_Z };
     glm::vec3 vel = fall * dt;
 
-    for (int i = 0; i < Const::RAIN_PARTICLE_COUNT; i++){
+    for (int i = 0; i < my_settings.rain_particle_count; i++){
         rain.particles[i].pos += vel;
 
         float dx = rain.particles[i].pos.x - cam_pos.x;
@@ -239,7 +240,7 @@ void rain_update(RainState& rain, float dt, glm::vec3 cam_pos, float speed, floa
 
     // tick splashes
     float life_step = dt / Const::RAIN_SPLASH_LIFE;
-    for (int i = 0; i < Const::RAIN_SPLASH_MAX; i++){
+    for (int i = 0; i < my_settings.rain_splash_max; i++){
         if (!rain.splashes[i].alive) continue;
         if (rain.splashes[i].life >= 1.0f){ rain.splashes[i].alive = false; continue; }
         rain.splashes[i].life += life_step;
@@ -253,7 +254,7 @@ void rain_draw(RainState& rain, const glm::mat4& view, const glm::mat4& proj, gl
     // pack VBO: 6 floats per vert (pos xyz, len_s, width_s, alpha_s)
     static float vbuf[Const::RAIN_PARTICLE_COUNT * 6 * 6];
     int idx = 0;
-    for (int i = 0; i < Const::RAIN_PARTICLE_COUNT; i++){
+    for (int i = 0; i < my_settings.rain_particle_count; i++){
         float x = rain.particles[i].pos.x;
         float y = rain.particles[i].pos.y;
         float z = rain.particles[i].pos.z;
@@ -311,7 +312,7 @@ void rain_draw(RainState& rain, const glm::mat4& view, const glm::mat4& proj, gl
     static float sbuf[Const::RAIN_SPLASH_MAX * 8 * 2 * 3];
     int scount = 0;
     int si = 0;
-    for (int i = 0; i < Const::RAIN_SPLASH_MAX; i++){
+    for (int i = 0; i < my_settings.rain_splash_max; i++){
         const RainSplash& sp = rain.splashes[i];
         if (!sp.alive) continue;
         float r = sp.radius;

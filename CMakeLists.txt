@@ -12,6 +12,7 @@ add_executable(tricycle-sim
     src/core/editor_input.cpp
     src/core/cam.cpp
     src/core/npc_update.cpp
+    src/core/settings.cpp
     src/renderer/shader.cpp
     src/renderer/mesh.cpp
     src/renderer/mesh_builder.cpp

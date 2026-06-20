@@ -27,6 +27,13 @@ enum EditorMode{
     MODE_AMBIENCE
 };
 
+enum SettingsPage {
+    SETTINGS_PAGE_MAIN,
+    SETTINGS_PAGE_GRAPHICS,
+    SETTINGS_PAGE_CONTROLS
+};
+
+
 // editor mode state lives in App
 // reset when toggling back to drive mode
 struct EditorState{
@@ -114,5 +121,11 @@ struct EditorState{
     int selected_zone_id = -1; // -1 = none selected
     int ambience_file_page = 0; // scroll offset in audio file list
     bool ambience_placing = false; // true = ghost zone follows ground cursor, LMB confirms
+    
+    // settings menu
+    // open with ESC in drive mode, ESC again or back closes it
+    bool settings_open = false;
+    SettingsPage settings_page = SETTINGS_PAGE_MAIN;
+    int settings_cursor = 0; // which row is highlighted, resets on page change
 
 };

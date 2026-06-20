@@ -1,3 +1,4 @@
+#include "../renderer/editor_renderer.hpp"
 #include "../physics/trike_aabb.hpp"
 #include "../physics/collision.hpp"
 #include "../world/world_map.hpp"
@@ -12,6 +13,7 @@
 #include <glm/glm.hpp>
 #include "app.hpp"
 #include "const.hpp"
+#include "settings.hpp"
 #include "editor_cam.hpp"
 #include "editor_input.hpp"
 #include "npc_update.hpp"
@@ -163,6 +165,7 @@ void app_init(App& app){
 
     hud_init(app.hud, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
     audio_init(app.audio, "../assets");
+    settings_load();
     rain_init(app.rain, app.trike.position);
 
     s_cam.pitch = Const::CAM_PITCH_DEFAULT;
@@ -173,6 +176,8 @@ void app_init(App& app){
     app.accumulator = 0.0f;
     app.running     = true;
 }
+
+void editor_input_settings(EditorState& editor, GLFWwindow* window);
 
 /********************************************
  MAIN LOOP
@@ -218,11 +223,26 @@ void app_run(App& app){
         }
         s_tab_pressed_last = tab_down;
 
+        // ESC - settings menu toggle
+        static bool s_esc_last = false;
+        bool esc_down = glfwGetKey(app.window.handle, GLFW_KEY_ESCAPE) == GLFW_PRESS;
+        if (esc_down && !s_esc_last){
+            app.editor.settings_open = !app.editor.settings_open;
+            app.editor.settings_page = SETTINGS_PAGE_MAIN;
+            app.editor.settings_cursor = 0;
+            if (!app.editor.settings_open)
+                settings_save();
+        }
+        s_esc_last = esc_down;
+
         /******************************************************************************
          EDITOR MODE
         ******************************************************************************/
         if (app.editor.active){
             editor_cam_update(app.editor, app.window.handle, dt);
+
+            glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             glm::mat4 view = editor_cam_get_view(app.editor);
             glm::mat4 proj = glm::perspective(
@@ -233,9 +253,6 @@ void app_run(App& app){
             editor_input_update(app.editor, app.map, app.editor_renderer,
                 app.window.handle, view, proj,
                 Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, dt, app.obstacles_dirty);
-
-            glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             // SHADOW PASS
             scene_update_daytime(app.scene, dt);
@@ -318,16 +335,22 @@ void app_run(App& app){
                     pose_npc_model, app.map);
             }
 
-            editor_renderer_draw_hud(app.editor_renderer, app.editor, app.map);
-            font_draw(app.editor_renderer.font,
-                "[TAB] drive  [L CLICK] place/select  [DEL] delete  [B] behavior  [Ctrl+S] save",
-                10, Const::WINDOW_HEIGHT - 40, 2, 0.7f, 0.7f, 0.7f);
-            font_draw(app.editor_renderer.font,
-                "[T] translate  [R] rotate  [Y] scale  [PgUp/PgDn] Y nudge  [1-9] prop  [/] page",
-                10, Const::WINDOW_HEIGHT - 20, 2, 0.7f, 0.7f, 0.7f);
+            if (!app.editor.settings_open){
+                editor_renderer_draw_hud(app.editor_renderer, app.editor, app.map);
+                font_draw(app.editor_renderer.font,
+                    "[TAB] drive  [L CLICK] place/select  [DEL] delete  [B] behavior  [Ctrl+S] save",
+                    10, Const::WINDOW_HEIGHT - 40, 2, 0.7f, 0.7f, 0.7f);
+                font_draw(app.editor_renderer.font,
+                    "[T] translate  [R] rotate  [Y] scale  [PgUp/PgDn] Y nudge  [1-9] prop  [/] page",
+                    10, Const::WINDOW_HEIGHT - 20, 2, 0.7f, 0.7f, 0.7f);
+            }
+            if (app.editor.settings_open){
+                editor_input_settings(app.editor, app.window.handle);
+                editor_renderer_draw_settings_menu(app.editor_renderer, app.editor);
+            }
 
             // pedestrian config overlay for selected object
-            if (app.editor.selected_id != -1){
+            if (!app.editor.settings_open && app.editor.selected_id != -1){
                 for (const auto& o : app.map.objects){
                     if (o.id != app.editor.selected_id) continue;
                     if (o.behavior != PEDESTRIAN) break;
@@ -356,6 +379,13 @@ void app_run(App& app){
         /******************************************************************************
          DRIVE MODE
         ******************************************************************************/
+
+        glm::mat4 proj = glm::perspective(
+            glm::radians(Const::CAM_FOV),
+            (float)Const::WINDOW_WIDTH / (float)Const::WINDOW_HEIGHT,
+            Const::CAM_NEAR, Const::CAM_FAR);
+        glm::mat4 view = cam_update(s_cam, app, dt, false);
+
 
         // TRIKE INPUT
         // S: brake if moving forward, reverse if stopped
@@ -560,11 +590,11 @@ void app_run(App& app){
         /******************************************************************************
          CAMERA
         ******************************************************************************/
-        glm::mat4 proj = glm::perspective(
+        proj = glm::perspective(
             glm::radians(Const::CAM_FOV),
             (float)Const::WINDOW_WIDTH / (float)Const::WINDOW_HEIGHT,
             Const::CAM_NEAR, Const::CAM_FAR);
-        glm::mat4 view = cam_update(s_cam, app, dt, arrow_held);
+        view = cam_update(s_cam, app, dt, arrow_held);
 
         /******************************************************************************
          AUDIO UPDATE
@@ -595,31 +625,34 @@ void app_run(App& app){
         app.editor_renderer.shadow_cull_center = app.trike.position;
         scene_shadow_pass(app.scene, app.obstacles, app.trike.position);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
-        glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
-        glClear(GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_FRONT);
-        editor_renderer_shadow_pass(app.editor_renderer, app.map,
-            app.scene.light_space_mat, app.dynamic_sims);
-        scene_trike_shadow_draw(app.scene, app.trike);
-        driver_model_draw(app.scene.driver_model, app.player, app.trike,
-            app.scene.shadow_shader, app.scene.light_space_mat, glm::mat4(1.0f),
-            app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
+        if (my_settings.render_shadows){
+            glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
+            glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_FRONT);
+            editor_renderer_shadow_pass(app.editor_renderer, app.map,
+                app.scene.light_space_mat, app.dynamic_sims);
+            scene_trike_shadow_draw(app.scene, app.trike);
+            driver_model_draw(app.scene.driver_model, app.player, app.trike,
+                app.scene.shadow_shader, app.scene.light_space_mat, glm::mat4(1.0f),
+                app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
 
-        for (const auto& npc : app.npcs){
-            glm::vec3 dnpc = npc.position - app.trike.position;
-            dnpc.y = 0.0f;
-            if (glm::dot(dnpc, dnpc) > Const::NPC_CULL_DIST_SQ) continue;
-            auto it = app.npc_model_cache.find(npc.model_path);
-            DriverModel* mdl = (it != app.npc_model_cache.end())
-                ? &it->second : &app.scene.driver_model;
-            npc_draw(npc, *mdl, app.scene.shadow_shader,
-                app.scene.light_space_mat, glm::mat4(1.0f));
+            for (const auto& npc : app.npcs){
+                glm::vec3 dnpc = npc.position - app.trike.position;
+                dnpc.y = 0.0f;
+                float npc_cull_sq = my_settings.npc_cull_dist * my_settings.npc_cull_dist;
+                if (glm::dot(dnpc, dnpc) > npc_cull_sq) continue;
+                auto it = app.npc_model_cache.find(npc.model_path);
+                DriverModel* mdl = (it != app.npc_model_cache.end())
+                    ? &it->second : &app.scene.driver_model;
+                npc_draw(npc, *mdl, app.scene.shadow_shader,
+                    app.scene.light_space_mat, glm::mat4(1.0f));
+            }
+            glCullFace(GL_BACK);
+            glDisable(GL_CULL_FACE);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
-        glCullFace(GL_BACK);
-        glDisable(GL_CULL_FACE);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         {
             int fb_w, fb_h;
             glfwGetFramebufferSize(app.window.handle, &fb_w, &fb_h);
@@ -666,7 +699,8 @@ void app_run(App& app){
         for (const auto& npc : app.npcs){
             glm::vec3 d = npc.position - app.trike.position;
             d.y = 0.0f;
-            if (glm::dot(d, d) > Const::NPC_CULL_DIST_SQ) continue;
+            float npc_cull_sq = my_settings.npc_cull_dist * my_settings.npc_cull_dist;
+            if (glm::dot(d, d) > npc_cull_sq) continue;
             auto it = app.npc_model_cache.find(npc.model_path);
             DriverModel* mdl = (it != app.npc_model_cache.end())
                 ? &it->second : &app.scene.driver_model;
@@ -714,7 +748,12 @@ void app_run(App& app){
 
         std::string radio_track = (app.audio.radio_on && app.audio.radio_index < (int)app.audio.radio_playlist.size())
             ? app.audio.radio_playlist[app.audio.radio_index] : "";
-        hud_draw(app.hud, app.trike, app.passenger_npc_id != -1, app.passenger_fare, app.audio.radio_on, radio_track);
+        bool driving = (app.player.mode == PLAYER_DRIVING || app.player.mode == PLAYER_MOUNTING);
+        if (my_settings.show_hud && driving) hud_draw(app.hud, app.trike, app.passenger_npc_id != -1, app.passenger_fare, app.audio.radio_on, radio_track);
+        if (app.editor.settings_open){
+            editor_input_settings(app.editor, app.window.handle);
+            editor_renderer_draw_settings_menu(app.editor_renderer, app.editor);
+        }
         window_swap_buffers(app.window);
         window_poll_events();
     }
@@ -725,6 +764,7 @@ void app_run(App& app){
 *****************************************************/
 void app_shutdown(App& app){
     rain_destroy(app.rain);
+    settings_save();
     audio_shutdown(app.audio);
     hud_destroy(app.hud);
     scene_destroy(app.scene);

@@ -6,11 +6,6 @@ static void cb_framebuffer_size(GLFWwindow*, int width, int height){
     glViewport(0, 0, width, height);
 }
 
-static void cb_key(GLFWwindow* w, int key, int, int action, int){
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(w, true);
-}
-
 void window_init(Window& w, int width, int height, const char* title){
     if (!glfwInit()) {
         std::cerr << "[window] glfwInit failed\n";
@@ -34,7 +29,6 @@ void window_init(Window& w, int width, int height, const char* title){
     glfwMakeContextCurrent(w.handle);
     glfwSwapInterval(Const::VSYNC ? 1 : 0);
     glfwSetFramebufferSizeCallback(w.handle, cb_framebuffer_size);
-    glfwSetKeyCallback(w.handle, cb_key);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cerr << "[window] GLAD init failed\n";

@@ -1,4 +1,5 @@
 #include "../renderer/editor_renderer.hpp"
+#include "../core/settings.hpp"
 #include "../world/npc.hpp"
 #include "../world/ambience_zone.hpp"
 #include "editor_input.hpp"
@@ -328,6 +329,153 @@ int editor_raycast_objects(double mx, double my, const glm::mat4& view, const gl
     }
 
     return hit_id;
+}
+
+
+void editor_input_settings(EditorState& editor, GLFWwindow* window){
+
+    static bool s_up_last = false;
+    static bool s_dn_last = false;
+    static bool s_lt_last = false;
+    static bool s_rt_last = false;
+    static bool s_en_last = false;
+
+    bool up = glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS;
+    bool dn = glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS;
+    bool lt = glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS;
+    bool rt = glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS;
+    bool en = glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS;
+
+    // MAIN PAGE
+    if (editor.settings_page == SETTINGS_PAGE_MAIN){
+        // 3 items: GRAPHICS=0, CONTROLS=1, QUIT=2
+        if (up && !s_up_last) editor.settings_cursor = std::max(0, editor.settings_cursor - 1);
+        if (dn && !s_dn_last) editor.settings_cursor = std::min(2, editor.settings_cursor + 1);
+
+        if (en && !s_en_last){
+            if (editor.settings_cursor == 0){
+                editor.settings_page  = SETTINGS_PAGE_GRAPHICS;
+                editor.settings_cursor = 0;
+            }
+            else if (editor.settings_cursor == 1){
+                editor.settings_page  = SETTINGS_PAGE_CONTROLS;
+                editor.settings_cursor = 0;
+            }
+            else {
+                // QUIT
+                glfwSetWindowShouldClose(window, GLFW_TRUE);
+            }
+        }
+    }
+
+    // CONTROLS PAGE
+    // cursor = sub-page index, left/right flips pages
+    else if (editor.settings_page == SETTINGS_PAGE_CONTROLS){
+        static const int CTRL_PAGES = 5;
+        if (lt && !s_lt_last) editor.settings_cursor = std::max(0, editor.settings_cursor - 1);
+        if (rt && !s_rt_last) editor.settings_cursor = std::min(CTRL_PAGES - 1, editor.settings_cursor + 1);
+
+        if (en && !s_en_last){
+            // enter returns to main
+            editor.settings_page   = SETTINGS_PAGE_MAIN;
+            editor.settings_cursor = 1; // leave cursor on CONTROLS
+        }
+    }
+
+    // GRAPHICS PAGE
+    // row 0 = preset, rows 1-9 = individual settings, row 10 = BACK
+    else if (editor.settings_page == SETTINGS_PAGE_GRAPHICS){
+        static const int GRAPHICS_ROWS = 11; // 0=preset, 1-9=settings, 10=back
+        if (up && !s_up_last) editor.settings_cursor = std::max(0, editor.settings_cursor - 1);
+        if (dn && !s_dn_last) editor.settings_cursor = std::min(GRAPHICS_ROWS - 1, editor.settings_cursor + 1);
+
+        // left/right adjust the selected row
+        if (editor.settings_cursor == 0){
+            // preset row: cycle presets
+            if (lt && !s_lt_last){
+                int p = std::max(0, (int)my_settings.preset - 1);
+                settings_apply_preset((Preset)p);
+            }
+            if (rt && !s_rt_last){
+                int p = std::min((int)CUSTOM, (int)my_settings.preset + 1);
+                settings_apply_preset((Preset)p);
+            }
+        }
+        else if (editor.settings_cursor == 10){
+            // BACK row
+            if (en && !s_en_last){
+                settings_save();
+                editor.settings_page   = SETTINGS_PAGE_MAIN;
+                editor.settings_cursor = 0;
+            }
+        }
+        else {
+            // individual setting rows 1-9
+            // map cursor to setting and adjust
+            // nudge amounts per setting
+            // shadow_map_size: *2 / /2 (power of 2 steps)
+            // throttle: int +-1
+            // distances: +-10m
+            // particle counts: +-500
+            // bools: toggle on left or right
+            int row = editor.settings_cursor;
+            switch(row){
+                case 1: // shadow map size
+                    if (lt && !s_lt_last) my_settings.shadow_map_size = std::max(128, my_settings.shadow_map_size / 2);
+                    if (rt && !s_rt_last) my_settings.shadow_map_size = std::min(4096, my_settings.shadow_map_size * 2);
+                    my_settings.preset = CUSTOM;
+                    break;
+                case 2: // shadow throttle
+                    if (lt && !s_lt_last) my_settings.shadow_throttle_frame = std::max(1, my_settings.shadow_throttle_frame - 1);
+                    if (rt && !s_rt_last) my_settings.shadow_throttle_frame = std::min(12, my_settings.shadow_throttle_frame + 1);
+                    my_settings.preset = CUSTOM;
+                    break;
+                case 3: // prop cull dist
+                    if (lt && !s_lt_last) my_settings.prop_cull_dist = std::max(30.0f,  my_settings.prop_cull_dist - 10.0f);
+                    if (rt && !s_rt_last) my_settings.prop_cull_dist = std::min(300.0f, my_settings.prop_cull_dist + 10.0f);
+                    my_settings.preset = CUSTOM;
+                    break;
+                case 4: // npc cull dist
+                    if (lt && !s_lt_last) my_settings.npc_cull_dist = std::max(10.0f,  my_settings.npc_cull_dist - 10.0f);
+                    if (rt && !s_rt_last) my_settings.npc_cull_dist = std::min(150.0f, my_settings.npc_cull_dist + 10.0f);
+                    my_settings.preset = CUSTOM;
+                    break;
+                case 5: // light cull dist
+                    if (lt && !s_lt_last) my_settings.light_cull_dist = std::max(30.0f,  my_settings.light_cull_dist - 10.0f);
+                    if (rt && !s_rt_last) my_settings.light_cull_dist = std::min(300.0f, my_settings.light_cull_dist + 10.0f);
+                    my_settings.preset = CUSTOM;
+                    break;
+                case 6: // rain particles
+                    if (lt && !s_lt_last) my_settings.rain_particle_count = std::max(0,    my_settings.rain_particle_count - 500);
+                    if (rt && !s_rt_last) my_settings.rain_particle_count = std::min(8000, my_settings.rain_particle_count + 500);
+                    my_settings.preset = CUSTOM;
+                    break;
+                case 7: // rain splashes
+                    if (lt && !s_lt_last) my_settings.rain_splash_max = std::max(0,    my_settings.rain_splash_max - 100);
+                    if (rt && !s_rt_last) my_settings.rain_splash_max = std::min(1200, my_settings.rain_splash_max + 100);
+                    my_settings.preset = CUSTOM;
+                    break;
+                case 8: // render shadows bool
+                    if ((lt && !s_lt_last) || (rt && !s_rt_last)){
+                        my_settings.render_shadows = !my_settings.render_shadows;
+                        my_settings.preset = CUSTOM;
+                    }
+                    break;
+                case 9: // show hud bool
+                    if ((lt && !s_lt_last) || (rt && !s_rt_last)){
+                        my_settings.show_hud = !my_settings.show_hud;
+                        my_settings.preset = CUSTOM;
+                    }
+                    break;
+            }
+        }
+    }
+
+    s_up_last = up;
+    s_dn_last = dn;
+    s_lt_last = lt;
+    s_rt_last = rt;
+    s_en_last = en;
 }
 
 

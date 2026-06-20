@@ -1,5 +1,6 @@
 #include "../../vendor/stb/stb_image.h"
 #include "../core/const.hpp"
+#include "../core/settings.hpp"
 #include "../world/world_object.hpp"
 #include "../world/ocean.hpp"
 #include "../world/npc.hpp"
@@ -609,8 +610,8 @@ void editor_renderer_shadow_pass(EditorRenderer& er, const WorldMap& map,
 
         // shadow cull
         glm::vec3 diff = o.position - er.shadow_cull_center;
-        static constexpr float SHADOW_CULL_SQ = 180.0f * 180.0f;
-        if (glm::dot(diff, diff) > SHADOW_CULL_SQ) continue;
+        float shadow_cull_sq = my_settings.prop_cull_dist * my_settings.prop_cull_dist;
+        if (glm::dot(diff, diff) > shadow_cull_sq) continue;
         ObjMesh& mesh = get_prop_mesh(er, o.model_path);
         if (mesh.data.vertices.empty()) continue;
 
@@ -678,7 +679,8 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     if (er.night_factor >= 0.01f){
         for (int i = 0; i < (int)lights.size() && active_lcount < Const::MAX_POINT_LIGHTS; i++){
             glm::vec3 d = lights[i].position - cam_pos;
-            if (glm::dot(d, d) > Const::LIGHT_CULL_DIST_SQ) continue;
+            float light_cull_sq = my_settings.light_cull_dist * my_settings.light_cull_dist;
+            if (glm::dot(d, d) > light_cull_sq) continue;
             // compact into slots 0..active_lcount
             glUniform3f(er.pt_light_loc.pos[active_lcount], lights[i].position.x, lights[i].position.y, lights[i].position.z);
             glUniform3f(er.pt_light_loc.color[active_lcount], lights[i].color.r, lights[i].color.g, lights[i].color.b);
@@ -702,8 +704,8 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
         
         // distance cull
         glm::vec3 diff = o.position - cam_pos;
-        if (glm::dot(diff, diff) > Const::PROP_CULL_DIST_SQ) continue;
-
+        float prop_cull_sq = my_settings.prop_cull_dist * my_settings.prop_cull_dist;
+        if (glm::dot(diff, diff) > prop_cull_sq) continue;
         ObjMesh& mesh = get_prop_mesh(er, o.model_path);
         if (mesh.data.vertices.empty()) continue;
 
@@ -1609,6 +1611,282 @@ void editor_renderer_draw_hud(EditorRenderer& er, const EditorState& editor, con
     }
 }
 
+void editor_renderer_draw_settings_menu(EditorRenderer& er, const EditorState& editor){
+    // full-screen dark overlay so world is still visible but dimmed
+    // drawn as a screen-space font overlay — no GL geometry needed
+    // font coords are pixel space: 0,0 = top-left
+
+    static const int SW = Const::WINDOW_WIDTH;
+    static const int SH = Const::WINDOW_HEIGHT;
+    static const int CX = SW / 2;
+
+    // CONTROLS PAGE
+    if (editor.settings_page == SETTINGS_PAGE_CONTROLS){
+
+        struct ControlPage {
+            const char* title;
+            const char* desc;
+            const char* keys[20][2]; // [key, action]
+            int count;
+        };
+
+        static const ControlPage PAGES[] = {
+            {
+                "DRIVE MODE",
+                "Controls while driving or on foot in the barangay.",
+                {
+                    { "W",            "Accelerate"                    },
+                    { "S",            "Brake  /  Reverse"             },
+                    { "A / D",        "Steer left / right"            },
+                    { "E",            "Mount or dismount trike"       },
+                    { "Q",            "Accept hailing passenger"      },
+                    { "L",            "Toggle headlights"             },
+                    { "P",            "Radio on / off"                },
+                    { "/",            "Next radio track"              },
+                    { "R",            "Reset trike and position"      },
+                    { "F",            "Free camera toggle"            },
+                    { "H",            "Show collision hitboxes"       },
+                    { "Arrows",       "Orbit camera around trike"     },
+                    { "TAB",          "Enter editor mode"             },
+                    { "ESC",          "Open settings menu"            },
+                },
+                14
+            },
+            {
+                "OBJECT MODE",
+                "Place, select, and transform props in the world.",
+                {
+                    { "L Click",      "Place prop / select object"    },
+                    { "Ctrl+Click",   "Select smallest object hit"    },
+                    { "Shift+Click",  "Place on top of selected"      },
+                    { "DEL",          "Delete selected object"        },
+                    { "T",            "Translate tool"                },
+                    { "R",            "Rotate tool"                   },
+                    { "Y",            "Scale tool"                    },
+                    { "Arrows",       "Move / rotate / scale"         },
+                    { "Shift+Arrows", "Fine step (5cm)"               },
+                    { "PgUp / PgDn",  "Nudge Y up / down"            },
+                    { "B",            "Cycle behavior (Static etc)"   },
+                    { "N",            "Cycle physics preset (Dynamic)"},
+                    { "1-9",          "Select prop from palette"      },
+                    { "[ / ]",        "Prev / next prop page"         },
+                    { "Ctrl+C / V",   "Copy / paste object"           },
+                    { "Ctrl+S",       "Save map"                      },
+                    { "F5",           "Rescan assets folder"          },
+                },
+                17
+            },
+            {
+                "TERRAIN  &  ROAD",
+                "Sculpt the heightfield and lay road splines.",
+                {
+                    { "H",            "Toggle terrain sculpt mode"    },
+                    { "L Click hold", "Raise terrain"                 },
+                    { "R Click hold", "Lower terrain"                 },
+                    { "Shift+Click",  "Smooth brush"                  },
+                    { "[ / ]",        "Shrink / grow brush radius"    },
+                    { "Ctrl+Z",       "Undo last sculpt stroke"       },
+                    { "P",            "Toggle surface paint mode"     },
+                    { "0-7",          "Select surface type to paint"  },
+                    { "Ctrl+Shift+W", "Wipe entire surface canvas"    },
+                    { "M",            "Toggle road spline mode"       },
+                    { "L Click",      "Add spline control point"      },
+                    { "R Click",      "Undo last control point"       },
+                    { "[ / ]",        "Cycle road type"               },
+                    { "ENTER",        "Finish spline"                 },
+                    { "DEL",          "Delete active spline"          },
+                    { "Ctrl+S",       "Save"                          },
+                },
+                16
+            },
+            {
+                "LIGHT, OCEAN, AMBIENCE",
+                "Place point lights, water zones, and ambient audio.",
+                {
+                    { "L",            "Toggle light placement mode"   },
+                    { "L Click",      "Place or select a light"       },
+                    { "Arrows",       "Move selected light XZ"        },
+                    { "PgUp / PgDn",  "Move selected light Y"         },
+                    { "[ / ]",        "Adjust light radius"           },
+                    { "+ / -",        "Adjust intensity"              },
+                    { "Q/E  Z/X  C/V","Tune R / G / B tint"           },
+                    { "DEL",          "Delete selected light"         },
+                    { "O",            "Toggle ocean mode"             },
+                    { "PgUp / PgDn",  "Nudge ocean Y level"           },
+                    { "E",            "Toggle ocean on / off"         },
+                    { "I",            "Toggle ambience zone mode"     },
+                    { "L Click",      "Place or select zone"          },
+                    { "[ / ]",        "Adjust zone radius"            },
+                    { "F",            "Toggle zone type (Night/Prox)" },
+                    { "1-8",          "Assign audio file to zone"     },
+                },
+                16
+            },
+            {
+                "POSE  &  AUDIO",
+                "Edit driver and NPC bone poses. Assign object audio.",
+                {
+                    { "K",            "Toggle pose editor mode"       },
+                    { "F",            "Cycle active bone"             },
+                    { "Arrows",       "Rotate bone X / Y axis"        },
+                    { "PgUp / PgDn",  "Rotate bone Z axis"            },
+                    { "Shift+any",    "Fine rotation mode"            },
+                    { "NP0",          "Toggle seat / bone translate"  },
+                    { "NP8/2/4/6",    "Move seat or bone offset"      },
+                    { "NP+ / NP-",    "Seat / bone Y up / down"       },
+                    { "V",            "Toggle hail / mount pose"      },
+                    { "Ctrl+H",       "Save hail pose to NPC"         },
+                    { "Ctrl+M",       "Save mount pose to NPC"        },
+                    { "Ctrl+S",       "Save driver pose to file"      },
+                    { "ENTER",        "Dump pose as code to console"  },
+                    { "Z",            "Toggle audio editor mode"      },
+                    { "TAB",          "Cycle audio slot"              },
+                    { "1-8",          "Assign audio file to slot"     },
+                    { "DEL",          "Clear audio slot"              },
+                },
+                17
+            },
+        };
+        static const int PAGE_COUNT = 5;
+
+        // settings_cursor doubles as the sub-page index on the controls page
+        // clamped in input handling
+        int sub = glm::clamp(editor.settings_cursor, 0, PAGE_COUNT - 1);
+        const ControlPage& cp = PAGES[sub];
+
+        // header
+        char pg_buf[32];
+        snprintf(pg_buf, sizeof(pg_buf), "PAGE %d / %d", sub + 1, PAGE_COUNT);
+        font_draw(er.font, "CONTROLS", 60, 140, 5, 1.0f, 1.0f, 1.0f);
+        font_draw(er.font, pg_buf, 380, 152, 3, 0.5f, 0.5f, 0.5f);
+        font_draw(er.font, cp.title, 60, 220, 4, 0.20f, 1.00f, 0.55f);
+        font_draw(er.font, cp.desc, 60, 265, 2, 0.60f, 0.60f, 0.60f);
+
+        // key list 
+        // two columns
+        int col_x[2] = { 60, 780 };
+        int y = 295;
+        int half = (cp.count + 1) / 2;
+        for (int i = 0; i < cp.count; i++){
+            int col = i / half;
+            int row = i % half;
+            int rx = col_x[col];
+            int ry = y + row * 28;
+            font_draw(er.font, cp.keys[i][0], rx, ry, 2, 0.90f, 0.85f, 0.40f);
+            font_draw(er.font, cp.keys[i][1], rx + 200, ry, 2, 0.80f, 0.80f, 0.80f);
+        }
+        
+        // nav hints
+        font_draw(er.font, "LEFT / RIGHT = change page",
+            60, SH - 58, 3, 0.6f, 0.6f, 0.6f);
+        font_draw(er.font, "ESC = close ENTER = back to settings",
+            60, SH - 28, 3, 0.6f, 0.6f, 0.6f);
+        return;
+    }
+
+
+
+    // GRAPHICS PAGE
+    if (editor.settings_page == SETTINGS_PAGE_GRAPHICS){
+        font_draw(er.font, "GRAPHICS", 60, 80, 5, 1.0f, 1.0f, 1.0f);
+
+        // preset row
+        {
+            bool sel = (editor.settings_cursor == 0);
+            font_draw(er.font, "PRESET", 60, 170, 3, 0.9f, 0.9f, 0.9f);
+            const char* presets[] = { "LOW", "MODERATE", "HIGH", "CUSTOM" };
+            int px = 280;
+            for (int i = 0; i < 4; i++){
+                bool active = ((int)my_settings.preset == i);
+                float r = active ? 0.20f : 0.45f;
+                float g = active ? 1.00f : 0.45f;
+                float b = active ? 0.55f : 0.45f;
+                if (sel && active){ r = 1.0f; g = 1.0f; b = 0.3f; }
+                font_draw(er.font, presets[i], px, 170, 3, r, g, b);
+                px += (int)(strlen(presets[i]) * 20 + 50);
+            }
+        }
+
+        // individual settings rows
+        // layout: label | [-] value [+]
+        struct Row {
+            const char* label;
+            const char* unit;
+            float val;
+            bool is_bool;
+            bool bool_val;
+        };
+
+        Row rows[] = {
+            { "SHADOW MAP SIZE", "px",  (float)my_settings.shadow_map_size,       false, false },
+            { "SHADOW THROTTLE", "frm", (float)my_settings.shadow_throttle_frame, false, false },
+            { "PROP CULL DIST",  "m",   my_settings.prop_cull_dist,               false, false },
+            { "NPC CULL DIST",   "m",   my_settings.npc_cull_dist,                false, false },
+            { "LIGHT CULL DIST", "m",   my_settings.light_cull_dist,              false, false },
+            { "RAIN PARTICLES",  "",    (float)my_settings.rain_particle_count,   false, false },
+            { "RAIN SPLASHES",   "",    (float)my_settings.rain_splash_max,       false, false },
+            { "RENDER SHADOWS",  "",    0.0f, true,  my_settings.render_shadows },
+            { "SHOW HUD",        "",    0.0f, true,  my_settings.show_hud       },
+        };
+        static const int ROW_COUNT = 9;
+
+        int y = 240;
+        for (int i = 0; i < ROW_COUNT; i++){
+            bool sel = (editor.settings_cursor == i + 1); // +1 because row 0 = preset
+            float lr = sel ? 1.0f : 0.70f;
+            float lg = sel ? 1.0f : 0.70f;
+            float lb = sel ? 0.3f : 0.70f;
+
+            font_draw(er.font, rows[i].label, 60, y, 3, lr, lg, lb);
+
+            if (rows[i].is_bool){
+                const char* bval = rows[i].bool_val ? "ON" : "OFF";
+                float vr = rows[i].bool_val ? 0.20f : 0.70f;
+                float vg = rows[i].bool_val ? 1.00f : 0.30f;
+                float vb = rows[i].bool_val ? 0.55f : 0.30f;
+                if (sel){ font_draw(er.font, "<", 580, y, 3, 1.0f, 1.0f, 1.0f); }
+                font_draw(er.font, bval, 620, y, 3, vr, vg, vb);
+                if (sel){ font_draw(er.font, ">", 700, y, 3, 1.0f, 1.0f, 1.0f); }
+            }
+            else {
+                char vbuf[32];
+                snprintf(vbuf, sizeof(vbuf), "%.0f %s", rows[i].val, rows[i].unit);
+                if (sel){ font_draw(er.font, "<", 580, y, 3, 1.0f, 1.0f, 1.0f); }
+                font_draw(er.font, vbuf, 620, y, 3, 0.85f, 0.85f, 0.85f);
+                if (sel){ font_draw(er.font, ">", 760, y, 3, 1.0f, 1.0f, 1.0f); }
+            }
+            y += 42;
+        }
+
+        // back row
+        {
+            bool sel = (editor.settings_cursor == ROW_COUNT + 1);
+            font_draw(er.font, "BACK", 60, y + 10, sel ? 4 : 3,
+                sel ? 0.20f : 0.60f,
+                sel ? 1.00f : 0.60f,
+                sel ? 0.55f : 0.60f);
+        }
+
+        font_draw(er.font, "UP/DN=navigate  LEFT/RIGHT=adjust  ENTER=preset/back  ESC=close",
+            60, SH - 50, 3, 0.6f, 0.6f, 0.6f);
+        return;
+    }
+
+    // MAIN PAGE
+    font_draw(er.font, "SETTINGS", 100, SH/2 - 100, 5, 1.0f, 1.0f, 1.0f);
+
+    const char* items[] = { "GRAPHICS", "CONTROLS", "QUIT" };
+    for (int i = 0; i < 3; i++){
+        bool sel = (editor.settings_cursor == i);
+        float r = sel ? 0.20f : 0.60f;
+        float g = sel ? 1.00f : 0.60f;
+        float b = sel ? 0.55f : 0.60f;
+        font_draw(er.font, items[i], 100, SH/2 - 10 + i * 50, 4, r, g, b);
+    }
+
+    font_draw(er.font, "UP/DN=navigate ENTER=select ESC=close",
+        100, SH/2 + 160, 2, 0.4f, 0.4f, 0.4f);
+}
 
 void editor_renderer_destroy(EditorRenderer& er){
     shader_destroy(er.shader);
