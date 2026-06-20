@@ -198,12 +198,13 @@ void app_run(App& app){
         static bool s_h_last = false;
         bool h_down  = glfwGetKey(app.window.handle, GLFW_KEY_H) == GLFW_PRESS;
         bool ctrl_h  = glfwGetKey(app.window.handle, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
-        if (h_down && !s_h_last && !ctrl_h) app.editor.show_hitboxes = !app.editor.show_hitboxes;
+        if (!app.editor.settings_open && h_down && !s_h_last && !ctrl_h)
+            app.editor.show_hitboxes = !app.editor.show_hitboxes;
         s_h_last = h_down;
 
-        // TAB key toggle EDITOR <-> DRIVE (blocked in Audio submode)
+        // TAB key toggle EDITOR <-> DRIVE (blocked in Audio submode and settings)
         bool tab_down = glfwGetKey(app.window.handle, GLFW_KEY_TAB) == GLFW_PRESS;
-        if (tab_down && !s_tab_pressed_last && app.editor.mode != MODE_AUDIO){
+        if (!app.editor.settings_open && tab_down && !s_tab_pressed_last && app.editor.mode != MODE_AUDIO){
             app.editor.active = !app.editor.active;
             if (app.editor.active){
                 app.editor.cam_pos = app.trike.position + glm::vec3(0.0f, 12.0f, 0.0f);
@@ -230,8 +231,13 @@ void app_run(App& app){
             app.editor.settings_open = !app.editor.settings_open;
             app.editor.settings_page = SETTINGS_PAGE_MAIN;
             app.editor.settings_cursor = 0;
-            if (!app.editor.settings_open)
+            if (app.editor.settings_open)
+                audio_pause(app.audio);
+            else {
+                audio_resume(app.audio);
                 settings_save();
+            }
+
         }
         s_esc_last = esc_down;
 
@@ -239,7 +245,8 @@ void app_run(App& app){
          EDITOR MODE
         ******************************************************************************/
         if (app.editor.active){
-            editor_cam_update(app.editor, app.window.handle, dt);
+            if (!app.editor.settings_open)
+                editor_cam_update(app.editor, app.window.handle, dt);
 
             glClearColor(Const::CLEAR_R, Const::CLEAR_G, Const::CLEAR_B, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -250,9 +257,10 @@ void app_run(App& app){
                 (float)Const::WINDOW_WIDTH / (float)Const::WINDOW_HEIGHT,
                 Const::CAM_NEAR, Const::CAM_FAR);
 
-            editor_input_update(app.editor, app.map, app.editor_renderer,
-                app.window.handle, view, proj,
-                Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, dt, app.obstacles_dirty);
+            if (!app.editor.settings_open)
+                editor_input_update(app.editor, app.map, app.editor_renderer,
+                    app.window.handle, view, proj,
+                    Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT, dt, app.obstacles_dirty);
 
             // SHADOW PASS
             scene_update_daytime(app.scene, dt);
@@ -385,230 +393,234 @@ void app_run(App& app){
             (float)Const::WINDOW_WIDTH / (float)Const::WINDOW_HEIGHT,
             Const::CAM_NEAR, Const::CAM_FAR);
         glm::mat4 view = cam_update(s_cam, app, dt, false);
+        
 
-
-        // TRIKE INPUT
-        // S: brake if moving forward, reverse if stopped
-        TrikeInput input = {};
-        if (app.player.mode == PLAYER_DRIVING || app.player.mode == PLAYER_MOUNTING){
-            input.throttle = (glfwGetKey(app.window.handle, GLFW_KEY_W) == GLFW_PRESS) ? 1.0f : 0.0f;
-            bool s_held   = glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS;
-            input.brake   = (s_held && app.trike.speed >  0.5f) ? 1.0f : 0.0f;
-            input.reverse = (s_held && app.trike.speed <= 0.5f) ? 1.0f : 0.0f;
-            input.steer   = 0.0f;
-            if (glfwGetKey(app.window.handle, GLFW_KEY_A) == GLFW_PRESS) input.steer -= 1.0f;
-            if (glfwGetKey(app.window.handle, GLFW_KEY_D) == GLFW_PRESS) input.steer += 1.0f;
-        }
-        else {
-            // FOOT MODE — A/D orbit camera, W/S move along cam facing
-            float move   = 0.0f;
-            bool a_held  = glfwGetKey(app.window.handle, GLFW_KEY_A) == GLFW_PRESS;
-            bool d_held  = glfwGetKey(app.window.handle, GLFW_KEY_D) == GLFW_PRESS;
-            if (glfwGetKey(app.window.handle, GLFW_KEY_W) == GLFW_PRESS) move =  1.0f;
-            if (glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS) move = -1.0f;
-            if (a_held) s_cam.yaw -= 120.0f * dt;
-            if (d_held) s_cam.yaw += 120.0f * dt;
-
-            // +180 so W moves toward where the camera is looking
-            float cam_world_angle = glm::radians(s_cam.yaw) + glm::radians(180.0f);
-            glm::vec3 fwd_dir = { std::cos(cam_world_angle), 0.0f, std::sin(cam_world_angle) };
-
-            float walk_speed = 4.0f;
-            glm::vec3 walk_vel = glm::vec3(0.0f);
-            if (move != 0.0f){
-                walk_vel = fwd_dir * (move * walk_speed);
-                app.player.yaw = std::atan2(walk_vel.z, walk_vel.x);
-            }
-
-            // wrap yaw diff to [-pi, pi] to always take the short arc
-            float yaw_diff = app.player.yaw - app.player.visual_yaw;
-            while (yaw_diff >  glm::pi<float>()) yaw_diff -= glm::two_pi<float>();
-            while (yaw_diff < -glm::pi<float>()) yaw_diff += glm::two_pi<float>();
-            app.player.visual_yaw += yaw_diff * glm::clamp(12.0f * dt, 0.0f, 1.0f);
-
-            app.player.pos += walk_vel * dt;
-            app.player.speed = glm::length(walk_vel);
-            app.player.pos.y = heightfield_sample(app.map.terrain, app.player.pos.x, app.player.pos.z);
-            app.player.anim_timer += (app.player.speed > 0.1f ? app.player.speed * 1.8f : 1.0f) * dt;
-
-            // footstep SFX mapped to surface type
-            if (app.player.speed > 0.1f){
-                static const char* STEP_PATHS[(int)SURFACE_COUNT] = {
-                    "",
-                    "audio/footstep/concrete",
-                    "audio/footstep/gravel",
-                    "audio/footstep/dirt",
-                    "audio/footstep/sand",
-                    "audio/footstep/grass",
-                    "audio/footstep/concrete",
-                    "audio/footstep/rock"
-                };
-                SurfaceType surf = heightfield_get_surface(app.map.terrain,
-                    app.player.pos.x, app.player.pos.z);
-                int si = glm::clamp((int)surf, 0, (int)SURFACE_COUNT - 1);
-                if (si > 0)
-                    audio_trigger_step(app.audio,
-                        std::string("../assets/") + STEP_PATHS[si], app.player.speed * dt);
-            }
-        }
-
-        // F key - free cam
-        static bool s_f_pressed_last = false;
-        bool f_down = glfwGetKey(app.window.handle, GLFW_KEY_F) == GLFW_PRESS;
-        if (f_down && !s_f_pressed_last) s_cam.free_cam = !s_cam.free_cam;
-        s_f_pressed_last = f_down;
-
-        // Q key -  confirm passenger pickup
-        static bool s_q_last = false;
-        bool q_down    = glfwGetKey(app.window.handle, GLFW_KEY_Q) == GLFW_PRESS;
-        bool s_q_pickup = (q_down && !s_q_last);
-        s_q_last = q_down;
-
-        // E  key - mount/dismount
-        static bool s_e_last = false;
-        bool e_down = glfwGetKey(app.window.handle, GLFW_KEY_E) == GLFW_PRESS;
-        if (e_down && !s_e_last && app.player.mode != PLAYER_MOUNTING){
-            if (app.player.mode == PLAYER_DRIVING){
-                float side = app.trike.heading + glm::half_pi<float>();
-                app.player.pos = app.trike.position + glm::vec3(std::cos(side), 0.0f, std::sin(side)) * 1.2f;
-                app.player.yaw = app.trike.heading;
-                app.player.visual_yaw = app.trike.heading;
-                s_cam.yaw = 0.0f;
-                s_cam.pos = app.player.pos + glm::vec3(0.0f, 4.0f, 0.0f);
-                s_cam.needs_snap = true;
-                app.player.mode = PLAYER_FOOT;
-                app.player.headlights_on = false;
-                if (app.audio.radio_on) audio_radio_toggle(app.audio);
+        // gate gameplay to freeze when opening settings
+        if (!app.editor.settings_open){
+            // TRIKE INPUT
+            // S: brake if moving forward, reverse if stopped
+            TrikeInput input = {};
+            if (app.player.mode == PLAYER_DRIVING || app.player.mode == PLAYER_MOUNTING){
+                input.throttle = (glfwGetKey(app.window.handle, GLFW_KEY_W) == GLFW_PRESS) ? 1.0f : 0.0f;
+                bool s_held   = glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS;
+                input.brake   = (s_held && app.trike.speed >  0.5f) ? 1.0f : 0.0f;
+                input.reverse = (s_held && app.trike.speed <= 0.5f) ? 1.0f : 0.0f;
+                input.steer   = 0.0f;
+                if (glfwGetKey(app.window.handle, GLFW_KEY_A) == GLFW_PRESS) input.steer -= 1.0f;
+                if (glfwGetKey(app.window.handle, GLFW_KEY_D) == GLFW_PRESS) input.steer += 1.0f;
             }
             else {
-                // 3m mount radius, stored as squared distance to avoid sqrt
-                glm::vec3 delta = app.trike.position - app.player.pos;
-                delta.y = 0.0f;
-                if (glm::dot(delta, delta) < 9.0f){
-                    app.player.mode        = PLAYER_MOUNTING;
-                    app.player.mount_timer = 0.3f;
+                // FOOT MODE - A/D orbit camera, W/S move along cam facing
+                float move   = 0.0f;
+                bool a_held  = glfwGetKey(app.window.handle, GLFW_KEY_A) == GLFW_PRESS;
+                bool d_held  = glfwGetKey(app.window.handle, GLFW_KEY_D) == GLFW_PRESS;
+                if (glfwGetKey(app.window.handle, GLFW_KEY_W) == GLFW_PRESS) move =  1.0f;
+                if (glfwGetKey(app.window.handle, GLFW_KEY_S) == GLFW_PRESS) move = -1.0f;
+                if (a_held) s_cam.yaw -= 120.0f * dt;
+                if (d_held) s_cam.yaw += 120.0f * dt;
+
+                // +180 so W moves toward where the camera is looking
+                float cam_world_angle = glm::radians(s_cam.yaw) + glm::radians(180.0f);
+                glm::vec3 fwd_dir = { std::cos(cam_world_angle), 0.0f, std::sin(cam_world_angle) };
+
+                float walk_speed = 4.0f;
+                glm::vec3 walk_vel = glm::vec3(0.0f);
+                if (move != 0.0f){
+                    walk_vel = fwd_dir * (move * walk_speed);
+                    app.player.yaw = std::atan2(walk_vel.z, walk_vel.x);
+                }
+
+                // wrap yaw diff to [-pi, pi] to always take the short arc
+                float yaw_diff = app.player.yaw - app.player.visual_yaw;
+                while (yaw_diff >  glm::pi<float>()) yaw_diff -= glm::two_pi<float>();
+                while (yaw_diff < -glm::pi<float>()) yaw_diff += glm::two_pi<float>();
+                app.player.visual_yaw += yaw_diff * glm::clamp(12.0f * dt, 0.0f, 1.0f);
+
+                app.player.pos += walk_vel * dt;
+                app.player.speed = glm::length(walk_vel);
+                app.player.pos.y = heightfield_sample(app.map.terrain, app.player.pos.x, app.player.pos.z);
+                app.player.anim_timer += (app.player.speed > 0.1f ? app.player.speed * 1.8f : 1.0f) * dt;
+
+                // footstep SFX mapped to surface type
+                if (app.player.speed > 0.1f){
+                    static const char* STEP_PATHS[(int)SURFACE_COUNT] = {
+                        "",
+                        "audio/footstep/concrete",
+                        "audio/footstep/gravel",
+                        "audio/footstep/dirt",
+                        "audio/footstep/sand",
+                        "audio/footstep/grass",
+                        "audio/footstep/concrete",
+                        "audio/footstep/rock"
+                    };
+                    SurfaceType surf = heightfield_get_surface(app.map.terrain,
+                        app.player.pos.x, app.player.pos.z);
+                    int si = glm::clamp((int)surf, 0, (int)SURFACE_COUNT - 1);
+                    if (si > 0)
+                        audio_trigger_step(app.audio,
+                            std::string("../assets/") + STEP_PATHS[si], app.player.speed * dt);
                 }
             }
-        }
-        s_e_last = e_down;
 
-        // brief mount transition so the driver snap doesn't look instant
-        if (app.player.mode == PLAYER_MOUNTING){
-            app.player.mount_timer -= dt;
-            if (app.player.mount_timer <= 0.0f)
-                app.player.mode = PLAYER_DRIVING;
-        }
+            // F key - free cam
+            static bool s_f_pressed_last = false;
+            bool f_down = glfwGetKey(app.window.handle, GLFW_KEY_F) == GLFW_PRESS;
+            if (f_down && !s_f_pressed_last) s_cam.free_cam = !s_cam.free_cam;
+            s_f_pressed_last = f_down;
 
-        // R key - full reset: player, dynamic objects, cam
-        static bool s_r_last = false;
-        bool r_down = glfwGetKey(app.window.handle, GLFW_KEY_R) == GLFW_PRESS;
-        if (r_down && !s_r_last){
-            app.trike = TrikeState{};
-            app.player = PlayerState{};
-            s_cam.yaw = Const::CAM_YAW_DEFAULT;
-            s_cam.pitch = Const::CAM_PITCH_DEFAULT;
-            s_cam.dist = Const::CAM_DIST_DEFAULT;
-            app.dynamic_sims.clear();
-            init_dynamic_sims(app);
-            for (auto& obs : app.obstacles) obs.hit_timer = 0.0f;
-        }
-        s_r_last = r_down;
+            // Q key -  confirm passenger pickup
+            static bool s_q_last = false;
+            bool q_down    = glfwGetKey(app.window.handle, GLFW_KEY_Q) == GLFW_PRESS;
+            bool s_q_pickup = (q_down && !s_q_last);
+            s_q_last = q_down;
 
-        // L key - headlight toggle (driving only)
-        static bool s_l_last = false;
-        bool l_down = glfwGetKey(app.window.handle, GLFW_KEY_L) == GLFW_PRESS;
-        if (l_down && !s_l_last && app.player.mode == PLAYER_DRIVING){
-            app.player.headlights_on = !app.player.headlights_on;
-            audio_trigger_voice_local(app.audio, "../assets/audio/misc/headlight_switch.wav");
-        }
-        s_l_last = l_down;
+            // E  key - mount/dismount
+            static bool s_e_last = false;
+            bool e_down = glfwGetKey(app.window.handle, GLFW_KEY_E) == GLFW_PRESS;
+            if (e_down && !s_e_last && app.player.mode != PLAYER_MOUNTING){
+                if (app.player.mode == PLAYER_DRIVING){
+                    float side = app.trike.heading + glm::half_pi<float>();
+                    app.player.pos = app.trike.position + glm::vec3(std::cos(side), 0.0f, std::sin(side)) * 1.2f;
+                    app.player.yaw = app.trike.heading;
+                    app.player.visual_yaw = app.trike.heading;
+                    s_cam.yaw = 0.0f;
+                    s_cam.pos = app.player.pos + glm::vec3(0.0f, 4.0f, 0.0f);
+                    s_cam.needs_snap = true;
+                    app.player.mode = PLAYER_FOOT;
+                    app.player.headlights_on = false;
+                    if (app.audio.radio_on) audio_radio_toggle(app.audio);
+                }
+                else {
+                    // 3m mount radius, stored as squared distance to avoid sqrt
+                    glm::vec3 delta = app.trike.position - app.player.pos;
+                    delta.y = 0.0f;
+                    if (glm::dot(delta, delta) < 9.0f){
+                        app.player.mode        = PLAYER_MOUNTING;
+                        app.player.mount_timer = 0.3f;
+                    }
+                }
+            }
+            s_e_last = e_down;
 
-        // P key - radio toggle (driving only)
-        static bool s_p_last = false;
-        bool p_down = glfwGetKey(app.window.handle, GLFW_KEY_P) == GLFW_PRESS;
-        if (p_down && !s_p_last && app.player.mode == PLAYER_DRIVING)
-            audio_radio_toggle(app.audio);
-        s_p_last = p_down;
+            // brief mount transition so the driver snap doesn't look instant
+            if (app.player.mode == PLAYER_MOUNTING){
+                app.player.mount_timer -= dt;
+                if (app.player.mount_timer <= 0.0f)
+                    app.player.mode = PLAYER_DRIVING;
+            }
 
-        // / key - next radio track
-        static bool s_next_last = false;
-        bool next_down = glfwGetKey(app.window.handle, GLFW_KEY_SLASH) == GLFW_PRESS;
-        if (next_down && !s_next_last && app.audio.radio_on)
-            audio_radio_next(app.audio);
-        s_next_last = next_down;
+            // R key - full reset: player, dynamic objects, cam
+            static bool s_r_last = false;
+            bool r_down = glfwGetKey(app.window.handle, GLFW_KEY_R) == GLFW_PRESS;
+            if (r_down && !s_r_last){
+                app.trike = TrikeState{};
+                app.player = PlayerState{};
+                s_cam.yaw = Const::CAM_YAW_DEFAULT;
+                s_cam.pitch = Const::CAM_PITCH_DEFAULT;
+                s_cam.dist = Const::CAM_DIST_DEFAULT;
+                app.dynamic_sims.clear();
+                init_dynamic_sims(app);
+                for (auto& obs : app.obstacles) obs.hit_timer = 0.0f;
+            }
+            s_r_last = r_down;
 
-        // arrow keys orbit camera
-        if (glfwGetKey(app.window.handle, GLFW_KEY_LEFT)  == GLFW_PRESS) s_cam.yaw   -= Const::CAM_YAW_SPEED   * dt;
-        if (glfwGetKey(app.window.handle, GLFW_KEY_RIGHT) == GLFW_PRESS) s_cam.yaw   += Const::CAM_YAW_SPEED   * dt;
-        if (glfwGetKey(app.window.handle, GLFW_KEY_UP)    == GLFW_PRESS) s_cam.pitch += Const::CAM_PITCH_SPEED * dt;
-        if (glfwGetKey(app.window.handle, GLFW_KEY_DOWN)  == GLFW_PRESS) s_cam.pitch -= Const::CAM_PITCH_SPEED * dt;
-        s_cam.pitch = glm::clamp(s_cam.pitch, Const::CAM_PITCH_MIN, Const::CAM_PITCH_MAX);
+            // L key - headlight toggle (driving only)
+            static bool s_l_last = false;
+            bool l_down = glfwGetKey(app.window.handle, GLFW_KEY_L) == GLFW_PRESS;
+            if (l_down && !s_l_last && app.player.mode == PLAYER_DRIVING){
+                app.player.headlights_on = !app.player.headlights_on;
+                audio_trigger_voice_local(app.audio, "../assets/audio/misc/headlight_switch.wav");
+            }
+            s_l_last = l_down;
 
-        bool arrow_held = glfwGetKey(app.window.handle, GLFW_KEY_LEFT)  == GLFW_PRESS
-                       || glfwGetKey(app.window.handle, GLFW_KEY_RIGHT) == GLFW_PRESS
-                       || glfwGetKey(app.window.handle, GLFW_KEY_UP)    == GLFW_PRESS
-                       || glfwGetKey(app.window.handle, GLFW_KEY_DOWN)  == GLFW_PRESS;
+            // P key - radio toggle (driving only)
+            static bool s_p_last = false;
+            bool p_down = glfwGetKey(app.window.handle, GLFW_KEY_P) == GLFW_PRESS;
+            if (p_down && !s_p_last && app.player.mode == PLAYER_DRIVING)
+                audio_radio_toggle(app.audio);
+            s_p_last = p_down;
 
-        // exp decay spring-back to behind trike while driving
-        if (app.player.mode == PLAYER_DRIVING && std::abs(app.trike.speed) > 0.3f && !arrow_held)
-            s_cam.yaw = glm::mix(s_cam.yaw, 0.0f, 1.0f - std::exp(-3.5f * dt));
+            // / key - next radio track
+            static bool s_next_last = false;
+            bool next_down = glfwGetKey(app.window.handle, GLFW_KEY_SLASH) == GLFW_PRESS;
+            if (next_down && !s_next_last && app.audio.radio_on)
+                audio_radio_next(app.audio);
+            s_next_last = next_down;
 
-        /******************************************************************************
-         FIXED-TIMESTEP PHYSICS (120 Hz)
-         real time accumulated and consumed in fixed chunks for stable sim
-        ******************************************************************************/
-        app.accumulator += dt;
-        while (app.accumulator >= Const::FIXED_TIMESTEP){
-            trike_physics_update(app.trike, input, app.map.terrain, Const::FIXED_TIMESTEP);
-            app.accumulator -= Const::FIXED_TIMESTEP;
-        }
-        trike_model_update(app.scene.trike_model, app.trike.speed, dt);
+            // arrow keys orbit camera
+            if (glfwGetKey(app.window.handle, GLFW_KEY_LEFT)  == GLFW_PRESS) s_cam.yaw   -= Const::CAM_YAW_SPEED   * dt;
+            if (glfwGetKey(app.window.handle, GLFW_KEY_RIGHT) == GLFW_PRESS) s_cam.yaw   += Const::CAM_YAW_SPEED   * dt;
+            if (glfwGetKey(app.window.handle, GLFW_KEY_UP)    == GLFW_PRESS) s_cam.pitch += Const::CAM_PITCH_SPEED * dt;
+            if (glfwGetKey(app.window.handle, GLFW_KEY_DOWN)  == GLFW_PRESS) s_cam.pitch -= Const::CAM_PITCH_SPEED * dt;
+            s_cam.pitch = glm::clamp(s_cam.pitch, Const::CAM_PITCH_MIN, Const::CAM_PITCH_MAX);
 
-        if (!app.trike.is_tipping && !app.trike.is_rolled_over)
-            aabb_update(app.trike.aabb, app.trike.position, app.trike.heading);
+            bool arrow_held = glfwGetKey(app.window.handle, GLFW_KEY_LEFT)  == GLFW_PRESS
+                        || glfwGetKey(app.window.handle, GLFW_KEY_RIGHT) == GLFW_PRESS
+                        || glfwGetKey(app.window.handle, GLFW_KEY_UP)    == GLFW_PRESS
+                        || glfwGetKey(app.window.handle, GLFW_KEY_DOWN)  == GLFW_PRESS;
 
-        if (app.trike.impact_timer > 0.0f) app.trike.impact_timer -= dt;
+            // exp decay spring-back to behind trike while driving
+            if (app.player.mode == PLAYER_DRIVING && std::abs(app.trike.speed) > 0.3f && !arrow_held)
+                s_cam.yaw = glm::mix(s_cam.yaw, 0.0f, 1.0f - std::exp(-3.5f * dt));
 
-        float pre_collision_speed = app.trike.speed;
-        bool any_collision = false;
-        collision_static_update(app, dt, pre_collision_speed, any_collision);
+            /******************************************************************************
+             FIXED-TIMESTEP PHYSICS (120 Hz)
+            real time accumulated and consumed in fixed chunks for stable sim
+            ******************************************************************************/
+            app.accumulator += dt;
+            while (app.accumulator >= Const::FIXED_TIMESTEP){
+                trike_physics_update(app.trike, input, app.map.terrain, Const::FIXED_TIMESTEP);
+                app.accumulator -= Const::FIXED_TIMESTEP;
+            }
+            trike_model_update(app.scene.trike_model, app.trike.speed, dt);
 
-        // clamp speed to pre-collision value after all responses
-        // without this, throttle held during wall contact gives free acceleration
-        if (any_collision){
-            float max_spd = std::abs(pre_collision_speed);
-            if (std::abs(app.trike.speed) > max_spd + 0.5f)
-                app.trike.speed = std::copysign(max_spd, app.trike.speed);
-            app.trike.lateral_speed = 0.0f;
-        }
+            if (!app.trike.is_tipping && !app.trike.is_rolled_over)
+                aabb_update(app.trike.aabb, app.trike.position, app.trike.heading);
 
-        collision_dynamic_update(app, dt);
-        collision_dynamic_vs_dynamic(app);
+            if (app.trike.impact_timer > 0.0f) app.trike.impact_timer -= dt;
 
-        npc_update(app, dt, s_q_pickup);
+            float pre_collision_speed = app.trike.speed;
+            bool any_collision = false;
+            collision_static_update(app, dt, pre_collision_speed, any_collision);
 
-        /******************************************************************************
-         CAMERA
-        ******************************************************************************/
-        proj = glm::perspective(
-            glm::radians(Const::CAM_FOV),
-            (float)Const::WINDOW_WIDTH / (float)Const::WINDOW_HEIGHT,
-            Const::CAM_NEAR, Const::CAM_FAR);
-        view = cam_update(s_cam, app, dt, arrow_held);
+            // clamp speed to pre-collision value after all responses
+            // without this, throttle held during wall contact gives free acceleration
+            if (any_collision){
+                float max_spd = std::abs(pre_collision_speed);
+                if (std::abs(app.trike.speed) > max_spd + 0.5f)
+                    app.trike.speed = std::copysign(max_spd, app.trike.speed);
+                app.trike.lateral_speed = 0.0f;
+            }
 
-        /******************************************************************************
-         AUDIO UPDATE
-        ******************************************************************************/
-        {
-            glm::vec3 lis_pos = (app.player.mode == PLAYER_FOOT)
-                ? app.player.pos : app.trike.position;
-            glm::vec3 lis_fwd = glm::vec3(std::cos(app.trike.heading), 0.0f, std::sin(app.trike.heading));
-            bool driving = (app.player.mode == PLAYER_DRIVING || app.player.mode == PLAYER_MOUNTING);
-            audio_update(app.audio, dt, lis_pos, lis_fwd,
-                app.trike.speed, Const::TRIKE_MAX_SPEED, driving);
-            audio_update_env(app.audio, dt, lis_pos,
-                app.map.ambience_zones, app.map.ambience_count, app.scene.night_factor);
-        }
+            collision_dynamic_update(app, dt);
+            collision_dynamic_vs_dynamic(app);
+
+            npc_update(app, dt, s_q_pickup);
+
+            /******************************************************************************
+             CAMERA
+            ******************************************************************************/
+            proj = glm::perspective(
+                glm::radians(Const::CAM_FOV),
+                (float)Const::WINDOW_WIDTH / (float)Const::WINDOW_HEIGHT,
+                Const::CAM_NEAR, Const::CAM_FAR);
+            view = cam_update(s_cam, app, dt, arrow_held);
+
+            /******************************************************************************
+             AUDIO UPDATE
+            ******************************************************************************/
+            {
+                glm::vec3 lis_pos = (app.player.mode == PLAYER_FOOT)
+                    ? app.player.pos : app.trike.position;
+                glm::vec3 lis_fwd = glm::vec3(std::cos(app.trike.heading), 0.0f, std::sin(app.trike.heading));
+                bool driving = (app.player.mode == PLAYER_DRIVING || app.player.mode == PLAYER_MOUNTING);
+                audio_update(app.audio, dt, lis_pos, lis_fwd,
+                    app.trike.speed, Const::TRIKE_MAX_SPEED, driving);
+                audio_update_env(app.audio, dt, lis_pos,
+                    app.map.ambience_zones, app.map.ambience_count, app.scene.night_factor);
+            }
+
+        } // end !settings_open input+physics+audio gate
 
         /******************************************************************************
          RENDER
@@ -732,18 +744,19 @@ void app_run(App& app){
         }
 
         // RAIN
-        app.scene.sky_rain_target = app.rain.active ? 1.0f : 0.0f;
         glm::vec3 rain_origin = (app.player.mode == PLAYER_FOOT) ? app.player.pos : app.trike.position;
         float rain_speed = (app.player.mode == PLAYER_FOOT) ? app.player.speed : app.trike.speed;
-
-        rain_tick_trigger(app.rain, dt);
-        audio_rain_set(app.audio, app.rain.active);
-        rain_tick_thunder(app.rain, dt, "../assets");
-        if (app.rain.thunder_boom_pending && app.rain.thunder_audio_delay <= 0.0f){
-            app.rain.thunder_boom_pending = false;
-            audio_trigger_voice_local(app.audio, "../assets/audio/ambience/thunder.wav");
+        if (!app.editor.settings_open){
+            app.scene.sky_rain_target = app.rain.active ? 1.0f : 0.0f;
+            rain_tick_trigger(app.rain, dt);
+            audio_rain_set(app.audio, app.rain.active);
+            rain_tick_thunder(app.rain, dt, "../assets");
+            if (app.rain.thunder_boom_pending && app.rain.thunder_audio_delay <= 0.0f){
+                app.rain.thunder_boom_pending = false;
+                audio_trigger_voice_local(app.audio, "../assets/audio/ambience/thunder.wav");
+            }
+            rain_update(app.rain, dt, rain_origin, rain_speed, app.trike.heading, app.map.terrain);
         }
-        rain_update(app.rain, dt, rain_origin, rain_speed, app.trike.heading, app.map.terrain);
         rain_draw(app.rain, view, proj, rain_origin, rain_speed, app.trike.heading);
 
         std::string radio_track = (app.audio.radio_on && app.audio.radio_index < (int)app.audio.radio_playlist.size())

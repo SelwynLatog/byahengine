@@ -325,6 +325,18 @@ void audio_radio_set_volume(AudioSystem& audio, float vol){
     if (audio.radio) ma_sound_set_volume(audio.radio, audio.radio_volume);
 }
 
+void audio_pause(AudioSystem& audio){
+    if (!audio.initialized) return;
+    ma_device* dev = ma_engine_get_device(audio.engine);
+    if (dev) ma_device_stop(dev);
+}
+void audio_resume(AudioSystem& audio){
+    if (!audio.initialized) return;
+    ma_device* dev = ma_engine_get_device(audio.engine);
+    if (dev) ma_device_start(dev);
+}
+
+
 void audio_rain_set(AudioSystem& audio, bool active){
     audio.rain_active = active;
     // actual volume lerp happens in audio_update_env each frame

@@ -110,3 +110,6 @@ void audio_update_env(AudioSystem& audio, float dt, const glm::vec3& listener_po
     const AmbienceZone* zones, int zone_count, float night_factor);
 
 void audio_rain_set(AudioSystem& audio, bool active);
+
+void audio_pause(AudioSystem& audio);
+void audio_resume(AudioSystem& audio);
