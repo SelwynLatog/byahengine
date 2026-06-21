@@ -8,119 +8,6 @@
 #include <cstdlib>
 #include <cmath>
 
-
-/*
- * RAIN SYSTEM 
- * billboard quad particles n pos update every frame
- * vertex shader expands each pos into a cam facing quad
- * angled by wind dir to get that streak look
- */
-static const char* RAIN_VERT = R"(
-#version 330 core
-    
-layout(location = 0) in vec3  a_pos;
-layout(location = 1) in float a_len_scale;
-layout(location = 2) in float a_width_scale;
-layout(location = 3) in float a_alpha_scale;
-
-uniform mat4  u_view;
-uniform mat4  u_proj;
-uniform vec3  u_cam_right;
-uniform vec3  u_streak_dir;
-uniform float u_streak_len;
-uniform float u_streak_width;
-uniform vec3  u_cam_center;
-uniform float u_box_half_xz;
-    
-out float v_alpha;
-out float v_edge_fade;
-
-void main(){
-    int qi = gl_VertexID % 6;
-    
-    // fade out particles in outer 35% of box so hard edge is never visible
-    float dx = abs(a_pos.x - u_cam_center.x) / u_box_half_xz;
-    float dz = abs(a_pos.z - u_cam_center.z) / u_box_half_xz;
-    float edge = max(dx, dz);
-    v_edge_fade = 1.0 - smoothstep(0.65, 1.0, edge);
-
-    vec3 top = a_pos;
-    vec3 bot = a_pos + u_streak_dir * (u_streak_len * a_len_scale);
-    vec3 right = u_cam_right * (u_streak_width * a_width_scale);
-    v_alpha = a_alpha_scale;
-    
-    vec3 TL = top - right;
-    vec3 TR = top + right;
-    vec3 BL = bot - right;
-    vec3 BR = bot + right;
-    
-    vec3 p;
-    if (qi == 0) p = TL;
-    else if (qi == 1) p = BL;
-    else if (qi == 2) p = TR;
-    else if (qi == 3) p = BL;
-    else if (qi == 4) p = BR;
-    else p = TR;
-    
-     gl_Position = u_proj * u_view * vec4(p, 1.0);
-}
-)";
-
-
-static const char* RAIN_FRAG = R"(
-#version 330 core
-in float v_alpha;
-in float v_edge_fade;
-out vec4 frag_color;
-uniform float u_alpha;
-void main(){
-    // rain frag color edit here
-    frag_color = vec4(0.78, 0.88, 1.00, u_alpha * v_alpha * v_edge_fade);
-}
-)";
-
-static const char* SPLASH_VERT = R"(
-#version 330 core
-layout(location = 0) in vec3 a_pos;
-uniform mat4 u_view;
-uniform mat4 u_proj;
-void main(){
-    gl_Position = u_proj * u_view * vec4(a_pos, 1.0);
-}
-)";
-
-static const char* SPLASH_FRAG = R"(
-#version 330 core
-out vec4 frag_color;
-uniform float u_alpha;
-void main(){
-    frag_color = vec4(0.82, 0.92, 1.00, u_alpha);
-}
-)";
-
-static const char* FLASH_VERT = R"(
-#version 330 core
-const vec2 VERTS[6] = vec2[](
-    vec2(-1,-1), vec2(1,-1), vec2(1,1),
-    vec2(-1,-1), vec2(1,1), vec2(-1,1)
-);
-void main(){
-    gl_Position = vec4(VERTS[gl_VertexID], 0.0, 1.0);
-}
-)";
-
-static const char* FLASH_FRAG = R"(
-#version 330 core
-out vec4 frag_color;
-uniform float u_alpha;
-uniform vec2  u_res;
-void main(){
-    vec2 uv = (gl_FragCoord.xy / u_res) * 2.0 - 1.0;
-    float vignette = 1.0 - smoothstep(0.3, 1.4, length(uv));
-    frag_color = vec4(0.90, 0.95, 1.0, u_alpha * (0.6 + 0.4 * vignette));
-}
-)";
-
 static float randf(float lo, float hi){
     return lo + (hi - lo) * ((float)rand() / (float)RAND_MAX);
 }
@@ -137,7 +24,7 @@ static void spawn_particle(RainParticle& p, glm::vec3 cam_pos){
 }
 
 void rain_init(RainState& rain, glm::vec3 cam_pos){
-    shader_init(rain.shader, RAIN_VERT, RAIN_FRAG);
+    shader_init_from_file(rain.shader, "../assets/shaders/rain.vert", "../assets/shaders/rain.frag");
 
     GLuint id = rain.shader.id;
     rain.loc.view = glGetUniformLocation(id, "u_view");
@@ -184,7 +71,7 @@ void rain_init(RainState& rain, glm::vec3 cam_pos){
     rain.timer = randf(Const::RAIN_INTERVAL_MIN, Const::RAIN_INTERVAL_MAX);
 
     // splash ring pool GL setup
-    shader_init(rain.splash_shader, SPLASH_VERT, SPLASH_FRAG);
+    shader_init_from_file(rain.splash_shader, "../assets/shaders/splash.vert", "../assets/shaders/splash.frag");
     rain.splash_loc.view = glGetUniformLocation(rain.splash_shader.id, "u_view");
     rain.splash_loc.proj = glGetUniformLocation(rain.splash_shader.id, "u_proj");
     rain.splash_loc.alpha = glGetUniformLocation(rain.splash_shader.id, "u_alpha");
@@ -200,7 +87,7 @@ void rain_init(RainState& rain, glm::vec3 cam_pos){
 
 
     // flash quad
-    shader_init(rain.flash_shader, FLASH_VERT, FLASH_FRAG);
+    shader_init_from_file(rain.flash_shader, "../assets/shaders/rain_flash.vert", "../assets/shaders/rain_flash.frag");
     rain.flash_loc_alpha = glGetUniformLocation(rain.flash_shader.id, "u_alpha");
     rain.flash_loc_res = glGetUniformLocation(rain.flash_shader.id, "u_res");
     glGenVertexArrays(1, &rain.flash_vao);
