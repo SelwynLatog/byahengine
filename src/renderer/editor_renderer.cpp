@@ -121,6 +121,50 @@ static void push_wire_box(
     }
 }
 
+static void draw_settings_overlay(EditorRenderer& er){
+    static GLuint s_vao = 0, s_vbo = 0;
+    if (!s_vao){
+        float verts[] = {
+            -1.f,-1.f,0.f,  0.f,0.f,0.f,
+             1.f,-1.f,0.f,  0.f,0.f,0.f,
+             1.f, 1.f,0.f,  0.f,0.f,0.f,
+            -1.f,-1.f,0.f,  0.f,0.f,0.f,
+             1.f, 1.f,0.f,  0.f,0.f,0.f,
+            -1.f, 1.f,0.f,  0.f,0.f,0.f,
+        };
+        glGenVertexArrays(1, &s_vao);
+        glGenBuffers(1, &s_vbo);
+        glBindVertexArray(s_vao);
+        glBindBuffer(GL_ARRAY_BUFFER, s_vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STATIC_DRAW);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)(3*sizeof(float)));
+        glEnableVertexAttribArray(1);
+        glBindVertexArray(0);
+    }
+
+    glm::mat4 identity = glm::mat4(1.0f);
+    shader_bind(er.shader);
+    set_mat4(er.shader, "u_model", identity);
+    set_mat4(er.shader, "u_view", identity);
+    set_mat4(er.shader, "u_proj", identity);
+
+    glEnable(GL_BLEND);
+    glBlendFuncSeparate(GL_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA, GL_ONE, GL_ONE);
+    glBlendColor(0.f, 0.f, 0.f, 0.60f);
+    glDisable(GL_DEPTH_TEST);
+
+    glBindVertexArray(s_vao);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+
+    glEnable(GL_DEPTH_TEST);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendColor(0.f, 0.f, 0.f, 0.f);
+    glDisable(GL_BLEND);
+}
+
 // flushes er.line_verts to the persistent line_batch and draws it
 static void flush_line_batch(EditorRenderer& er, const Shader& shader,
     const glm::mat4& view, const glm::mat4& proj){
@@ -1612,6 +1656,7 @@ void editor_renderer_draw_hud(EditorRenderer& er, const EditorState& editor, con
 }
 
 void editor_renderer_draw_settings_menu(EditorRenderer& er, const EditorState& editor){
+    draw_settings_overlay(er);
     // full-screen dark overlay so world is still visible but dimmed
     // drawn as a screen-space font overlay — no GL geometry needed
     // font coords are pixel space: 0,0 = top-left
@@ -1844,15 +1889,15 @@ void editor_renderer_draw_settings_menu(EditorRenderer& er, const EditorState& e
                 float vr = rows[i].bool_val ? 0.20f : 0.70f;
                 float vg = rows[i].bool_val ? 1.00f : 0.30f;
                 float vb = rows[i].bool_val ? 0.55f : 0.30f;
-                if (sel){ font_draw(er.font, "<", 580, y, 3, 1.0f, 1.0f, 1.0f); }
-                font_draw(er.font, bval, 620, y, 3, vr, vg, vb);
-                if (sel){ font_draw(er.font, ">", 700, y, 3, 1.0f, 1.0f, 1.0f); }
+                if (sel){ font_draw(er.font, "<", 540, y, 3, 1.0f, 1.0f, 1.0f); }
+                font_draw(er.font, bval, 580, y, 3, vr, vg, vb);
+                if (sel){ font_draw(er.font, ">", 660, y, 3, 1.0f, 1.0f, 1.0f); }
             }
             else {
                 char vbuf[32];
                 snprintf(vbuf, sizeof(vbuf), "%.0f %s", rows[i].val, rows[i].unit);
-                if (sel){ font_draw(er.font, "<", 580, y, 3, 1.0f, 1.0f, 1.0f); }
-                font_draw(er.font, vbuf, 620, y, 3, 0.85f, 0.85f, 0.85f);
+                if (sel){ font_draw(er.font, "<", 540, y, 3, 1.0f, 1.0f, 1.0f); }
+                font_draw(er.font, vbuf, 580, y, 3, 0.85f, 0.85f, 0.85f);
                 if (sel){ font_draw(er.font, ">", 760, y, 3, 1.0f, 1.0f, 1.0f); }
             }
             y += 42;
