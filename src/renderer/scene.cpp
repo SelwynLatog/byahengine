@@ -870,6 +870,33 @@ void scene_draw_drop_marker(SceneState& scene, glm::vec3 pos, float pulse, const
     glBindVertexArray(0);
 }
 
+void scene_shadow_resize(SceneState& scene){
+    // delete old depth tex and recreate at new size
+    // FBO itself stays valid
+    // just reattach the new tex
+    if (scene.shadow_depth_tex){
+        glDeleteTextures(1, &scene.shadow_depth_tex);
+        scene.shadow_depth_tex = 0;
+    }
+
+    int size = my_settings.shadow_map_size;
+
+    glGenTextures(1, &scene.shadow_depth_tex);
+    glBindTexture(GL_TEXTURE_2D, scene.shadow_depth_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, size, size, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float border[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, scene.shadow_fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, scene.shadow_depth_tex, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
 void scene_destroy(SceneState& scene){
     if (scene.sky_tex) glDeleteTextures(1, &scene.sky_tex);
     if (scene.sky_night_tex) glDeleteTextures(1, &scene.sky_night_tex);

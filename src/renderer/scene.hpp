@@ -142,3 +142,5 @@ void scene_draw_driver(
     const glm::quat pose_quats[BONE_COUNT],
     const glm::vec3 pose_offsets[BONE_COUNT],
     glm::vec3 pose_seat);
+
+void scene_shadow_resize(SceneState& scene);

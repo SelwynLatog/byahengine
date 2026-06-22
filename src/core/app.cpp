@@ -236,6 +236,7 @@ void app_run(App& app){
             else {
                 audio_resume(app.audio);
                 settings_save();
+                scene_shadow_resize(app.scene);
             }
 
         }
@@ -273,7 +274,7 @@ void app_run(App& app){
 
             if (my_settings.render_shadows){
                 glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
-                glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
+                glViewport(0, 0, my_settings.shadow_map_size, my_settings.shadow_map_size);
                 glClear(GL_DEPTH_BUFFER_BIT);
                 glEnable(GL_CULL_FACE);
                 glCullFace(GL_FRONT);
@@ -288,7 +289,7 @@ void app_run(App& app){
             }
             else {
                 glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
-                glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
+                glViewport(0, 0, my_settings.shadow_map_size, my_settings.shadow_map_size);
                 glClearDepth(1.0);
                 glClear(GL_DEPTH_BUFFER_BIT);
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -649,7 +650,7 @@ void app_run(App& app){
         
         if (my_settings.render_shadows){
             glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
-            glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
+            glViewport(0, 0, my_settings.shadow_map_size, my_settings.shadow_map_size);
             glClear(GL_DEPTH_BUFFER_BIT);
             glEnable(GL_CULL_FACE);
             glCullFace(GL_FRONT);
@@ -679,7 +680,7 @@ void app_run(App& app){
             // wipe the depth map to white (1.0) so the lit shader sees no shadow
             // without this, the stale FBO content projects ghost shadows when toggled off
             glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
-            glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
+            glViewport(0, 0, my_settings.shadow_map_size, my_settings.shadow_map_size);
             glClearDepth(1.0);
             glClear(GL_DEPTH_BUFFER_BIT);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
