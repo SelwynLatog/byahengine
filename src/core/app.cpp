@@ -175,6 +175,8 @@ void app_init(App& app){
     app.last_time   = (float)glfwGetTime();
     app.accumulator = 0.0f;
     app.running     = true;
+
+    window_show(app.window);
 }
 
 void editor_input_settings(EditorState& editor, GLFWwindow* window);

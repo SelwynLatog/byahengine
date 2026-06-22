@@ -15,6 +15,7 @@ void window_init(Window& w, int width, int height, const char* title){
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
     w.handle = glfwCreateWindow(width, height, title, nullptr, nullptr);
     w.width  = width;
@@ -38,6 +39,10 @@ void window_init(Window& w, int width, int height, const char* title){
 
     std::cout << "[window] OpenGL " << glGetString(GL_VERSION) << "\n";
     std::cout << "[window] GPU:    " << glGetString(GL_RENDERER) << "\n";
+}
+
+void window_show(Window& w){
+    glfwShowWindow(w.handle);
 }
 
 void window_destroy(Window& w){
