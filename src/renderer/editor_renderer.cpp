@@ -706,8 +706,8 @@ void editor_renderer_draw_props(EditorRenderer& er, const WorldMap& map,
     glUniform3f(OL.light_dir, LIGHT_DIR.x, LIGHT_DIR.y, LIGHT_DIR.z);
     glUniformMatrix4fv(OL.light_space, 1, GL_FALSE, glm::value_ptr(er.light_space_mat));
     glUniform3f(OL.fog_color, er.fog_color.r, er.fog_color.g, er.fog_color.b);
-    glUniform1f(OL.fog_near, er.fog_near);
-    glUniform1f(OL.fog_far, er.fog_far);
+    glUniform1f(OL.fog_near, my_settings.render_fog ? er.fog_near : Const::CAM_FAR);
+    glUniform1f(OL.fog_far,  my_settings.render_fog ? er.fog_far : Const::CAM_FAR + 1.0f);
     glUniform1f(OL.ambient, er.ambient);
     glUniform1f(OL.diff_intensity, er.diff_intensity);
     glUniform3f(OL.light_color, er.light_color.r, er.light_color.g, er.light_color.b);
@@ -957,8 +957,8 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
 
     glm::vec3 cam_pos_r = glm::vec3(glm::inverse(view)[3]);
     glUniform3f(RL.fog_color, er.fog_color.r,  er.fog_color.g,  er.fog_color.b);
-    glUniform1f(RL.fog_near, er.fog_near);
-    glUniform1f(RL.fog_far, er.fog_far);
+    glUniform1f(RL.fog_near, my_settings.render_fog ? er.fog_near : Const::CAM_FAR);
+    glUniform1f(RL.fog_far,  my_settings.render_fog ? er.fog_far : Const::CAM_FAR + 1.0f);
     glUniform3f(RL.fog_cam_pos, cam_pos_r.x, cam_pos_r.y, cam_pos_r.z);
     upload_point_lights(er.road_shader.id, er.last_lights, cam_pos_r, er.night_factor);
 
@@ -1206,8 +1206,8 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
 
     glm::vec3 cam_pos_t = glm::vec3(glm::inverse(view)[3]);
     glUniform3f(RL.fog_color, er.fog_color.r,  er.fog_color.g,  er.fog_color.b);
-    glUniform1f(RL.fog_near, er.fog_near);
-    glUniform1f(RL.fog_far, er.fog_far);
+    glUniform1f(RL.fog_near, my_settings.render_fog ? er.fog_near : Const::CAM_FAR);
+    glUniform1f(RL.fog_far,  my_settings.render_fog ? er.fog_far : Const::CAM_FAR + 1.0f);
     glUniform3f(RL.fog_cam_pos, cam_pos_t.x, cam_pos_t.y, cam_pos_t.z);
     upload_point_lights(er.road_shader.id, er.last_lights, cam_pos_t, er.night_factor);
 
@@ -1872,8 +1872,9 @@ void editor_renderer_draw_settings_menu(EditorRenderer& er, const EditorState& e
             { "RAIN SPLASHES",   "",    (float)my_settings.rain_splash_max,       false, false },
             { "RENDER SHADOWS",  "",    0.0f, true,  my_settings.render_shadows },
             { "SHOW HUD",        "",    0.0f, true,  my_settings.show_hud       },
+            { "RENDER FOG",      "",    0.0f, true,  my_settings.render_fog    },
         };
-        static const int ROW_COUNT = 9;
+        static const int ROW_COUNT = 10;
 
         int y = 240;
         for (int i = 0; i < ROW_COUNT; i++){

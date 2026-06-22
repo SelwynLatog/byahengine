@@ -19,6 +19,7 @@ static void apply_low() {
     my_settings.rain_particle_count   = 1000;
     my_settings.rain_splash_max       = 0;
     my_settings.show_hud              = true;
+    my_settings.render_fog            = false;
 }
 
 static void apply_moderate() {
@@ -32,6 +33,7 @@ static void apply_moderate() {
     my_settings.rain_particle_count   = 2500;
     my_settings.rain_splash_max       = 300;
     my_settings.show_hud              = true;
+    my_settings.render_fog            = true;
 }
 
 static void apply_high() {
@@ -45,6 +47,7 @@ static void apply_high() {
     my_settings.rain_particle_count   = Const::RAIN_PARTICLE_COUNT;
     my_settings.rain_splash_max       = Const::RAIN_SPLASH_MAX;
     my_settings.show_hud              = true;
+    my_settings.render_fog            = true;
 }
 
 void settings_apply_preset(Preset preset) {
@@ -81,6 +84,7 @@ void settings_save() {
     fprintf(f, "rain_particles=%d\n",  my_settings.rain_particle_count);
     fprintf(f, "rain_splashes=%d\n",   my_settings.rain_splash_max);
     fprintf(f, "show_hud=%d\n",        (int)my_settings.show_hud);
+    fprintf(f, "render_fog=%d\n",     (int)my_settings.render_fog);
 
     fclose(f);
 }
@@ -111,6 +115,7 @@ void settings_load() {
         else if (strcmp(key, "rain_particles") == 0) my_settings.rain_particle_count = atoi(val);
         else if (strcmp(key, "rain_splashes") == 0) my_settings.rain_splash_max = atoi(val);
         else if (strcmp(key, "show_hud") == 0) my_settings.show_hud = atoi(val);
+        else if (strcmp(key, "render_fog") == 0) my_settings.render_fog = atoi(val);
     }
 
     fclose(f);

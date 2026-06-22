@@ -17,6 +17,8 @@ namespace Const{
     // day cycle
     // 10 real minutes = 1 full in-game day
     inline constexpr float DAY_DURATION_SECONDS = 600.0f;
+
+    // configure in 24h clock format to select which time specifically
     inline constexpr float DAY_START_TIME = 7.0f; // start at 7am
 
     // time ranges (0-24)
@@ -188,10 +190,10 @@ namespace Const{
     inline constexpr float LIGHT_CULL_DIST = 120.0f; // metres, lights beyond this aren't uploaded
     inline constexpr float LIGHT_CULL_DIST_SQ = LIGHT_CULL_DIST * LIGHT_CULL_DIST;
 
-    inline constexpr float PROP_CULL_DIST = 150.0f;
+    inline constexpr float PROP_CULL_DIST = 200.0f;
     inline constexpr float PROP_CULL_DIST_SQ = PROP_CULL_DIST * PROP_CULL_DIST;
 
-    inline constexpr float NPC_CULL_DIST = 40.0f;
+    inline constexpr float NPC_CULL_DIST = 80.0f;
     inline constexpr float NPC_CULL_DIST_SQ = NPC_CULL_DIST * NPC_CULL_DIST;
 
     // streetlight warm yellow
@@ -204,7 +206,7 @@ namespace Const{
     inline constexpr float SHADOW_ORTHO_SIZE = 120.0f; // world units covered by shadow frustum
     inline constexpr float SHADOW_NEAR = 1.0f;
     inline constexpr float SHADOW_FAR  = 300.0f;
-    inline constexpr float SHADOW_BIAS = 0.0015f;    
+    inline constexpr float SHADOW_BIAS = 0.0015f;
 
     // ground & terrain
     inline constexpr float GROUND_HALF_EXTENT= 200.0f;
@@ -353,7 +355,7 @@ namespace Const{
     // rain
     inline constexpr bool RAIN_FORCE_ENABLE = false; // enable to insta trigger rain at build, debug
     inline constexpr bool RAIN_PAUSE = false; // enable to pause rain for debugging streak texture
-    inline constexpr int RAIN_PARTICLE_COUNT = 4000;
+    inline constexpr int RAIN_PARTICLE_COUNT = 8000;
     inline constexpr float RAIN_FALL_SPEED = 22.0f;
     inline constexpr float RAIN_STREAK_SPEED = 0.55f;
     inline constexpr float RAIN_STREAK_LENGTH = 0.55f; // quad height
@@ -385,7 +387,7 @@ namespace Const{
 
 
     // rain splashes
-    inline constexpr int RAIN_SPLASH_MAX = 600;
+    inline constexpr int RAIN_SPLASH_MAX = 1200;
     inline constexpr float RAIN_SPLASH_LIFE = 0.55f; // higher = more visible particles
     inline constexpr float RAIN_SPLASH_RADIUS = 0.35f; // higher = bigger splash rad
 

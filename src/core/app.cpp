@@ -271,19 +271,28 @@ void app_run(App& app){
             app.editor_renderer.shadow_cull_center = app.editor.cam_pos;
             scene_shadow_pass(app.scene, app.obstacles, app.editor.cam_pos);
 
-            glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
-            glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
-            glClear(GL_DEPTH_BUFFER_BIT);
-            glEnable(GL_CULL_FACE);
-            glCullFace(GL_FRONT);
-            editor_renderer_shadow_pass(app.editor_renderer, app.map, app.scene.light_space_mat, app.dynamic_sims);
-            scene_trike_shadow_draw(app.scene, app.trike);
-            driver_model_draw(app.scene.driver_model, app.player, app.trike,
-                app.scene.shadow_shader, app.scene.light_space_mat, glm::mat4(1.0f),
-                app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
-            glCullFace(GL_BACK);
-            glDisable(GL_CULL_FACE);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            if (my_settings.render_shadows){
+                glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
+                glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
+                glClear(GL_DEPTH_BUFFER_BIT);
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_FRONT);
+                editor_renderer_shadow_pass(app.editor_renderer, app.map, app.scene.light_space_mat, app.dynamic_sims);
+                scene_trike_shadow_draw(app.scene, app.trike);
+                driver_model_draw(app.scene.driver_model, app.player, app.trike,
+                    app.scene.shadow_shader, app.scene.light_space_mat, glm::mat4(1.0f),
+                    app.editor.pose_quat, app.editor.pose_offset, app.editor.pose_seat);
+                glCullFace(GL_BACK);
+                glDisable(GL_CULL_FACE);
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            }
+            else {
+                glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
+                glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
+                glClearDepth(1.0);
+                glClear(GL_DEPTH_BUFFER_BIT);
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            }
             {
                 int fb_w, fb_h;
                 glfwGetFramebufferSize(app.window.handle, &fb_w, &fb_h);
@@ -637,6 +646,7 @@ void app_run(App& app){
         app.editor_renderer.shadow_cull_center = app.trike.position;
         scene_shadow_pass(app.scene, app.obstacles, app.trike.position);
 
+        
         if (my_settings.render_shadows){
             glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
             glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
@@ -663,6 +673,15 @@ void app_run(App& app){
             }
             glCullFace(GL_BACK);
             glDisable(GL_CULL_FACE);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
+        else {
+            // wipe the depth map to white (1.0) so the lit shader sees no shadow
+            // without this, the stale FBO content projects ghost shadows when toggled off
+            glBindFramebuffer(GL_FRAMEBUFFER, app.scene.shadow_fbo);
+            glViewport(0, 0, Const::SHADOW_MAP_SIZE, Const::SHADOW_MAP_SIZE);
+            glClearDepth(1.0);
+            glClear(GL_DEPTH_BUFFER_BIT);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         }
         {

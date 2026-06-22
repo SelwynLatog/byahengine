@@ -26,6 +26,7 @@ struct Settings{
     int rain_splash_max;
 
     bool show_hud;
+    bool render_fog;
 };
 
 extern Settings my_settings;

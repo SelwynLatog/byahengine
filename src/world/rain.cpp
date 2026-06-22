@@ -46,7 +46,7 @@ void rain_init(RainState& rain, glm::vec3 cam_pos){
     // shader derives the 4 corners from gl_VertexID
     // VBO layout: vec3 pos | float len_s | float width_s | float alpha_s
     // stride = 6 floats = 24 bytes
-    int total_verts = my_settings.rain_particle_count * 6;
+    int total_verts = Const::RAIN_PARTICLE_COUNT * 6;
     std::vector<float> init_data(total_verts * 6, 0.0f);
 
     glGenVertexArrays(1, &rain.mesh.vao);
@@ -54,6 +54,7 @@ void rain_init(RainState& rain, glm::vec3 cam_pos){
     glBindVertexArray(rain.mesh.vao);
     glBindBuffer(GL_ARRAY_BUFFER, rain.mesh.vbo);
     glBufferData(GL_ARRAY_BUFFER, init_data.size() * sizeof(float), init_data.data(), GL_DYNAMIC_DRAW);
+
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
@@ -158,7 +159,7 @@ void rain_draw(RainState& rain, const glm::mat4& view, const glm::mat4& proj, gl
         }
     }
     glBindBuffer(GL_ARRAY_BUFFER, rain.mesh.vbo);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vbuf), vbuf);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, my_settings.rain_particle_count * 6 * 6 * sizeof(float), vbuf);
 
     glm::vec3 cam_right = glm::vec3(view[0][0], view[1][0], view[2][0]);
 
@@ -190,7 +191,7 @@ void rain_draw(RainState& rain, const glm::mat4& view, const glm::mat4& proj, gl
     glDepthMask(GL_FALSE);
     glEnable(GL_DEPTH_TEST);
     glBindVertexArray(rain.mesh.vao);
-    glDrawArrays(GL_TRIANGLES, 0, rain.mesh.count);
+    glDrawArrays(GL_TRIANGLES, 0, my_settings.rain_particle_count * 6);
     glBindVertexArray(0);
 
     // SPLASH DRAW

@@ -643,8 +643,8 @@ void scene_draw(
     glUniform1f(L.diff_intensity, scene.diff_intensity);
     glUniform1f(L.shadow_bias, Const::SHADOW_BIAS);
     glUniform3f(L.fog_color, scene.fog_color.r, scene.fog_color.g, scene.fog_color.b);
-    glUniform1f(L.fog_near, scene.fog_near);
-    glUniform1f(L.fog_far, scene.fog_far);
+    glUniform1f(L.fog_near, my_settings.render_fog ? scene.fog_near : Const::CAM_FAR);
+    glUniform1f(L.fog_far,  my_settings.render_fog ? scene.fog_far  : Const::CAM_FAR + 1.0f);
 
     // upload point lights 
     // cpu cull to camera distance

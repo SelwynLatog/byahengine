@@ -385,7 +385,7 @@ void editor_input_settings(EditorState& editor, GLFWwindow* window){
     // GRAPHICS PAGE
     // row 0 = preset, rows 1-9 = individual settings, row 10 = BACK
     else if (editor.settings_page == SETTINGS_PAGE_GRAPHICS){
-        static const int GRAPHICS_ROWS = 11; // 0=preset, 1-9=settings, 10=back
+        static const int GRAPHICS_ROWS = 12; // 0=preset, 1-10=settings, 11=back
         if (up && !s_up_last) editor.settings_cursor = std::max(0, editor.settings_cursor - 1);
         if (dn && !s_dn_last) editor.settings_cursor = std::min(GRAPHICS_ROWS - 1, editor.settings_cursor + 1);
 
@@ -401,7 +401,7 @@ void editor_input_settings(EditorState& editor, GLFWwindow* window){
                 settings_apply_preset((Preset)p);
             }
         }
-        else if (editor.settings_cursor == 10){
+        else if (editor.settings_cursor == 11){
             // BACK row
             if (en && !s_en_last){
                 settings_save();
@@ -436,12 +436,12 @@ void editor_input_settings(EditorState& editor, GLFWwindow* window){
                     my_settings.preset = CUSTOM;
                     break;
                 case 4: // npc cull dist
-                    if (lt && !s_lt_last) my_settings.npc_cull_dist = std::max(10.0f,  my_settings.npc_cull_dist - 10.0f);
-                    if (rt && !s_rt_last) my_settings.npc_cull_dist = std::min(150.0f, my_settings.npc_cull_dist + 10.0f);
+                    if (lt && !s_lt_last) my_settings.npc_cull_dist = std::max(40.0f,  my_settings.npc_cull_dist - 10.0f);
+                    if (rt && !s_rt_last) my_settings.npc_cull_dist = std::min(300.0f, my_settings.npc_cull_dist + 10.0f);
                     my_settings.preset = CUSTOM;
                     break;
                 case 5: // light cull dist
-                    if (lt && !s_lt_last) my_settings.light_cull_dist = std::max(30.0f,  my_settings.light_cull_dist - 10.0f);
+                    if (lt && !s_lt_last) my_settings.light_cull_dist = std::max(40.0f,  my_settings.light_cull_dist - 10.0f);
                     if (rt && !s_rt_last) my_settings.light_cull_dist = std::min(300.0f, my_settings.light_cull_dist + 10.0f);
                     my_settings.preset = CUSTOM;
                     break;
@@ -464,6 +464,12 @@ void editor_input_settings(EditorState& editor, GLFWwindow* window){
                 case 9: // show hud bool
                     if ((lt && !s_lt_last) || (rt && !s_rt_last)){
                         my_settings.show_hud = !my_settings.show_hud;
+                        my_settings.preset = CUSTOM;
+                    }
+                    break;
+                case 10: // render fog bool
+                     if ((lt && !s_lt_last) || (rt && !s_rt_last)){
+                        my_settings.render_fog = !my_settings.render_fog;
                         my_settings.preset = CUSTOM;
                     }
                     break;
