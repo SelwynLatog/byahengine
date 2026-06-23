@@ -408,7 +408,7 @@ namespace Const{
     inline constexpr float NPC_HAIL_TIMER_MAX = 20.0f;
 
     // fare system
-    inline constexpr float FARE_RATE_PER_METRE = 0.00001f; // pesos per metre
+    inline constexpr float FARE_RATE_PER_METRE = 0.00001; // pesos per metre <- adjust based on horrible gas prices in 2026
     inline constexpr float FARE_BASE = 10.0f; // base fare on pickup
     inline constexpr float DROPOFF_SLOW_THRESHOLD = 120.0f; // seconds, 2 minutes
 

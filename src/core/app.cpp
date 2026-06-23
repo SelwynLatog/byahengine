@@ -115,9 +115,17 @@ void app_init(App& app){
                   -(Const::TERRAIN_ROWS * Const::TERRAIN_CELL_SIZE) * 0.5f));
 
     editor_scan_props(app.editor, "../assets");
+    
+    /*****************************************************
+     LEGACY MAP MIGRATION
 
-     map_manager_scan();
-    // migrate legacy flat files into pre made default (maps/poblacion) on first run
+    Converts pre-map-manager saves into the
+    modern maps/<name>/ folder layout.
+
+    Runs once on startup.
+    ******************************************************/
+
+    map_manager_scan();
     {
         std::string legacy_map = "../assets/map.txt";
         std::string legacy_amb = "../assets/_ambience.amb";
@@ -271,7 +279,22 @@ void app_run(App& app){
                 audio_resume(app.audio);
                 settings_save();
                 scene_shadow_resize(app.scene);
-                // map switched while settings was open -> full reload
+                
+                /*****************************************************
+                 MAP HOT RELOAD
+
+                If the active map changed while the settings
+                menu was open, rebuild all runtime state:
+
+                - world map
+                - terrain
+                - roads
+                - obstacles
+                - dynamic sims
+                - NPCs
+                - lookup tables
+
+                ******************************************************/
                 if (g_maps.maps[g_maps.active_index].dir != s_prev_loaded_dir){
                     world_map_save(app.map, g_maps.loaded_dir + "/map.txt");
                     ambience_save(app.map.ambience_zones, app.map.ambience_count,

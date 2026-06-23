@@ -22,11 +22,31 @@
 #include <fstream>
 #include <filesystem>
 
+
+/**********************************************************************
+
+EDITOR RENDERER
+
+Responsibilities
+
+- Asset mesh caching
+- Texture loading/cache
+- Prop bounds generation
+- Terrain rendering
+- Road rendering
+- Ocean rendering
+- Shadow rendering
+- Debug visualization
+- Editor gizmos
+
+**********************************************************************/
+
+
 // internal helpers
 static void set_mat4(const Shader& s, const char* n, const glm::mat4& m){
     glUniformMatrix4fv(glGetUniformLocation(s.id, n), 1, GL_FALSE, glm::value_ptr(m));
 }
-
+// TEXTURE CACHE
 // loads a texture from disk into GL, caches by path
 // returns 0 on failure
 // cache format: [uint64 mtime][int32 w][int32 h][w*h*4 bytes RGBA]
@@ -102,7 +122,7 @@ static GLuint load_texture(EditorRenderer& er, const std::string& path){
 }
 
 // draws a wireframe box from world space min/max corners
-// then uplaods a throwawau vao.vbo each call & destroys after drajwing
+// then uplaods a throwaway vao.vbo each call & destroys after drajwing
 // not meant for high frequency draws
 // purposely for editor only
 static void push_wire_box(
@@ -224,10 +244,9 @@ void editor_renderer_init(EditorRenderer& er){
     font_init(er.font, Const::WINDOW_WIDTH, Const::WINDOW_HEIGHT);
     shader_init_from_file(er.depth_shader, "../assets/shaders/depth.vert", "../assets/shaders/depth.frag");
 
-    // buid the snap grid as a static mesh
+    // build the snap grid as a static mesh
     // two sets parallel one along x, one along z
     // color is baked into vertex buffer so no need to uniform per line
-    // sprinkle different gray so it wont overpower placed objects
     std::vector<float> lines;
     float r = (float) Const::EDITOR_GRID_RADIUS;
 
@@ -296,19 +315,20 @@ void editor_renderer_init(EditorRenderer& er){
     {
         GLuint id = er.ocean_shader.id;
         auto& OL = er.ocean_loc;
-        OL.view           = glGetUniformLocation(id, "u_view");
-        OL.proj           = glGetUniformLocation(id, "u_proj");
-        OL.time           = glGetUniformLocation(id, "u_time");
-        OL.y_level        = glGetUniformLocation(id, "u_y_level");
-        OL.light_dir      = glGetUniformLocation(id, "u_light_dir");
-        OL.cam_pos        = glGetUniformLocation(id, "u_cam_pos");
-        OL.light_color    = glGetUniformLocation(id, "u_light_color");
-        OL.ambient        = glGetUniformLocation(id, "u_ambient");
+        OL.view = glGetUniformLocation(id, "u_view");
+        OL.proj = glGetUniformLocation(id, "u_proj");
+        OL.time = glGetUniformLocation(id, "u_time");
+        OL.y_level = glGetUniformLocation(id, "u_y_level");
+        OL.light_dir = glGetUniformLocation(id, "u_light_dir");
+        OL.cam_pos = glGetUniformLocation(id, "u_cam_pos");
+        OL.light_color = glGetUniformLocation(id, "u_light_color");
+        OL.ambient = glGetUniformLocation(id, "u_ambient");
         OL.diff_intensity = glGetUniformLocation(id, "u_diff_intensity");
     }
 
     er.depth_loc.light_space = glGetUniformLocation(er.depth_shader.id, "u_light_space");
     er.depth_loc.model = glGetUniformLocation(er.depth_shader.id, "u_model");
+
     {
         GLuint id = er.obj_shader.id;
         auto& LL = er.pt_light_loc;
@@ -339,10 +359,26 @@ void editor_renderer_init(EditorRenderer& er){
 
 
 }
-// returns a ref to the cached ObjMesh for this filename
-// loads from assets/ on first call then returns cached entry after
-// asset_dir is relative path eg "../assets"
 
+// =====================================================
+// PROP CACHE + BOUNDS GENERATION
+//
+// Loads OBJ assets lazily.
+//
+// Also computes:
+//
+// - local bounds
+// - floor offset
+// - cached AABBs
+//
+// Used by:
+//
+// - selection
+// - hitboxes
+// - collision setup
+// - placement
+//
+// =====================================================
 static ObjMesh& get_prop_mesh(EditorRenderer& er, const std::string& filename){
     auto it = er.prop_cache.find(filename);
     if (it != er.prop_cache.end()) return it->second;
@@ -446,6 +482,24 @@ static void rotated_world_bounds(
 }
 
 
+// =====================================================
+// MAIN EDITOR RENDER PASS
+//
+// Draw order:
+//
+// 1. Grid
+// 2. Editor gizmos
+// 3. Terrain
+// 4. Roads
+// 5. Props
+// 6. NPCs
+// 7. Debug overlays
+// 8. UI overlays
+// TODO: should probably split to different render_what_is_rendered
+// filenames but works for now
+// core gameplay renders in scene.cpp, editor in here
+// =====================================================
+
 void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const WorldMap& map,
     const glm::mat4& view, const glm::mat4& proj, bool show_hitboxes,
     const std::vector<LightSource>& lights){
@@ -456,7 +510,7 @@ void editor_renderer_draw(EditorRenderer& er, const EditorState& editor, const W
     set_mat4(er.shader, "u_proj", proj);
 
     // SNAP GRID
-    // obhect mode only
+    // object mode only
     if (editor.mode == MODE_OBJECT){
         glBindVertexArray(er.grid.vao);
         glDrawArrays(GL_LINES, 0, er.grid.count);

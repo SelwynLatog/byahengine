@@ -15,6 +15,23 @@
 #include <iostream>
 #include <fstream>
 
+
+/**********************************************************************
+
+EDITOR INPUT
+
+Owns:
+
+- Object editing
+- Terrain sculpting
+- Road editing
+- Light editing
+- Ambience editing
+- Pose editing
+- Settings navigation
+
+**********************************************************************/
+
 /*
 =============================================================
   EDITOR CONTROLS
@@ -86,6 +103,25 @@
 =============================================================
 */
 
+
+/**********************************************************************
+
+FILE LAYOUT
+
+1. Key state tracking
+2. Asset scanning
+3. Raycast helpers
+4. Settings menu
+5. Object mode
+6. Terrain mode
+7. Road mode
+8. Light mode
+9. Ambience mode
+10. Pose mode
+11. Main editor update
+
+**********************************************************************/
+
 // key state tracking to prevent held key repeat
 static bool s_tab_last = false;
 static bool s_del_last = false;
@@ -139,6 +175,20 @@ static bool s_arr_up_last = false;
 static bool s_arr_down_last = false;
 static bool s_pgup_last = false;
 static bool s_pgdn_last = false;
+
+
+// =====================================================
+// ASSET DISCOVERY
+//
+// Scans assets/ for:
+//
+// - props
+// - entities
+// - audio
+//
+// Populates editor palettes.
+//
+// =====================================================
 
 void editor_scan_props(EditorState& editor, const char* assets_dir){
     editor.prop_list.clear();
@@ -194,6 +244,19 @@ void editor_scan_audio(EditorState& editor, const char* assets_dir){
     std::cout << "[editor] found " << editor.audio_file_list.size() << " audio files\n";
 }
 
+// =====================================================
+// RAYCAST HELPERS
+//
+// Mouse -> world projection
+//
+// Used for:
+//
+// - selection
+// - placement
+// - terrain editing
+// - road editing
+//
+// =====================================================
 bool editor_raycast_ground( double mx, double my,
     const glm::mat4& view, const glm::mat4& proj,
     int screen_w, int screen_h, glm::vec3& out_pos,
@@ -333,6 +396,19 @@ int editor_raycast_objects(double mx, double my, const glm::mat4& view, const gl
     return hit_id;
 }
 
+
+// =====================================================
+// SETTINGS MENU NAVIGATION
+//
+// Keyboard-driven settings UI.
+//
+// Handles:
+//
+// - graphics
+// - controls
+// - maps
+//
+// =====================================================
 
 void editor_input_settings(EditorState& editor, GLFWwindow* window){
 

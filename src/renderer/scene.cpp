@@ -13,6 +13,41 @@
 #include <iostream>
 #include <cmath>
 
+/**********************************************************************
+
+SCENE SYSTEM
+
+Responsibilities
+
+- Core world rendering
+- Sky rendering
+- Day/night cycle
+- Weather lighting
+- Shadow setup
+- Trike rendering
+- Driver rendering
+- Debug visualization
+
+**********************************************************************/
+
+
+/**********************************************************************
+
+FILE LAYOUT
+
+1. Debug draw helpers
+2. Scene initialization
+3. Shadow system
+4. Day/night simulation
+5. Weather simulation
+6. Sky rendering
+7. World rendering
+8. Driver rendering
+9. Debug overlays
+
+**********************************************************************/
+
+
 // internal helpers
 
 static void set_vec3(const Shader& s, const char* n, glm::vec3 v){
@@ -90,6 +125,20 @@ static void draw_box_lit(
     mesh_destroy(box);
 }
 
+// =====================================================
+// SCENE INIT
+//
+// Loads:
+//
+// - shaders
+// - sky resources
+// - vehicle assets
+// - driver assets
+// - persistent debug buffers
+//
+// Caches all uniform locations
+//
+// =====================================================
 void scene_init(SceneState& scene){
 
     shader_init_from_file(scene.shader, "../assets/shaders/scene_lit.vert", "../assets/shaders/scene_lit.frag");
@@ -367,6 +416,19 @@ void scene_trike_shadow_draw(SceneState& scene, const TrikeState& trike){
     }
 }
 
+// =====================================================
+// DAY / NIGHT + WEATHER SIMULATION
+//
+// Drives:
+//
+// - sun direction
+// - light color
+// - ambient intensity
+// - fog distance
+// - sky blending
+// - rain overcast lighting
+//
+// =====================================================
 void scene_update_daytime(SceneState& scene, float dt){
     // advance time — 10 real minutes = 24 in-game hours
     float time_scale = 24.0f / Const::DAY_DURATION_SECONDS;
@@ -619,6 +681,18 @@ void scene_draw_sky(SceneState& scene, const glm::mat4& view, const glm::mat4& p
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+// =====================================================
+// MAIN SCENE DRAW
+//
+// Draw order:
+//
+// 1. Ground
+// 2. Obstacles
+// 3. Dynamic lights
+// 4. Vehicle
+// 5. Debug overlays
+//
+// =====================================================
 void scene_draw(
     SceneState& scene,
     const TrikeState& trike,
