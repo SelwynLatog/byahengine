@@ -65,7 +65,6 @@ namespace Const{
     inline constexpr float FADE_SPEED = 1.2f; // vol units/sec fade in+out
     inline constexpr float RAIN_VOL_MAX = 0.85f;
     inline constexpr float NIGHT_THRESH = 0.35f; // night_factor above this activates AMBIENCE_NIGHT zones
-    inline constexpr const char* AMBIENCE_SAVE_PATH = "../assets/_ambience.amb";
 
 
     // physics
@@ -146,7 +145,6 @@ namespace Const{
     inline constexpr float EDITOR_GRID_SNAP = 0.5f; // metres, placement snaps to this grid
     inline constexpr float EDITOR_ROTATE_SPEED = 1.5f; // radians/sec
     inline constexpr float EDITOR_SCALE_SPEED = 0.5f; // units/sec
-    inline constexpr const char* MAP_SAVE_PATH = "../assets/map.txt";
     inline constexpr int EDITOR_GRID_RADIUS = 50;  // grid lines extend 50m from origin
     inline constexpr int EDITOR_PAGE_SIZE = 9; // num of prop selection
     inline constexpr float EDITOR_GRID_SNAP_FINE = 0.05f;  // alt+arrows: 5cm steps

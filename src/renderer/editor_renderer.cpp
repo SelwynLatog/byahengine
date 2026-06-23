@@ -1,6 +1,7 @@
 #include "../../vendor/stb/stb_image.h"
 #include "../core/const.hpp"
 #include "../core/settings.hpp"
+#include "../core/map_manager.hpp"
 #include "../world/world_object.hpp"
 #include "../world/ocean.hpp"
 #include "../world/npc.hpp"
@@ -863,7 +864,12 @@ void editor_renderer_build_terrain_mesh(EditorRenderer& er, const HeightField& h
         }
     }
 
-    if (er.terrain_mesh.vao) mesh_destroy(er.terrain_mesh);
+    if (er.terrain_mesh.vao){
+        mesh_destroy(er.terrain_mesh);
+        er.terrain_mesh.vao = 0;
+        er.terrain_mesh.vbo = 0;
+        er.terrain_mesh.count = 0;
+    }
     mesh_init(er.terrain_mesh, lines);
     er.terrain_mesh_dirty = false;
 }
@@ -1111,7 +1117,12 @@ void editor_renderer_build_terrain_surface(EditorRenderer& er, const HeightField
     // we reuse the single Mesh slot for the first bucket and store extras inline
     // simplest approach: pack all buckets into one mesh, draw in surface-type passes
     // store bucket byte offsets so draw call can glDrawArrays with offset+count
-    if (er.terrain_surface_mesh.vao) mesh_destroy(er.terrain_surface_mesh);
+    if (er.terrain_surface_mesh.vao){
+        mesh_destroy(er.terrain_surface_mesh);
+        er.terrain_surface_mesh.vao = 0;
+        er.terrain_surface_mesh.vbo = 0;
+        er.terrain_surface_mesh.count = 0;
+    }
 
     // flatten all buckets into one buffer, record offsets
     std::vector<float> combined;
@@ -1918,11 +1929,51 @@ void editor_renderer_draw_settings_menu(EditorRenderer& er, const EditorState& e
         return;
     }
 
+    // MAPS PAGE
+    if (editor.settings_page == SETTINGS_PAGE_MAPS){
+        font_draw(er.font, "MAPS", 60, 80, 5, 1.0f, 1.0f, 1.0f);
+
+        int total = (int)g_maps.maps.size();
+        int y = 180;
+
+        if (g_maps.rename_mode){
+            font_draw(er.font, "RENAME:", 60, y, 3, 0.90f, 0.90f, 0.30f);
+            std::string display = g_maps.rename_buf + "_";
+            font_draw(er.font, display, 260, y, 3, 1.0f, 1.0f, 1.0f);
+            font_draw(er.font, "ENTER=confirm  BACKSPACE=delete",
+                60, SH - 50, 3, 0.6f, 0.6f, 0.6f);
+            return;
+        }
+
+        for (int i = 0; i < total; i++){
+            bool sel  = (editor.settings_cursor == i);
+            bool active = (i == g_maps.active_index);
+            float r = sel ? 0.20f : (active ? 0.90f : 0.65f);
+            float g2 = sel ? 1.00f : (active ? 0.90f : 0.65f);
+            float b  = sel ? 0.55f : (active ? 0.30f : 0.65f);
+            std::string label = (active ? "* " : "  ") + g_maps.maps[i].name;
+            font_draw(er.font, label, 60, y, sel ? 4 : 3, r, g2, b);
+            y += sel ? 52 : 40;
+        }
+
+        // [NEW MAP] row
+        {
+            bool sel = (editor.settings_cursor == total);
+            font_draw(er.font, "+ NEW MAP", 60, y + 8, sel ? 4 : 3,
+                sel ? 0.20f : 0.50f,
+                sel ? 1.00f : 0.50f,
+                sel ? 0.55f : 0.50f);
+        }
+
+        font_draw(er.font, "UP/DN=select  ENTER=switch  F2=rename  LEFT=back",
+            60, SH - 50, 3, 0.6f, 0.6f, 0.6f);
+        return;
+    }
+
     // MAIN PAGE
     font_draw(er.font, "SETTINGS", 100, SH/2 - 100, 5, 1.0f, 1.0f, 1.0f);
-
-    const char* items[] = { "GRAPHICS", "CONTROLS", "QUIT" };
-    for (int i = 0; i < 3; i++){
+    const char* items[] = { "GRAPHICS", "CONTROLS", "CHANGE MAPS", "QUIT" };
+    for (int i = 0; i < 4; i++){
         bool sel = (editor.settings_cursor == i);
         float r = sel ? 0.20f : 0.60f;
         float g = sel ? 1.00f : 0.60f;
@@ -1931,7 +1982,7 @@ void editor_renderer_draw_settings_menu(EditorRenderer& er, const EditorState& e
     }
 
     font_draw(er.font, "UP/DN=navigate ENTER=select ESC=close",
-        100, SH/2 + 160, 2, 0.4f, 0.4f, 0.4f);
+        100, SH/2 + 230, 2, 0.4f, 0.4f, 0.4f);
 }
 
 void editor_renderer_destroy(EditorRenderer& er){

@@ -18,6 +18,7 @@
 #include "editor_input.hpp"
 #include "npc_update.hpp"
 #include "cam.hpp"
+#include "map_manager.hpp"
 #include <cmath>
 #include <iostream>
 #include <fstream>
@@ -115,10 +116,36 @@ void app_init(App& app){
 
     editor_scan_props(app.editor, "../assets");
 
-    world_map_load(app.map, Const::MAP_SAVE_PATH);
+     map_manager_scan();
+    // migrate legacy flat files into pre made default (maps/poblacion) on first run
+    {
+        std::string legacy_map = "../assets/map.txt";
+        std::string legacy_amb = "../assets/_ambience.amb";
+        std::string target_dir = "../assets/maps/poblacion";
+        if (std::filesystem::exists(legacy_map) && !std::filesystem::exists(target_dir)){
+            std::filesystem::create_directories(target_dir);
+            std::filesystem::rename(legacy_map, target_dir + "/map.txt");
+            if (std::filesystem::exists(legacy_amb))
+                std::filesystem::rename(legacy_amb, target_dir + "/_ambience.amb");
+            // migrate all sibling files: _terrain.hf, _roads.rd, _ocean.oc, _audio.au, _lights.lt, _npc_poses.np
+            for (const char* suffix : {"_terrain.hf","_roads.rd","_ocean.oc","_audio.au","_lights.lt","_npc_poses.np"}){
+                std::string src = "../assets/map" + std::string(suffix);
+                std::string dst = target_dir + "/map" + suffix;
+                if (std::filesystem::exists(src))
+                    std::filesystem::rename(src, dst);
+            }
+            map_write_name(target_dir, "Poblacion");
+            map_manager_scan();
+            std::cout << "[maps] migrated legacy files to maps/barangay\n";
+        }
+        if (g_maps.maps.empty()) map_manager_new("Poblacion");
+    }
+    
+    world_map_load(app.map, g_maps.map_path());
+    g_maps.loaded_index = g_maps.active_index;
+    g_maps.loaded_dir = g_maps.maps[g_maps.active_index].dir;
     ambience_load(app.map.ambience_zones, app.map.ambience_count,
-        Const::MAX_AMBIENCE_ZONES, Const::AMBIENCE_SAVE_PATH);
-
+        Const::MAX_AMBIENCE_ZONES, g_maps.ambience_path().c_str());
     for (auto& r : app.map.roads)
         road_spline_build_mesh(r, &app.map.terrain);
 
@@ -230,18 +257,59 @@ void app_run(App& app){
         static bool s_esc_last = false;
         bool esc_down = glfwGetKey(app.window.handle, GLFW_KEY_ESCAPE) == GLFW_PRESS;
         if (esc_down && !s_esc_last){
+            static int s_prev_map_idx = 0;
+            static std::string s_prev_loaded_dir;
             app.editor.settings_open = !app.editor.settings_open;
             app.editor.settings_page = SETTINGS_PAGE_MAIN;
             app.editor.settings_cursor = 0;
-            if (app.editor.settings_open)
+            if (app.editor.settings_open){
                 audio_pause(app.audio);
+                s_prev_map_idx = g_maps.active_index;
+                s_prev_loaded_dir = g_maps.loaded_dir;
+            }
             else {
                 audio_resume(app.audio);
                 settings_save();
                 scene_shadow_resize(app.scene);
-            }
+                // map switched while settings was open -> full reload
+                if (g_maps.maps[g_maps.active_index].dir != s_prev_loaded_dir){
+                    world_map_save(app.map, g_maps.loaded_dir + "/map.txt");
+                    ambience_save(app.map.ambience_zones, app.map.ambience_count,
+                       (g_maps.loaded_dir + "/_ambience.amb").c_str());
 
-        }
+
+                    app.map = WorldMap{};
+                    heightfield_init(app.map.terrain,
+                        Const::TERRAIN_ROWS, Const::TERRAIN_COLS,
+                        Const::TERRAIN_CELL_SIZE,
+                        glm::vec3(-(Const::TERRAIN_COLS * Const::TERRAIN_CELL_SIZE) * 0.5f, 0.0f,
+                                  -(Const::TERRAIN_ROWS * Const::TERRAIN_CELL_SIZE) * 0.5f));
+                    world_map_load(app.map, g_maps.map_path());
+                    
+                    
+                    ambience_load(app.map.ambience_zones, app.map.ambience_count,
+                        Const::MAX_AMBIENCE_ZONES, g_maps.ambience_path().c_str());
+                    for (auto& r : app.map.roads)
+                        road_spline_build_mesh(r, &app.map.terrain);
+                    for (const auto& o : app.map.objects)
+                        if (!o.model_path.empty())
+                            editor_get_y_floor_offset(app.editor_renderer, o.model_path);
+                    world_map_to_obstacles(app);
+                    init_dynamic_sims(app);
+                    init_npcs(app);
+                    app.wo_by_id.clear();
+                    for (const auto& o : app.map.objects) app.wo_by_id[o.id] = &o;
+                    g_maps.loaded_index = g_maps.active_index;
+                    g_maps.loaded_dir   = g_maps.maps[g_maps.active_index].dir;
+                    app.obstacles_dirty = false;
+                    app.editor_renderer.terrain_surface_dirty = true;
+                    app.editor_renderer.terrain_mesh_dirty = true;
+                    app.trike = TrikeState{};
+                    app.player = PlayerState{};
+                    app.dynamic_sims.clear();
+                    std::cout << "[maps] switched to " << g_maps.maps[g_maps.active_index].name << "\n";                }
+            }
+        }        
         s_esc_last = esc_down;
 
         /******************************************************************************
@@ -804,8 +872,9 @@ void app_shutdown(App& app){
     hud_destroy(app.hud);
     scene_destroy(app.scene);
     window_destroy(app.window);
-    world_map_save(app.map, Const::MAP_SAVE_PATH);
-    ambience_save(app.map.ambience_zones, app.map.ambience_count, Const::AMBIENCE_SAVE_PATH);
+    world_map_save(app.map, g_maps.loaded_dir + "/map.txt");
+    ambience_save(app.map.ambience_zones, app.map.ambience_count,
+        (g_maps.loaded_dir + "/_ambience.amb").c_str());    
     editor_renderer_destroy(app.editor_renderer);
     app.running = false;
 }
