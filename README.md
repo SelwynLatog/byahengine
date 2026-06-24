@@ -1,60 +1,100 @@
-a 3D simulation engine built with openGL C++, including a custom renderer, physics, content pipelines, and editor tooling. 
+# BYAHENGINE
 
-This project simply serves as my playground to learn low level graphics programming by simulating a tricycle driver's environment via custom terrain, road, animations, audio, rigid body, npc, & lighting systems.
+![poblacion overview1](assets/screenshots/poblacion_overview1.png)
 
-It's oddly specific and that's simply because I commute to college by tricycle in a rural area surrounded by uneven roads, hills, and a beach. I thought it would be both hilarious and fascinating to simulate my daily rides using a custom graphics engine. 
+## About
+a 3D simulation engine built in C++ and OpenGL as both a personal learning sandbox for low level graphics programming and a tribute to my dad who's also a tricycle driver. The sandbox environment is inspired by the rural area I actually live in - complete with rough roads,
+beaches, and barren hills. Might as well try and simulate my daily commute from scatch.
 
+No game engine. No shortcuts. Just raw OpenGL, a lot of midnight hours, and an
+oddly specific premise
 
-# V1:
-May-08-2026
-- custom trike physics engine
-- cam system
-- core game loop
-- impact & collision + aabb hitboxes
-- custom basic hud
-- sample immovable mesh
-- custom basic shader
-- trike model
+![poblacion overview2](assets/screenshots/poblacion_overview2.png)
 
-credits to @wawa for the trike model, you can find and download it for free on:
-https://sketchfab.com/3d-models/lowpoly-traysikeltricycle-08cb15a0c57748f793e0ead5e5095722
+## Features
 
-<img width="1873" height="1090" alt="image" src="https://github.com/user-attachments/assets/93b8092b-7db8-4828-a6fa-e32f7ea9fbdf" />
+### Renderer
 
-<img width="1864" height="1104" alt="image" src="https://github.com/user-attachments/assets/bd850430-7be0-4d09-a5b8-9c2ac00f3aa0" />
+![poblacion spawn](assets/screenshots/poblacion.png)
 
+- The renderer is a forward-renderer built on OpenGL 3.3 core profile. Shaders are loaded from .glsl files at runtime so you can tweak them without recompiling
 
-# V2 Goal:
-- in-game map editor
-- terrain foundation
-- road layout
-- world dressing (bumps, potholes, static props eg. traffic cones)
-- predestrians (the fun part. Ragdoll physics baby)
-- environmental fx (waves/beaches, rain, wet roads)
+- Mesh pipeline: .obj files are parsed by a custom loader with binary .objcache and .texcache sidecar files
 
-May-22-2026
+- Shadows: A single directional shadow map using PCF soft shadows
 
-<img width="1885" height="1162" alt="image" src="https://github.com/user-attachments/assets/cfa2621e-df2f-4e19-9e9d-ce52be652988" />
+- Day/night cycle: The sun moves along a defined arc. The skybox blends between three equirectangular textures
 
-<img width="1904" height="1166" alt="image" src="https://github.com/user-attachments/assets/dcaeb16e-d8e8-4bbf-8371-a5debdf87298" />
+- Ocean: Vertex-animated sine wave displacement with hash-based noise for variety
 
-<img width="1861" height="1102" alt="image" src="https://github.com/user-attachments/assets/b9e283f2-d21e-43bd-b18b-d47ad13cde24" />
+- Rain: A particle system of billboard quads that lean into their velocity. Each particle has randomized size, opacity, and speed. A ring buffer of splash pool quads spawns at impact points
 
-<img width="1868" height="1145" alt="image" src="https://github.com/user-attachments/assets/ae8e4b1f-5f21-40af-b8e7-659e8c42fec3" />
+![rain](assets/screenshots/rain.png)
 
-May-30-2026
-Basically environment is done. a lot of midnight hours spent on map building. I'd say pretty decent for a psx style game. Assets not mine. All free models you can find from sketchfab. 
+- Point lights: Placed per-object via the editor and saved to .lt sidecar files. At runtime, lights within a configurable radius are uploaded to the shader. Night-only lights (streetlamps, windows) are gated by time of day
 
-<img width="1919" height="1084" alt="image" src="https://github.com/user-attachments/assets/972b4976-fc23-4b69-a6de-24f4bd63a494" />
+### Physics
+- Trike physics: The tricycle has a custom physics model built around its real geometry - engine torque, gear ratios, wheel radius, suspension, and sidecar asymmetry
 
-no light system yet
-<img width="1919" height="1078" alt="image" src="https://github.com/user-attachments/assets/ea217409-2903-4147-a6ef-926325a89117" />
+- Collision: Every object in the world has an axis-aligned bounding box. Collision is resolved via Minimum Translation Vector (MTV) where trike is pushed out of overlapping objs each frame
 
-<img width="1919" height="1087" alt="image" src="https://github.com/user-attachments/assets/89214ad9-f8ea-4309-b2f5-7356d07669fb" />
+- Rigid Body Dynamics - Object stability is modeled with gravity, angular momentum, and a toppling threshold. Needs work though, its still quite goofy.
 
-<img width="1919" height="1082" alt="image" src="https://github.com/user-attachments/assets/6058f0fa-f02a-4dfe-8e2b-9c460b0d1cac" />
+![trike hits potato crates & chairs](assets/screenshots/impact.png)
 
-<img width="1919" height="1081" alt="image" src="https://github.com/user-attachments/assets/66f24c71-9c48-4a76-baca-479eb9f51971" />
+### Editor
+- The editor is a full in-engine tool accessible via TAB key. It runs in the same process as the sim
 
+- Object placement: Place, translate, rotate, and scale objects with mouse and keyboard. Objects are categorized into a paginated prop browser that scans the assets/props/
 
-<img width="1919" height="1072" alt="image" src="https://github.com/user-attachments/assets/9059bd96-9a73-46cf-84b1-4417078eaec0" />
+- Terrain: Height sculpt with raise/lower/flatten brushes. Surface painting assigns audio and visual material types per verts
+
+- Roads: Bezier spline roads with configurable width and segment count. Spline control points snap to terrain height
+
+- Lighting : Place and configure point lights. Set color, intensity, and radius.
+
+- Ambience zones: Place spherical ambience zones, assign audio files, set radius and type.
+
+- Multi-map system: The project supports multiple named maps. Each map lives in its own directory under assets/maps/ with its own object list, terrain, roads, NPC data, and ambience. Switch between maps at runtime
+
+![map editor terrain mode](assets/screenshots/terrain.png)
+
+![map editor light mode](assets/screenshots/light.png)
+
+![giant chicken](assets/screenshots/giant_chicken.png)
+
+### World & NPCs
+- NPCs have a state machine with seven states: IDLE, WALK, HAILING, MOUNTING, PASSENGER, DISMOUNTING, RAGDOLL
+
+- Pedestrians wander between waypoints, play idle chatter audio with proximity gating, and can be knocked into ragdoll by the trike. The ragdoll uses the dynamic sim for physics
+
+- Passenger flow: a pedestrian enters the HAILING state when the trike is near. Press Q to confirm pickup. The NPC mounts the sidecar, a destination marker appears in the world, and a HUD arrow points toward it.
+
+- NPC poses configured via Pose mode in editor
+
+- Animals: A separate animal NPC system with species-specific behavior tables. Animals can graze or flee when the trike approaches. Per-species walk cycle animations driven by procedural sine-wave bone offsets
+
+- Animations: All skeletal animation is procedural sine-wave offsets on named bones, tuned per pose and action. Not pixar. Thats too hard. 
+
+![hell yeah](assets/screenshots/ride.png)
+
+### Settings
+
+- settings.cfg stores runtime config
+
+- Graphics settings: fog toggle, shadow toggle, rain toggle, shadow map resolution. All settings take effect immediately without restart. Shadow map resizing re-allocates the FBO at runtime
+
+![graphics settings config](assets/screenshots/settings.png)
+
+## How to Run
+
+**Requirements:** CMake 3.x, a C++17 compiler, OpenGL 3.3+
+
+```bash
+git clone https://github.com/yourusername/tricycle-sim.git
+cd tricycle-sim/build
+cmake ..
+cmake --build .
+```
+
+Then run `run.ps1` on Windows, or execute the binary directly from `build/`.
