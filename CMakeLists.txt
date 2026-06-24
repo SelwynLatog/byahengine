@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
-project(tricycle-sim VERSION 1.0 LANGUAGES CXX C)
+project(byahengine VERSION 1.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(tricycle-sim
+add_executable(byahengine
     src/main.cpp
     src/core/app.cpp
     src/core/window.cpp
@@ -43,7 +43,7 @@ add_executable(tricycle-sim
     src/stb_impl.cpp
 )
 
-target_include_directories(tricycle-sim PRIVATE
+target_include_directories(byahengine PRIVATE
     src
     vendor/glad/include
     vendor/glfw/include
@@ -52,7 +52,7 @@ target_include_directories(tricycle-sim PRIVATE
     vendor/miniaudio
 )
 
-target_link_libraries(tricycle-sim PRIVATE
+target_link_libraries(byahengine PRIVATE
     ${CMAKE_SOURCE_DIR}/vendor/glfw/lib/libglfw3.a
     opengl32
     gdi32

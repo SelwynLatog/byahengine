@@ -1540,7 +1540,7 @@ void editor_renderer_draw_hud(EditorRenderer& er, const EditorState& editor, con
                     font_draw(er.font, line, x2, y2, 1, 0.75f, 0.75f, 0.75f);
                     y2 += 18;
                 }
-                char pg[32];
+                char pg[64];
                 snprintf(pg, sizeof(pg), "[%d-%d / %d]  UP/DN scroll",
                     editor.audio_file_page + 1,
                     std::min(editor.audio_file_page + AUDIO_PAGE_SIZE, total), total);
