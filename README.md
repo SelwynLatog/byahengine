@@ -94,7 +94,7 @@ oddly specific premise
 - Place `vendor/` in project root → `byahengine/vendor/`
 - Place `props/` in assets → `byahengine/assets/props/`
 - Place all contents inside `entity/` to -> `byahengine/assets/entity` or simply replace the folder entirely
-Make sure there is no subfolder duplicate layering eg. `assets/props/props/file.obj` should just be -> `assets/props/file.obj`
+- Make sure there is no subfolder duplicate layering eg. `assets/props/props/file.obj` should just be -> `assets/props/file.obj`
 
 ```bash
 git clone https://github.com/SelwynLatog/byahengine
