@@ -91,8 +91,15 @@ oddly specific premise
 **Requirements:** CMake 3.x, a C++17 compiler, OpenGL 3.3+
 
 ```bash
-git clone https://github.com/yourusername/tricycle-sim.git
-cd tricycle-sim/build
+git clone https://github.com/SelwynLatog/byahengine
+```
+**Download Dependencies available via Drive Link**
+https://drive.google.com/drive/folders/1HXlKvaPrwI-AJZNiK7k1ehtWSCPX0YoA?usp=drive_link
+Place vendor/ in project root -> byahengine/vendor
+Place props/ in assets/ -> byahengine/assets/props
+
+```bash
+cd byahengine/build
 cmake ..
 cmake --build .
 ```
