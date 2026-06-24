@@ -1,9 +1,11 @@
 build/
-assets/
 vendor/
 *.exe
-*.obj
 *.o
-*.ps1
 .cache/
 .vscode/
+assets/**/*.objcache
+assets/**/*.texcache
+assets/props/
+assets/entity/
+assets/settings.cfg
