@@ -1,0 +1,433 @@
+-----------------------------------------------------------------------------------------------------------
+BYAHENGINE - THIRD PARTY ASSET CREDITS
+-----------------------------------------------------------------------------------------------------------
+
+All 3D assets listed in this file are the property of their
+respective creators. I claim no ownership over any of these
+works. Full credit goes to the original artists.
+
+This is a non-commercial hobby project made out of personal
+passion. No assets are sold, redistributed, or sublicensed.
+
+If you are an artist whose work appears here and you would
+prefer it not be used, please contact me at:
+
+  GitHub: https://github.com/SelwynLatog
+  Email: selwynandraeautentico@gmail.com
+
+I will remove it immediately, no questions asked. Thank you so
+much for the beautiful models <3
+
+-----------------------------------------------------------------------------------------------------------
+ASSETS
+-----------------------------------------------------------------------------------------------------------
+
+Model:   TRIKE MODEL "\assets\props\TRAYSIKEL.obj" <Lowpoly Traysikel/Tricycle>
+Author:  <https://sketchfab.com/jshwwy>
+Source:  <https://sketchfab.com/3d-models/lowpoly-traysikeltricycle-08cb15a0c57748f793e0ead5e5095722>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   DRIVER MODEL <Male Character- Clothes and Hair>
+Author:  <https://sketchfab.com/sapenton8821>
+Source:  <https://sketchfab.com/3d-models/male-character-clothes-and-hair-da02a1daf5294a86b9be5ea17d0b34c5>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "\assets\props\apartment.obj" <PSX - Apartment>
+Author:  <https://sketchfab.com/Kasugay>
+Source:  <https://sketchfab.com/3d-models/psx-apartment-60b98974f45745c99e3a3d6843db2d8c>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "\assets\props\bahay_kubo.obj" <Bahay Kubo Balikat Ulo>
+Author:  <https://sketchfab.com/lowPolyBoy>
+Source:  <https://sketchfab.com/3d-models/bahay-kubo-balikat-ulo-5b03a62fb4204ca9bd83edc5c7d23331>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "\assets\props\bahay1.obj" <bahay4>
+Author:  <https://sketchfab.com/gwapzfranz>
+Source:  <https://sketchfab.com/3d-models/bahay4-e3ad7db6543545f4ba36360d6f8588b4>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "\assets\props\basketball.obj" <Rugged Basketball>
+Author:  <https://sketchfab.com/robin.sculac>
+Source:  <https://sketchfab.com/3d-models/rugged-basketball-008e9eacb9044b11b358a0c2bdae1934>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "\assets\props\brick_shop.obj" <Brick Shop Building | Lowpoly>
+Author:  <https://sketchfab.com/Fridqeir>
+Source:  <https://sketchfab.com/3d-models/brick-shop-building-lowpoly-548d4a0e62b54efcab4483fb6d0c3611>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "\assets\props\broken_pickup_truck.obj" <PSX/Low Poly Pickup>
+Author:  <https://sketchfab.com/domi236>
+Source:  <https://sketchfab.com/3d-models/psxlow-poly-pickup-31b9d6538c4d4c6c8355052ca20e351a>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:  "\assets\props\bus.obj" <PS1 styled bus>
+Author:  <https://sketchfab.com/almondz2549>
+Source:  <https://sketchfab.com/3d-models/ps1-styled-bus-833fa9c0c1f84c449f7ffd92c7a63e34>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "\assets\props\bus_stop.obj" <bus stop in ps1 style>
+Author:  <https://sketchfab.com/Hobu_Coffee>
+Source:  <https://sketchfab.com/3d-models/bus-stop-in-ps1-style-3be5f94b0f904d55a6f1f76d83003a63>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:  "assets\props\car_repair.obj" <Low poly car repair>
+Author:  <https://sketchfab.com/zubenko78>
+Source:  <sketchfab.com/3d-models/low-poly-car-repair-93588daf070a45ea9fd6e7fcfc6f0e1c>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:  "assets\props\car_sedan.obj" <PSX Sedan Car - @jonniemadeit>
+Author: <https://sketchfab.com/jonniemadeit>
+Source: <https://sketchfab.com/3d-models/psx-sedan-car-jonniemadeit-90bbcad62e0d480581bf0a191b2f6bd2>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:  "assets\props\chicken.obj" <Chicken>
+Author: <https://sketchfab.com/MAXDESIGN>
+Source: <https://sketchfab.com/3d-models/chicken-4ab19d3a675343959815ae770f8b178e>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:  "assets\props\chicken_shop.obj" <Pollos Asados Lokillo Restaurant>
+Author: <https://sketchfab.com/wobbs_>
+Source: <https://sketchfab.com/3d-models/pollos-asados-lokillo-restaurant-fedf5be352c44d3da9c23eeedda55013>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+// TODO:
+Model:  "assets\props\chinese_cart.obj" (its Vietnamese im so sorry for the wrong name) <BanhMi Cart>
+Author: <https://sketchfab.com/ngdkh>
+Source: <https://sketchfab.com/3d-models/banhmi-cart-f45b8dfd3a874779ac18323399a10258>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:  "assets\props\church.pbj" <PSX Church>
+Author: <https://sketchfab.com/Shazly>
+Source: <https://sketchfab.com/3d-models/psx-church-e2b9dc5b5b1e4f979473ac8bab16c5e3>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:  "assets\props\coconut_tree.obj" <Coconut Tree Low poly>
+Author: <https://sketchfab.com/ar.jethin>
+Source: <https://sketchfab.com/3d-models/coconut-tree-low-poly-8c5d6b661b2f4c37834d87cd187eb907>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:  "assets\props\coffee_shop.obj" <Low poly coffee shop - mm>
+Author: <https://sketchfab.com/RitiWox>
+Source: <https://sketchfab.com/3d-models/low-poly-coffee-shop-mm-b7ab4b5d532b4968b94ed90563948ad6>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:  "assets\props\commercial_bldg1.obj" <Midcity Buildings Set - Low Poly model>
+Author:  <https://sketchfab.com/DanielZhabotinsky>
+Source:  <https://sketchfab.com/3d-models/midcity-buildings-set-low-poly-model-d5cbc471d20c4c9da31c3df656648916>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/commercial_bldg2.obj" <Midcity Buildings Set - Low Poly model>
+Author:  <https://sketchfab.com/DanielZhabotinsky>
+Source:  <https://sketchfab.com/3d-models/midcity-buildings-set-low-poly-model-d5cbc471d20c4c9da31c3df656648916>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/commercial_bldg3.obj" <Midcity Buildings Set - Low Poly model>
+Author:  <https://sketchfab.com/DanielZhabotinsky>
+Source:  <https://sketchfab.com/3d-models/midcity-buildings-set-low-poly-model-d5cbc471d20c4c9da31c3df656648916>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/concrete_wall.obj" <Concrete with fence>
+Author:  <https://sketchfab.com/aVine>
+Source:  <https://sketchfab.com/3d-models/concrete-with-fence-c388ac2189104bc38b155e81ce59330b>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/cone_ps1.obj" <traffic cone>
+Author:  <https://sketchfab.com/Ledeyer>
+Source:  <https://sketchfab.com/3d-models/traffic-cone-9c95f3cd113040b5a01be7b260fc3fa0>
+License: Free Standard (personal/portfolio use, no redistribution)
+
+Model:   "assets/props/construction_cabin.obj" <Low Poly Construction Assets>
+Author:  <https://sketchfab.com/99.Miles>
+Source:  <https://sketchfab.com/3d-models/low-poly-construction-assets-5c134526af464b5389f6c8a29fddeaff>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/construction_sign.obj" <Construction Signs Set>
+Author:  <https://sketchfab.com/caboose3d>
+Source:  <https://sketchfab.com/3d-models/construction-signs-set-96b3785bb7654f4f8812d23bfaa9830d>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/crate.obj" <Small Vegetable Crate>
+Author:  <https://sketchfab.com/Helyeouka>
+Source:  <https://sketchfab.com/3d-models/small-vegetable-crate-b24a2b9978844b1d9a29484c99a11fdb>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/detour_sign.obj" <Construction Signs Set>
+Author:  <https://sketchfab.com/caboose3d>
+Source:  <https://sketchfab.com/3d-models/construction-signs-set-96b3785bb7654f4f8812d23bfaa9830d>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/dirt_mound.obj" <dirt mound>
+Author:  <https://sketchfab.com/anonymous_owl>
+Source:  <https://sketchfab.com/3d-models/dirt-mound-25383877adab48a4927f535b586241f7>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/electric_post.obj" <PSX Electric Pole>
+Author:  <https://sketchfab.com/Arimantos>
+Source:  <https://sketchfab.com/3d-models/psx-electric-pole-44f73e80c8b24c65b3967e0afbcb85e7>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/excavator.obj" <Low Poly Construction Assets>
+Author:  <https://sketchfab.com/99.Miles>
+Source:  <https://sketchfab.com/3d-models/low-poly-construction-assets-5c134526af464b5389f6c8a29fddeaff>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/excavator_hand.obj" <Low Poly Construction Assets>
+Author:  <https://sketchfab.com/99.Miles>
+Source:  <https://sketchfab.com/3d-models/low-poly-construction-assets-5c134526af464b5389f6c8a29fddeaff>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/fence.obj" <Wooden Fences [Low Poly]>
+Author:  <https://sketchfab.com/MrUnityCreations>
+Source:  <https://sketchfab.com/3d-models/wooden-fences-low-poly-1db7df90770e44128bc154a96bc0fe4c>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/fence_chain.obj" <Chainlink Fence - Low Poly>
+Author:  <https://sketchfab.com/Gamedirection>
+Source:  <https://sketchfab.com/3d-models/chainlink-fence-low-poly-50901b0cc91b4e04a18ecd13bc379a90>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/food_stall.obj" <PSX Japanese Food Vendor Kiosk 3D Model>
+Author:  <https://sketchfab.com/zzzhya>
+Source:  <https://sketchfab.com/3d-models/psx-japanese-food-vendor-kiosk-f4d336cbdfef45c6818287e77d4043dd>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/garage.obj" <PSX prop - Old Garage>
+Author:  <https://sketchfab.com/WardsterSAW>
+Source:  <https://sketchfab.com/3d-models/psx-prop-old-garage-192c06f284b5454f83ab081ef23f6567>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/garbage_bag1" <Garbage bag>
+Author:  <https://sketchfab.com/fhemmekam>
+Source:  <https://sketchfab.com/3d-models/garbage-bag-132e9b1a826644738eb44e789d5b2dcf>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/gas_bathroom.obj" <Gas station Props>
+Author:  <https://sketchfab.com/Elbolilloduro>
+Source:  <https://sketchfab.com/3d-models/gas-station-props-8fcd52f1b12e4b4296589b4c6328b777>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/gas_pillar.obj" <Gas station Props>
+Author:  <https://sketchfab.com/Elbolilloduro>
+Source:  <https://sketchfab.com/3d-models/gas-station-props-8fcd52f1b12e4b4296589b4c6328b777>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/gas_pump.obj" <Gas station Props>
+Author:  <https://sketchfab.com/Elbolilloduro>
+Source:  <https://sketchfab.com/3d-models/gas-station-props-8fcd52f1b12e4b4296589b4c6328b777>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/gas_roof.obj" <Gas station Props>
+Author:  <https://sketchfab.com/Elbolilloduro>
+Source:  <https://sketchfab.com/3d-models/gas-station-props-8fcd52f1b12e4b4296589b4c6328b777>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/gas_sign.obj" <Gas station Props>
+Author:  <https://sketchfab.com/Elbolilloduro>
+Source:  <https://sketchfab.com/3d-models/gas-station-props-8fcd52f1b12e4b4296589b4c6328b777>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/gas_store.obj" <Gas station Props>
+Author:  <https://sketchfab.com/Elbolilloduro>
+Source:  <https://sketchfab.com/3d-models/gas-station-props-8fcd52f1b12e4b4296589b4c6328b777>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/gas_slab.obj" <Gas station Props>
+Author:  <https://sketchfab.com/Elbolilloduro>
+Source:  <https://sketchfab.com/3d-models/gas-station-props-8fcd52f1b12e4b4296589b4c6328b777>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/grass_prop.obj" <Low-Poly Grass>
+Author:  <https://sketchfab.com/Talaei>
+Source:  <https://sketchfab.com/3d-models/low-poly-grass-3ab12df56ac04d63a096562ce3fc0763>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/grocery_store.obj" <Psx Groceries Store>
+Author:  <https://sketchfab.com/apispride00>
+Source:  <https://sketchfab.com/3d-models/psx-groceries-store-21a3be50255e405a918972abd99ba180>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/guardrail.obj" <guardrail road>
+Author:  <https://sketchfab.com/danimow>
+Source:  <https://sketchfab.com/3d-models/guardrail-road-76e85683d30c4e6ba35da370467b7aa6>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/hoop.obj" <Basketball Hoop Panel>
+Author:  <https://sketchfab.com/nimrodassaf>
+Source:  <https://sketchfab.com/3d-models/basketball-hoop-panel-a30a5de53a6748c39cbd2923946b5993>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/house3.obj" <PSX House>
+Author:  <https://sketchfab.com/Shazly>
+Source:  <https://sketchfab.com/3d-models/psx-house-b736aa08d0a848c6801db7e8fac0c852>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/house4" <PSX Japanese House>
+Author:  <<https://sketchfab.com/Shazly>>
+Source:  <https://sketchfab.com/3d-models/psx-japanese-house-1bb2ea4b2e344370997938d036d483b2>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/house_1" <(PSX) - Ozone House>
+Author:  <https://sketchfab.com/Kasugay>
+Source:  <https://sketchfab.com/3d-models/psx-ozone-house-f93e9b2c039f4432aeb33cfcb7a26963>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/house_2" <PSXprop - Ps1/psx House>
+Author:  <https://sketchfab.com/WardsterSAW>
+Source:  <https://sketchfab.com/3d-models/psxprop-ps1psx-house-508a0d596b5f4836ab057475b77fa47a>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/japanese_shop" <Old Japanese Store | Lowpoly>
+Author:  <https://sketchfab.com/Fridqeir>
+Source:  <https://sketchfab.com/3d-models/old-japanese-store-lowpoly-baa1a12ed0984143adde52b5e165e288>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/mansion.obj" <PSX Old Abandoned Mansion>
+Author:  <https://sketchfab.com/Shazly>
+Source:  <https://sketchfab.com/3d-models/psx-old-abandoned-mansion-f2835cf5ee06400da7ce3ca872c29f0b>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/mini_shop.obj" <PS1 Style Fastfood Mini-Shop>
+Author:  <https://sketchfab.com/spatka>
+Source:  <https://sketchfab.com/3d-models/ps1-style-fastfood-mini-shop-f724dc537e5d4cb29e217133cf2419aa>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/motorcyle2.obj" <Vario PSX Style - Han66st>
+Author:  <https://sketchfab.com/Han66st>
+Source:  <https://sketchfab.com/3d-models/vario-psx-style-han66st-6c67aa3f3c60455ba12780f442c65a81>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/network_tower.obj" <IT Tower low data size>
+Author:  <https://sketchfab.com/vfxstudio987>
+Source:  <https://sketchfab.com/3d-models/it-tower-low-data-size-dfeca8e7c7c5429b91d6207b3a3a9af4>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/potato.obj" <PS1 Potato>
+Author:  <https://sketchfab.com/Kasugay>
+Source:  <https://sketchfab.com/3d-models/ps1-potato-639b0915d4184fba9c376b04f5cf0d90>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/railing.obj" <Metal Barrier>
+Author:  <https://sketchfab.com/RM3DB>
+Source:  <https://sketchfab.com/3d-models/metal-barrier-89941acc92de40a3b568552fb914700b>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/restaurant.obj" <Lahori Dhaba – Traditional Roadside Restaurant>
+Author:  <https://sketchfab.com/shahzyprince9>
+Source:  <sketchfab.com/3d-models/lahori-dhaba-traditional-roadside-restaurant-1f022d56a9234121b57f7897eb159548>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/road_barrier.obj" <low poly road barrier>
+Author:  <https://sketchfab.com/muji>
+Source:  <https://sketchfab.com/3d-models/low-poly-road-barrier-e2b2282e32dc48c6bf31369cd800690a>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/road_block.obj" <Industrial Road Block (PS1)>
+Author:  <https://sketchfab.com/s1lmoon>
+Source:  <https://sketchfab.com/3d-models/industrial-road-block-ps1-a9579f8606424791bd5d918465b8db08>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/rough_road_sign.obj" <Construction Signs Set>
+Author:  <https://sketchfab.com/caboose3d>
+Source:  <https://sketchfab.com/3d-models/construction-signs-set-96b3785bb7654f4f8812d23bfaa9830d>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/rusty_house.obj" <Rusty Old Tropical Shop>
+Author:  <https://sketchfab.com/ar.jethin>
+Source:  <https://sketchfab.com/3d-models/rusty-old-tropical-shop-e925b04cdd8e4e51841a20b37bc9c056>
+License: Free Standard (personal/portfolio use, no redistribution)
+
+Model:   "assets/props/school.obj" <High School>
+Author:  <https://sketchfab.com/sinnik>
+Source:  <https://sketchfab.com/3d-models/high-school-598966bbb00c4f12989ae8126b04324d>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/speed_limit.obj" <30 Mile Road Sign>
+Author:  <https://sketchfab.com/cig3d>
+Source:  <https://sketchfab.com/3d-models/30-mile-road-sign-80b3c3e1cd114f48a6e0751d1d1cca24#download>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/steel_sheet.obj" <Low Poly Construction Assets>
+Author:  <https://sketchfab.com/99.Miles>
+Source:  <https://sketchfab.com/3d-models/low-poly-construction-assets-5c134526af464b5389f6c8a29fddeaff>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/street_light.obj" <Street Light Post>
+Author:  <https://sketchfab.com/gabrielmendesm>
+Source:  <https://sketchfab.com/3d-models/street-light-post-714031af7a4e4f92ab2b463f4180ee5c>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/street_light2.obj" <Low Poly Psx Street lamp>
+Author:  <https://sketchfab.com/SaukrDev>
+Source:  <https://sketchfab.com/3d-models/low-poly-psx-street-lamp-81a8d1861bbd4cef8ab1aed2986bf873>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/table.obj" <Plastic table | Пластиковый стол>
+Author:  <https://sketchfab.com/Every_3D>
+Source:  <https://sketchfab.com/3d-models/plastic-table-b6dd382b5f0f4127a684d696809d5cfd>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/transmission_tower.obj" <Korean Power Tansmission Tower 765kV>
+Author:  <https://sketchfab.com/yarankepang>
+Source:  <https://sketchfab.com/3d-models/korean-power-tansmission-tower-765kv-d6d76f975e7944d48a41201adb24bb5b>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/trash_bin1" <[CC0] Garbage Bin - Ready to Unity HDRP>
+Author:  <https://sketchfab.com/karlwirbelwind>
+Source:  <https://sketchfab.com/3d-models/cc0-garbage-bin-ready-to-unity-hdrp-27ae2319ba184d2588ba015f08058cbc>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/tree1obj.obj" <tree low-poly>
+Author:  <https://sketchfab.com/380660711785>
+Source:  <https://sketchfab.com/3d-models/tree-low-poly-4cd243eb74c74b3ea2190ebcec0439fb>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/tree2.obj" <Lowpoly Tree>
+Author:  <https://sketchfab.com/dionne>
+Source:  <https://sketchfab.com/3d-models/lowpoly-tree-b562b2e9f029440c804b4b6d36ebe174>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/truck.obj" <Ps1 90s Japanese truck>
+Author:  <https://sketchfab.com/Dorumin666>
+Source:  <https://sketchfab.com/3d-models/ps1-90s-japanese-truck-bffd56034d8b45528fc7147dfeb6a51d>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/warehouse1.obj" <PSX Japanese Warehouse>
+Author:  <https://sketchfab.com/Shazly>
+Source:  <https://sketchfab.com/3d-models/psx-japanese-warehouse-eca5946cca97444e9766bc816beb5aa7>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/warehouse2.obj" <PSXprop - Old Warehouse>
+Author:  <https://sketchfab.com/WardsterSAW>
+Source:  <https://sketchfab.com/3d-models/psxprop-old-warehouse-a7bb737a0bc1466c86666ef53dc28b1d>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/water_tower.obj" <Lowpoly Water Tower>
+Author:  <https://sketchfab.com/WardsterSAW>
+Source:  <https://sketchfab.com/3d-models/lowpoly-water-tower-c7cb41e0eeaa4887a0c51a50c0a798f9>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/white_house.obj" <PSX White House>
+Author:  <https://sketchfab.com/rimillerg>
+Source:  <https://sketchfab.com/3d-models/psx-white-house-354050b06b8f48319b54c004efeafb5b>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/props/wooden_cabin.obj" <PSXprop - wooden Cabin>
+Author:  <https://sketchfab.com/WardsterSAW>
+Source:  <https://sketchfab.com/3d-models/psxprop-wooden-cabin-36326caff8034fa8a8fb0d6cdbc71d70>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/entity/female_formal.obj" <Female Character 2>
+Author:  <https://sketchfab.com/Empire223>
+Source:  <https://sketchfab.com/3d-models/female-character-2-5d139e8d106c425b9ab904674daa4fe5>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+Model:   "assets/entity/" <Wolfgang>
+Author:  <sketchfab.com/brutzl0r>
+Source:  <https://sketchfab.com/3d-models/wolfgang-7b24cc3d0f22446a990e3c66ed5014a1>
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
+
+
+-----------------------------------------------------------------------------------------------------------
