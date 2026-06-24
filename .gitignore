@@ -4,8 +4,14 @@ vendor/
 *.o
 .cache/
 .vscode/
+
 assets/**/*.objcache
 assets/**/*.texcache
-assets/props/
-assets/entity/
+assets/props/*
+!assets/props/.gitkeep
+assets/entity/*.obj
+assets/entity/*.objcache
+assets/entity/*.texcache
+assets/entity/*.png
+assets/entity/*.jpeg
 assets/settings.cfg
