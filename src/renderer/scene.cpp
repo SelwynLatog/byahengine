@@ -187,7 +187,7 @@ void scene_init(SceneState& scene){
 
      // load rain/overcast sky
     {
-        const char* rain_path = "../assets/sky_rain.jpg";
+        const char* rain_path = "../assets/props/sky_rain.jpg";
         stbi_set_flip_vertically_on_load(0);
         int w, h, ch;
         unsigned char* px = stbi_load(rain_path, &w, &h, &ch, 3);
@@ -206,7 +206,7 @@ void scene_init(SceneState& scene){
 
     // load night sky
     {
-        const char* night_path = "../assets/sky_night.jpg";
+        const char* night_path = "../assets/props/sky_night.jpg";
         stbi_set_flip_vertically_on_load(0);
         int w, h, ch;
         unsigned char* px = stbi_load(night_path, &w, &h, &ch, 3);

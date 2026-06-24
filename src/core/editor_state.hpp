@@ -53,7 +53,7 @@ struct EditorState{
     // active tool
     EditorTool tool = TOOL_TRANSLATE;
 
-    // prop palette scans assets/ root only
+    // prop palette scans assets/props only
     std::vector<std::string> prop_list;
     int prop_page = 0;
 

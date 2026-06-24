@@ -106,7 +106,7 @@ void app_init(App& app){
 
     scene_init(app.scene);
     editor_renderer_init(app.editor_renderer);
-    road_builder_init("../assets");
+    road_builder_init("../assets/props");
 
     heightfield_init(app.map.terrain,
         Const::TERRAIN_ROWS, Const::TERRAIN_COLS,
@@ -114,7 +114,7 @@ void app_init(App& app){
         glm::vec3(-(Const::TERRAIN_COLS * Const::TERRAIN_CELL_SIZE) * 0.5f, 0.0f,
                   -(Const::TERRAIN_ROWS * Const::TERRAIN_CELL_SIZE) * 0.5f));
 
-    editor_scan_props(app.editor, "../assets");
+    editor_scan_props(app.editor, "../assets/props");
     
     /*****************************************************
      LEGACY MAP MIGRATION
@@ -127,8 +127,8 @@ void app_init(App& app){
 
     map_manager_scan();
     {
-        std::string legacy_map = "../assets/map.txt";
-        std::string legacy_amb = "../assets/_ambience.amb";
+        std::string legacy_map = "../assets/backup/map.txt";
+        std::string legacy_amb = "../assets/backup/_ambience.amb";
         std::string target_dir = "../assets/maps/poblacion";
         if (std::filesystem::exists(legacy_map) && !std::filesystem::exists(target_dir)){
             std::filesystem::create_directories(target_dir);

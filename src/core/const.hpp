@@ -12,7 +12,7 @@ namespace Const{
     inline constexpr float CLEAR_G = 0.12f;
     inline constexpr float CLEAR_B = 0.12f;
 
-    inline constexpr const char* SKY_IMAGE_PATH = "../assets/sky_day.jpg";
+    inline constexpr const char* SKY_IMAGE_PATH = "../assets/props/sky_day.jpg";
 
     // day cycle
     // 10 real minutes = 1 full in-game day
@@ -117,8 +117,8 @@ namespace Const{
     // no OBJ means I can determine if directional issues are physics or OBJ related visually
     inline constexpr bool USE_PROC_MESH = false;
     // tricycle model path
-    inline constexpr const char* TRIKE_MODEL_PATH = "../assets/TRAYSIKEL.obj";
-    inline constexpr const char* TRIKE_PARTS_MODEL_PATH = "../assets/TRAYSIKEL_parts.obj";
+    inline constexpr const char* TRIKE_MODEL_PATH = "../assets/props/TRAYSIKEL.obj";
+    inline constexpr const char* TRIKE_PARTS_MODEL_PATH = "../assets/props/TRAYSIKEL_parts.obj";
     inline constexpr float TRIKE_WHEEL_RADIUS = 0.28f; // metres, tune to model
 
     // cam
@@ -144,7 +144,7 @@ namespace Const{
     inline constexpr float EDITOR_LOOK_SENSITIVITY = 0.003f; // radians per pixel drag
     inline constexpr float EDITOR_GRID_SNAP = 0.5f; // metres, placement snaps to this grid
     inline constexpr float EDITOR_ROTATE_SPEED = 1.5f; // radians/sec
-    inline constexpr float EDITOR_SCALE_SPEED = 0.5f; // units/sec
+inline constexpr float EDITOR_SCALE_SPEED = 0.5f; // units/sec
     inline constexpr int EDITOR_GRID_RADIUS = 50;  // grid lines extend 50m from origin
     inline constexpr int EDITOR_PAGE_SIZE = 9; // num of prop selection
     inline constexpr float EDITOR_GRID_SNAP_FINE = 0.05f;  // alt+arrows: 5cm steps

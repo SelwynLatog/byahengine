@@ -5,7 +5,7 @@
 
 // one entry per surface type
 // name = stem used for .obj/.mtl/texture filenames
-// tex  = texture filename expected in assets/
+// tex  = texture filename expected in assets/props
 // uv_tile = how many times the texture repeats across the 4m quad
 // 1.0 = stretched to fit, 4.0 = 1 repeat per metre (good for most surfaces)
 struct RoadDef {
@@ -85,10 +85,12 @@ void road_builder_init(const std::string& assets_dir){
     for (int i = 0; i < ROAD_TYPE_COUNT; i++){
         const RoadDef& r = ROAD_TYPES[i];
 
+        // auto generate flat road texture files in assets_dir= assets/props/
+        // dir if texture does not exist already
         std::string obj_path = assets_dir + "/" + r.name + ".obj";
         std::string mtl_path = assets_dir + "/" + r.name + ".mtl";
 
-        // skip if already generated — don't overwrite edits
+        // skip if already generated 
         if (std::filesystem::exists(obj_path) && std::filesystem::exists(mtl_path)){
             std::cout << "[road] skipping existing: " << r.name << "\n";
             continue;

@@ -383,7 +383,10 @@ static ObjMesh& get_prop_mesh(EditorRenderer& er, const std::string& filename){
     auto it = er.prop_cache.find(filename);
     if (it != er.prop_cache.end()) return it->second;
 
-    std::string full_path = std::string("../assets/") + filename;
+    // check filename with entity/ sub dir, then scan props/
+    std::string full_path = (filename.rfind("entity/", 0) == 0)
+        ? std::string("../assets/") + filename
+        : std::string("../assets/props/") + filename;
     ObjData data;
     if (!obj_load(full_path, data)){
         er.prop_cache[filename] = ObjMesh{};
@@ -1027,7 +1030,7 @@ void editor_renderer_draw_roads(EditorRenderer& er, const std::vector<RoadSpline
 
         int type_idx = glm::clamp((int)road.type, 0, (int)ROAD_COUNT - 1);
 
-        std::string tex_path = std::string("../assets/") + ROAD_TEX_NAMES[type_idx];
+        std::string tex_path = std::string("../assets/props/") + ROAD_TEX_NAMES[type_idx];
         GLuint tex = load_texture(er, tex_path);
 
         if (tex){
@@ -1282,7 +1285,7 @@ void editor_renderer_draw_terrain_surface(EditorRenderer& er, const HeightField&
         if (er.terrain_surface_counts[i] == 0) continue;
         if (i == (int)SURFACE_NONE) continue;
 
-        std::string tex_path = std::string("../assets/") + SURF_TEX_NAMES[i];
+        std::string tex_path = std::string("../assets/props/") + SURF_TEX_NAMES[i];
         GLuint tex = load_texture(er, tex_path);
         if (tex){
             glActiveTexture(GL_TEXTURE0);
@@ -1645,7 +1648,7 @@ void editor_renderer_draw_hud(EditorRenderer& er, const EditorState& editor, con
         font_draw(er.font, "PROPS", x, y, 2, 0.9f, 0.9f, 0.9f);
         y += 30;
         if (total == 0){
-            font_draw(er.font, "no .obj in assets/", x, y, 1, 0.5f, 0.5f, 0.5f);
+            font_draw(er.font, "no .obj in assets/props/", x, y, 1, 0.5f, 0.5f, 0.5f);
         }
         else {
             int page_start = editor.prop_page * PAGE_SIZE;

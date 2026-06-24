@@ -208,7 +208,7 @@ void editor_scan_props(EditorState& editor, const char* assets_dir){
 
     // scan entity subfolder separately for NPC models
     editor.entity_list.clear();
-    std::string entity_dir = std::string(assets_dir) + "/entity";
+    std::string entity_dir = std::string("../assets/entity");
     if (std::filesystem::exists(entity_dir)) {
         for (const auto& entry : std::filesystem::directory_iterator(entity_dir)) {
             if (!entry.is_regular_file()) continue;
@@ -2097,10 +2097,10 @@ void editor_input_update(EditorState& editor, WorldMap& map, EditorRenderer& er,
         world_map_save(map, g_maps.loaded_dir + "/map.txt");
     }
 
-    // F5 rescan assets/ for new/removed props
+    // F5 rescan assets/props for new/removed props
     bool f5_down = glfwGetKey(window, GLFW_KEY_F5) == GLFW_PRESS;
     if (f5_down && !s_f5_last){
-        editor_scan_props(editor, "../assets");
+        editor_scan_props(editor, "../assets/props");
         editor.prop_page = 0;
         std::cout<< "[editor] assets refreshed total=" << editor.prop_list.size() << "\n";
      }
