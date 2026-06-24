@@ -90,18 +90,22 @@ oddly specific premise
 
 **Requirements:** CMake 3.x, a C++17 compiler, OpenGL 3.3+
 
+**Download Dependencies available via Drive Link:** [Google Drive](https://drive.google.com/drive/folders/1HXlKvaPrwI-AJZNiK7k1ehtWSCPX0YoA?usp=drive_link)
+- Place `vendor/` in project root → `byahengine/vendor/`
+- Place `props/` in assets → `byahengine/assets/props/`
+
 ```bash
 git clone https://github.com/SelwynLatog/byahengine
+cd byahengine
 ```
-**Download Dependencies available via Drive Link**
-- https://drive.google.com/drive/folders/1HXlKvaPrwI-AJZNiK7k1ehtWSCPX0YoA?usp=drive_link
-- Place vendor/ in project root -> byahengine/vendor
-- Place props/ in assets/ -> byahengine/assets/props
 
+**Windows:** run `run.ps1`  
+**Linux:** run `./run.sh`
+
+Or manually:
 ```bash
-cd byahengine/build
-cmake ..
-cmake --build .
+mkdir build && cd build
+cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+mingw32-make -j4
+./byahengine
 ```
-
-Then run `run.ps1` on Windows, or execute the binary directly from `build/`.
