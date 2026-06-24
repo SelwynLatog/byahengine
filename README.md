@@ -94,9 +94,9 @@ oddly specific premise
 git clone https://github.com/SelwynLatog/byahengine
 ```
 **Download Dependencies available via Drive Link**
-https://drive.google.com/drive/folders/1HXlKvaPrwI-AJZNiK7k1ehtWSCPX0YoA?usp=drive_link
-Place vendor/ in project root -> byahengine/vendor
-Place props/ in assets/ -> byahengine/assets/props
+- https://drive.google.com/drive/folders/1HXlKvaPrwI-AJZNiK7k1ehtWSCPX0YoA?usp=drive_link
+- Place vendor/ in project root -> byahengine/vendor
+- Place props/ in assets/ -> byahengine/assets/props
 
 ```bash
 cd byahengine/build
