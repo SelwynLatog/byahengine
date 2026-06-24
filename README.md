@@ -93,6 +93,8 @@ oddly specific premise
 **Download Dependencies available via Drive Link:** [Google Drive](https://drive.google.com/drive/folders/1HXlKvaPrwI-AJZNiK7k1ehtWSCPX0YoA?usp=drive_link)
 - Place `vendor/` in project root → `byahengine/vendor/`
 - Place `props/` in assets → `byahengine/assets/props/`
+- Place all contents inside `entity/` to -> `byahengine/assets/entity` or simply replace the folder entirely
+Make sure there is no subfolder duplicate layering eg. `assets/props/props/file.obj` should just be -> `assets/props/file.obj`
 
 ```bash
 git clone https://github.com/SelwynLatog/byahengine
