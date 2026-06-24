@@ -52,10 +52,21 @@ target_include_directories(byahengine PRIVATE
     vendor/miniaudio
 )
 
-target_link_libraries(byahengine PRIVATE
-    ${CMAKE_SOURCE_DIR}/vendor/glfw/lib/libglfw3.a
-    opengl32
-    gdi32
-    user32
-    shell32
-)
+if(WIN32)
+    target_link_libraries(tricycle-sim PRIVATE
+        ${CMAKE_SOURCE_DIR}/vendor/glfw/lib/libglfw3.a
+        opengl32
+        gdi32
+        user32
+        shell32
+    )
+else()
+    find_package(OpenGL REQUIRED)
+    target_link_libraries(tricycle-sim PRIVATE
+        ${CMAKE_SOURCE_DIR}/vendor/glfw/lib/libglfw3.a
+        OpenGL::GL
+        dl
+        pthread
+        m
+    )
+endif()
