@@ -53,7 +53,7 @@ target_include_directories(byahengine PRIVATE
 )
 
 if(WIN32)
-    target_link_libraries(tricycle-sim PRIVATE
+    target_link_libraries(byahengine PRIVATE
         ${CMAKE_SOURCE_DIR}/vendor/glfw/lib/libglfw3.a
         opengl32
         gdi32
@@ -62,7 +62,7 @@ if(WIN32)
     )
 else()
     find_package(OpenGL REQUIRED)
-    target_link_libraries(tricycle-sim PRIVATE
+    target_link_libraries(byahengine PRIVATE
         ${CMAKE_SOURCE_DIR}/vendor/glfw/lib/libglfw3.a
         OpenGL::GL
         dl
