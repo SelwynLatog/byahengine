@@ -144,7 +144,7 @@ namespace Const{
     inline constexpr float EDITOR_LOOK_SENSITIVITY = 0.003f; // radians per pixel drag
     inline constexpr float EDITOR_GRID_SNAP = 0.5f; // metres, placement snaps to this grid
     inline constexpr float EDITOR_ROTATE_SPEED = 1.5f; // radians/sec
-inline constexpr float EDITOR_SCALE_SPEED = 0.5f; // units/sec
+    inline constexpr float EDITOR_SCALE_SPEED = 0.5f; // units/sec
     inline constexpr int EDITOR_GRID_RADIUS = 50;  // grid lines extend 50m from origin
     inline constexpr int EDITOR_PAGE_SIZE = 9; // num of prop selection
     inline constexpr float EDITOR_GRID_SNAP_FINE = 0.05f;  // alt+arrows: 5cm steps
